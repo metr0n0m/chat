@@ -499,7 +499,7 @@ body { overflow: hidden; height: 100vh; }
           <div class="col-12">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="showSystemMessagesSetting">
-              <label class="form-check-label" for="showSystemMessagesSetting">?????????? ????????? ????????? ? ????</label>
+              <label class="form-check-label" for="showSystemMessagesSetting">Показывать сервисные сообщения в чате</label>
             </div>
           </div>
           <div class="col-12">
@@ -517,7 +517,7 @@ body { overflow: hidden; height: 100vh; }
         </div>
         <div id="settings-error" class="alert alert-danger mt-3 d-none"></div>
         <div id="settings-success" class="alert alert-success mt-3 d-none">Настройки сохранены.</div>
-        <button type="submit" class="btn btn-primary mt-3">Сохранить</button>
+        <button type="submit" class="btn btn-primary mt-3" id="settings-save-btn">Сохранить</button>
       </form>
     </div>
   </div></div>
@@ -904,7 +904,12 @@ function onMessageDeleted(data) {
 }
 
 function onSystemMessage(m) {
-  if (m.room_id !== currentRoomId) return;
+  if (m.scope === 'staff_call') {
+    showToast(m.content || 'Вызов персонала.', 'warning');
+    if (m.room_id !== currentRoomId || !shouldShowSystemMessages()) return;
+  } else if (m.room_id !== currentRoomId) {
+    return;
+  }
   if (!shouldShowSystemMessages()) return;
   $('#messages-list').append(`<div class="msg-system">${esc(m.content)}</div>`);
   if (isScrolledToBottom) scrollToBottom();
@@ -1361,6 +1366,13 @@ $('#friend-search').on('input', function() { loadFriends(); });
 //  SETTINGS
 // ════════════════════════════════════════════════
 function initSettings() {
+  const colorValidity = { nick_color: true, text_color: true };
+
+  function syncSettingsSaveState() {
+    const ok = colorValidity.nick_color && colorValidity.text_color;
+    $('#settings-save-btn').prop('disabled', !ok);
+  }
+
   $('#my-username').parent().closest('.sidebar-bottom').on('click', '#my-username', function() {
     const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
     $('[name="username"]').val(CURRENT_USER.username);
@@ -1369,29 +1381,46 @@ function initSettings() {
     $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
     $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
     modal.show();
+    $('[name="nick_color"]').trigger('input');
+    $('[name="text_color"]').trigger('input');
+    syncSettingsSaveState();
   });
 
-  // Color picker live preview
   function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
-    $(`[name="${pickerName}"]`).on('input', function() {
+    $(`[name="${pickerName}"]`).off('input.colorcheck').on('input.colorcheck', function() {
       const hex = $(this).val();
+      const $fb = $(`#${feedbackId}`);
       $(`#${previewLightId}`).css('color', hex);
       $(`#${previewDarkId}`).css('color', hex);
+      $fb.html('<span class="text-muted">Проверка...</span>');
+
       $.post('/api/color-check', {color: hex}, function(resp) {
-        const $fb = $(`#${feedbackId}`);
+        colorValidity[pickerName] = !!resp.valid;
         if (resp.valid) {
-          $fb.html(`<span class="text-success"><i class="fa fa-check"></i></span> Свет: ${resp.ratios.light}:1 / Тёмн: ${resp.ratios.dark}:1`);
+          $fb.html(`<span class="text-success"><i class="fa fa-check"></i></span> Свет: ${resp.ratios.light}:1 / Тёмная: ${resp.ratios.dark}:1`);
         } else {
           $fb.html(`<span class="text-danger"><i class="fa fa-times"></i> ${esc(resp.error)}</span>`);
         }
+        syncSettingsSaveState();
+      }, 'json').fail(function() {
+        colorValidity[pickerName] = false;
+        $fb.html('<span class="text-danger"><i class="fa fa-times"></i> Не удалось проверить цвет.</span>');
+        syncSettingsSaveState();
       });
     });
   }
-  updateColorPreview('nick_color',  'nick-preview-light',  'nick-preview-dark',  'nick-color-feedback');
-  updateColorPreview('text_color',  'text-preview-light',  'text-preview-dark',  'text-color-feedback');
 
-  $('#settingsForm').on('submit', function(e) {
+  updateColorPreview('nick_color', 'nick-preview-light', 'nick-preview-dark', 'nick-color-feedback');
+  updateColorPreview('text_color', 'text-preview-light', 'text-preview-dark', 'text-color-feedback');
+
+  $('#settingsForm').off('submit').on('submit', function(e) {
     e.preventDefault();
+    syncSettingsSaveState();
+    if ($('#settings-save-btn').prop('disabled')) {
+      $('#settings-error').text('Выбранный цвет плохо читается на теме. Исправьте цвета и сохраните снова.').removeClass('d-none');
+      return;
+    }
+
     const fd = new FormData(this);
     fd.set('csrf_token', CSRF_TOKEN);
     $('#settings-error').addClass('d-none');
@@ -1404,7 +1433,9 @@ function initSettings() {
       contentType: false,
       success: function(resp) {
         if (resp.success) {
-          if (resp.user) { Object.assign(CURRENT_USER, resp.user); }
+          if (resp.user) {
+            Object.assign(CURRENT_USER, resp.user);
+          }
           localStorage.setItem('show_system_messages', $('#showSystemMessagesSetting').is(':checked') ? '1' : '0');
           $('#settings-success').removeClass('d-none');
           initUser();
@@ -1413,17 +1444,16 @@ function initSettings() {
           }
           setTimeout(() => location.reload(), 250);
         } else {
-          $('#settings-error').text(resp.error).removeClass('d-none');
+          $('#settings-error').text(resp.error || 'Не удалось сохранить настройки.').removeClass('d-none');
         }
       },
       error: function(xhr) {
-        const err = xhr.responseJSON?.error || 'Ошибка сохранения';
+        const err = xhr.responseJSON?.error || 'Не удалось сохранить настройки.';
         $('#settings-error').text(err).removeClass('d-none');
       }
     });
   });
 }
-
 // ════════════════════════════════════════════════
 //  SIDEBAR TOGGLE
 // ════════════════════════════════════════════════
@@ -1527,14 +1557,14 @@ function loadAdminUsers(page) {
   const search = $('#admin-user-search').val();
   $.get('/api/admin/users', {page, search}, function(resp) {
     if (!resp.success) return;
-    let html = '<table class="table table-sm table-hover"><thead><tr><th>ID</th><th>????????????</th><th>Email</th><th>?????????? ????</th><th>???</th><th>???????? ??????</th><th></th></tr></thead><tbody>';
+    let html = '<table class="table table-sm table-hover"><thead><tr><th>ID</th><th>Пользователь</th><th>Email</th><th>Глобальная роль</th><th>Бан</th><th>Создание комнат</th><th></th></tr></thead><tbody>';
     resp.users.forEach(u => {
       html += `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.email||'')}</td>
-        <td><select class="form-select form-select-sm user-role-sel" data-id="${u.id}" style="width:auto">
-          <option value="user" ${u.global_role==='user'?'selected':''}>????????????</option>
-          <option value="moderator" ${u.global_role==='moderator'?'selected':''}>?????????? ?????????</option>
-          <option value="admin" ${u.global_role==='admin'?'selected':''}>?????????? ?????????????</option>
-          <option value="platform_owner" ${u.global_role==='platform_owner'?'selected':''}>???????? ?????????</option>
+        <td><select class="form-select form-select-sm user-role-sel" data-id="${u.id}" data-prev="${u.global_role}" style="width:auto">
+          <option value="user" ${u.global_role==='user'?'selected':''}>Пользователь</option>
+          <option value="moderator" ${u.global_role==='moderator'?'selected':''}>Глобальный модератор</option>
+          <option value="admin" ${u.global_role==='admin'?'selected':''}>Глобальный администратор</option>
+          <option value="platform_owner" ${u.global_role==='platform_owner'?'selected':''}>Владелец платформы</option>
         </select></td>
         <td><input type="checkbox" class="form-check-input user-ban-cb" data-id="${u.id}" ${u.is_banned?'checked':''}></td>
         <td><input type="checkbox" class="form-check-input user-room-cb" data-id="${u.id}" ${u.can_create_room?'checked':''}></td>
@@ -1545,35 +1575,78 @@ function loadAdminUsers(page) {
   });
 }
 
-$('#admin-users-table').on('change', '.user-role-sel', function() {
-  const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, global_role: $(this).val()}, () => showToast('?????????? ???? ?????????.'));
+$('#admin-users-table').off('change', '.user-role-sel').on('change', '.user-role-sel', function() {
+  const $select = $(this);
+  const id = $select.data('id');
+  const prev = $select.attr('data-prev');
+  const next = $select.val();
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, global_role: next}, function(resp) {
+    if (resp.success) {
+      $select.attr('data-prev', next);
+      showToast('Глобальная роль обновлена.', 'success');
+      return;
+    }
+    $select.val(prev);
+    showToast(resp.error || 'Не удалось изменить роль.', 'danger');
+  }, 'json').fail(function(xhr) {
+    $select.val(prev);
+    showToast(xhr.responseJSON?.error || 'Не удалось изменить роль.', 'danger');
+  });
 });
-$('#admin-users-table').on('change', '.user-ban-cb', function() {
-  const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, is_banned: this.checked ? 1 : 0}, () => showToast('?????? ???? ????????.'));
+
+$('#admin-users-table').off('change', '.user-ban-cb').on('change', '.user-ban-cb', function() {
+  const $cb = $(this);
+  const id = $cb.data('id');
+  const prev = !$cb.is(':checked');
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, is_banned: $cb.is(':checked') ? 1 : 0}, function(resp) {
+    if (resp.success) {
+      showToast('Статус бана обновлён.', 'success');
+      return;
+    }
+    $cb.prop('checked', prev);
+    showToast(resp.error || 'Не удалось обновить бан.', 'danger');
+  }, 'json').fail(function(xhr) {
+    $cb.prop('checked', prev);
+    showToast(xhr.responseJSON?.error || 'Не удалось обновить бан.', 'danger');
+  });
 });
-$('#admin-users-table').on('change', '.user-room-cb', function() {
-  const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, can_create_room: this.checked ? 1 : 0}, () => showToast('????? ?????????.'));
+
+$('#admin-users-table').off('change', '.user-room-cb').on('change', '.user-room-cb', function() {
+  const $cb = $(this);
+  const id = $cb.data('id');
+  const prev = !$cb.is(':checked');
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, can_create_room: $cb.is(':checked') ? 1 : 0}, function(resp) {
+    if (resp.success) {
+      showToast('Право на создание комнат обновлено.', 'success');
+      return;
+    }
+    $cb.prop('checked', prev);
+    showToast(resp.error || 'Не удалось обновить право.', 'danger');
+  }, 'json').fail(function(xhr) {
+    $cb.prop('checked', prev);
+    showToast(xhr.responseJSON?.error || 'Не удалось обновить право.', 'danger');
+  });
 });
-$('#admin-users-table').on('click', '.user-del-btn', function() {
-  const id = $(this).data('id');
-  if (!confirm('??????? ?????????????')) return;
-  $.ajax({url:`/api/admin/users/${id}`,method:'DELETE',data:{csrf_token:CSRF_TOKEN},success:()=>{ showToast('???????????? ??????.'); loadAdminUsers(); }});
-});
-$('#admin-users-table').on('change', '.user-ban-cb', function() {
-  const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, is_banned: this.checked ? 1 : 0}, () => showToast('Обновлено.'));
-});
-$('#admin-users-table').on('change', '.user-room-cb', function() {
-  const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, can_create_room: this.checked ? 1 : 0}, () => showToast('Обновлено.'));
-});
-$('#admin-users-table').on('click', '.user-del-btn', function() {
+
+$('#admin-users-table').off('click', '.user-del-btn').on('click', '.user-del-btn', function() {
   const id = $(this).data('id');
   if (!confirm('Удалить пользователя?')) return;
-  $.ajax({url:`/api/admin/users/${id}`,method:'DELETE',data:{csrf_token:CSRF_TOKEN},success:()=>{ showToast('Удалён.'); loadAdminUsers(); }});
+  $.ajax({
+    url: `/api/admin/users/${id}`,
+    method: 'DELETE',
+    data: {csrf_token: CSRF_TOKEN},
+    success: function(resp) {
+      if (resp.success) {
+        showToast('Пользователь удалён.', 'success');
+        loadAdminUsers();
+      } else {
+        showToast(resp.error || 'Не удалось удалить пользователя.', 'danger');
+      }
+    },
+    error: function(xhr) {
+      showToast(xhr.responseJSON?.error || 'Не удалось удалить пользователя.', 'danger');
+    }
+  });
 });
 
 function loadAdminRooms() {
@@ -1648,7 +1721,7 @@ function roleLabel(role) {
 }
 
 function roomRoleLabel(role) {
-  return {owner:'Владелец комнаты', local_admin:'Локальный админ', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
+  return {owner:'Владелец комнаты', local_admin:'Локальный администратор', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
 }
 
 <?php endif; ?>

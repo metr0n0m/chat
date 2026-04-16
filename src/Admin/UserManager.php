@@ -55,7 +55,7 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('???????????? ?? ??????.', 404);
+            self::jsonError('Пользователь не найден.', 404);
         }
 
         self::assertRoleManagementAllowed($actor, $target, $targetId, $data);
@@ -73,7 +73,7 @@ class UserManager
 
             if ($field === 'global_role') {
                 if (!in_array($value, ['platform_owner', 'admin', 'moderator', 'user'], true)) {
-                    self::jsonError('???????????? ????.');
+                    self::jsonError('Недопустимая роль.');
                 }
             } else {
                 $value = (int) (bool) $value;
@@ -84,7 +84,7 @@ class UserManager
         }
 
         if ($set === []) {
-            self::jsonError('??? ?????? ??? ??????????.');
+            self::jsonError('Нет данных для обновления.');
         }
 
         $params[] = $targetId;
@@ -104,7 +104,7 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('???????????? ?? ??????.', 404);
+            self::jsonError('Пользователь не найден.', 404);
         }
 
         self::assertHigherRole($actor, $target, $targetId);
@@ -316,22 +316,25 @@ class UserManager
 
     private static function assertRoleManagementAllowed(array $actor, array $target, int $targetId, array $data): void
     {
-        self::assertHigherRole($actor, $target, $targetId);
+        $actorRole = (string) ($actor['global_role'] ?? 'user');
+        $actorId = (int) ($actor['id'] ?? 0);
+        $targetRole = (string) ($target['global_role'] ?? 'user');
+
+        if ($actorId === $targetId) {
+            self::jsonError('Нельзя менять собственные административные права через админку.', 403);
+        }
+
+        if (self::roleLevel($actorRole) <= self::roleLevel($targetRole)) {
+            self::jsonError('Можно изменять только пользователей с более низкой ролью.', 403);
+        }
 
         if (!array_key_exists('global_role', $data)) {
             return;
         }
 
         $newRole = (string) $data['global_role'];
-        $actorRole = (string) ($actor['global_role'] ?? 'user');
-        $actorId = (int) ($actor['id'] ?? 0);
-
-        if ($actorId === $targetId && $newRole !== $actorRole) {
-            self::jsonError('?????? ?????? ??????????? ?????????? ????.', 403);
-        }
-
-        if (self::roleLevel($newRole) >= self::roleLevel($actorRole) && $newRole !== $actorRole) {
-            self::jsonError('?????? ????????? ???? ?? ???? ?????.', 403);
+        if (self::roleLevel($newRole) >= self::roleLevel($actorRole)) {
+            self::jsonError('Нельзя назначать роль не ниже собственной.', 403);
         }
     }
 
@@ -342,11 +345,11 @@ class UserManager
         $targetRole = (string) ($target['global_role'] ?? 'user');
 
         if ($actorId === $targetId) {
-            self::jsonError('?????? ?????? ??????????? ??????.', 403);
+            self::jsonError('Нельзя удалять или изменять собственную административную запись.', 403);
         }
 
         if (self::roleLevel($actorRole) <= self::roleLevel($targetRole)) {
-            self::jsonError('????? ?????? ?????? ?????? ????????????? ???? ????.', 403);
+            self::jsonError('Можно управлять только пользователями с более низкой ролью.', 403);
         }
     }
 

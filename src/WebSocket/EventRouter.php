@@ -401,6 +401,7 @@ class EventRouter
 
         $message = [
             'room_id' => $roomId,
+            'scope' => 'staff_call',
             'content' => sprintf(
                 'Вызов персонала: %s позвал(а) в комнату "%s".',
                 (string) ($session['username'] ?? 'Пользователь'),
@@ -422,4 +423,6 @@ class EventRouter
             ]);
         }
     }
+
 }
+
