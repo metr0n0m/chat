@@ -137,6 +137,10 @@ class EventRouter
             'event'   => 'new_message',
             'message' => $result,
         ]);
+
+        if (str_contains((string) ($data['content'] ?? ''), '@!')) {
+            $this->notifyGlobalStaffCall($roomId, $session);
+        }
     }
 
     private function onDeleteMessage(ConnectionInterface $conn, array $session, array $data): void
@@ -385,5 +389,37 @@ class EventRouter
             'avatar_url'  => $session['avatar_url'],
             'global_role' => $session['global_role'],
         ];
+    }
+
+    private function notifyGlobalStaffCall(int $roomId, array $session): void
+    {
+        $db = Connection::getInstance();
+        $room = $db->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId]);
+        $staff = $db->fetchAll(
+            "SELECT id FROM users WHERE global_role IN ('platform_owner', 'admin', 'moderator') AND is_banned = 0"
+        );
+
+        $message = [
+            'room_id' => $roomId,
+            'content' => sprintf(
+                'Вызов персонала: %s позвал(а) в комнату "%s".',
+                (string) ($session['username'] ?? 'Пользователь'),
+                (string) ($room['name'] ?? ('#' . $roomId))
+            ),
+            'type' => 'system',
+            'created_at' => date('Y-m-d H:i:s.000'),
+        ];
+
+        foreach ($staff as $member) {
+            $staffId = (int) ($member['id'] ?? 0);
+            if ($staffId === (int) ($session['id'] ?? 0)) {
+                continue;
+            }
+
+            $this->cm->sendToUser($staffId, [
+                'event' => 'system_message',
+                'message' => $message,
+            ]);
+        }
     }
 }

@@ -950,10 +950,10 @@ function visibleRoleClass(u) {
   return 'bg-secondary';
 }
 
-function insertMention(username) {
+function insertMention(username, prefix = '@i+') {
   const $input = $('#msg-input');
   const base = $input.val();
-  const mention = `@${username} `;
+  const mention = `${prefix}${username} `;
   $input.val(base ? `${base}${base.endsWith(' ') ? '' : ' '}${mention}` : mention).trigger('input').focus();
 }
 
@@ -1103,7 +1103,7 @@ $('#online-users-list').on('click', '.online-user-avatar, .online-user-main', fu
   const $user = $(this).closest('.online-user');
   const uid = Number($user.data('id'));
   const uname = $user.data('username');
-  if (uid !== Number(CURRENT_USER.id)) insertMention(uname);
+  if (uid !== Number(CURRENT_USER.id)) insertMention(uname, '@i+');
 });
 
 $('#online-users-list').on('click', '.user-action-btn', function(e) {
@@ -1115,10 +1115,10 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
 
   switch (action) {
     case 'mention':
-      if (uid !== Number(CURRENT_USER.id)) insertMention(uname);
+      if (uid !== Number(CURRENT_USER.id)) insertMention(uname, '@i+');
       break;
     case 'whisper':
-      if (uid !== Number(CURRENT_USER.id)) activateWhisperMode(uid, uname);
+      if (uid !== Number(CURRENT_USER.id)) { insertMention(uname, '@p+'); activateWhisperMode(uid, uname); }
       break;
     case 'invite':
       wsSend('invite_user', {to_user_id: uid});
@@ -1173,9 +1173,10 @@ $(document).on('click', '#ctx-menu a', function(e) {
 
   switch (action) {
     case 'mention':
-      insertMention(uname);
+      insertMention(uname, '@i+');
       break;
     case 'whisper':
+      insertMention(uname, '@p+');
       activateWhisperMode(uid, uname);
       break;
     case 'invite':

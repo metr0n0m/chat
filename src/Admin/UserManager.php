@@ -10,6 +10,12 @@ use Chat\Security\Session;
 
 class UserManager
 {
+    private const GLOBAL_ROLE_LEVELS = [
+        'user' => 1,
+        'moderator' => 2,
+        'admin' => 3,
+        'platform_owner' => 4,
+    ];
     public static function list(int $page = 1, string $search = ''): void
     {
         $db = Connection::getInstance();
@@ -49,8 +55,10 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('Пользователь не найден.', 404);
+            self::jsonError('???????????? ?? ??????.', 404);
         }
+
+        self::assertRoleManagementAllowed($actor, $target, $targetId, $data);
 
         $allowed = ['global_role', 'is_banned', 'can_create_room'];
         $set = [];
@@ -65,13 +73,7 @@ class UserManager
 
             if ($field === 'global_role') {
                 if (!in_array($value, ['platform_owner', 'admin', 'moderator', 'user'], true)) {
-                    self::jsonError('Недопустимая роль.');
-                }
-                if (($actor['global_role'] ?? 'user') !== 'platform_owner' && in_array($value, ['platform_owner', 'admin'], true)) {
-                    self::jsonError('Недостаточно прав.', 403);
-                }
-                if (($actor['global_role'] ?? 'user') !== 'platform_owner' && in_array($target['global_role'] ?? 'user', ['platform_owner', 'admin'], true)) {
-                    self::jsonError('Недостаточно прав.', 403);
+                    self::jsonError('???????????? ????.');
                 }
             } else {
                 $value = (int) (bool) $value;
@@ -82,7 +84,7 @@ class UserManager
         }
 
         if ($set === []) {
-            self::jsonError('Нет данных для обновления.');
+            self::jsonError('??? ?????? ??? ??????????.');
         }
 
         $params[] = $targetId;
@@ -102,12 +104,10 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('Пользователь не найден.', 404);
+            self::jsonError('???????????? ?? ??????.', 404);
         }
 
-        if (($actor['global_role'] ?? 'user') !== 'platform_owner' && in_array($target['global_role'] ?? 'user', ['platform_owner', 'admin'], true)) {
-            self::jsonError('Недостаточно прав.', 403);
-        }
+        self::assertHigherRole($actor, $target, $targetId);
 
         $db->execute('DELETE FROM users WHERE id = ?', [$targetId]);
         self::jsonSuccess(['deleted' => true]);
@@ -313,6 +313,47 @@ class UserManager
         return AVATAR_URL_PREFIX . '/' . $userId . '.jpg?t=' . time();
     }
 
+
+    private static function assertRoleManagementAllowed(array $actor, array $target, int $targetId, array $data): void
+    {
+        self::assertHigherRole($actor, $target, $targetId);
+
+        if (!array_key_exists('global_role', $data)) {
+            return;
+        }
+
+        $newRole = (string) $data['global_role'];
+        $actorRole = (string) ($actor['global_role'] ?? 'user');
+        $actorId = (int) ($actor['id'] ?? 0);
+
+        if ($actorId === $targetId && $newRole !== $actorRole) {
+            self::jsonError('?????? ?????? ??????????? ?????????? ????.', 403);
+        }
+
+        if (self::roleLevel($newRole) >= self::roleLevel($actorRole) && $newRole !== $actorRole) {
+            self::jsonError('?????? ????????? ???? ?? ???? ?????.', 403);
+        }
+    }
+
+    private static function assertHigherRole(array $actor, array $target, int $targetId): void
+    {
+        $actorId = (int) ($actor['id'] ?? 0);
+        $actorRole = (string) ($actor['global_role'] ?? 'user');
+        $targetRole = (string) ($target['global_role'] ?? 'user');
+
+        if ($actorId === $targetId) {
+            self::jsonError('?????? ?????? ??????????? ??????.', 403);
+        }
+
+        if (self::roleLevel($actorRole) <= self::roleLevel($targetRole)) {
+            self::jsonError('????? ?????? ?????? ?????? ????????????? ???? ????.', 403);
+        }
+    }
+
+    private static function roleLevel(string $role): int
+    {
+        return self::GLOBAL_ROLE_LEVELS[$role] ?? 0;
+    }
     private static function headRequest(string $url): array
     {
         $context = stream_context_create([
