@@ -11,7 +11,7 @@ class AdminPanel
     public static function requireAdmin(): array
     {
         $user = Session::current();
-        if (!$user || $user['global_role'] !== 'admin') {
+        if (!$user || !in_array($user['global_role'], ['platform_owner', 'admin'], true)) {
             http_response_code(403);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => 'Доступ запрещён.']);

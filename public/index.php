@@ -400,7 +400,7 @@ body { overflow: hidden; height: 100vh; }
       <div id="room-title" class="fw-bold flex-1">Выберите комнату</div>
       <div id="room-online-count" class="text-muted small"></div>
       <button id="room-manage-btn" class="btn btn-sm btn-outline-secondary d-none" title="Управление"><i class="fa fa-cog"></i></button>
-      <?php if ($user['global_role'] === 'admin'): ?>
+      <?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
       <a href="#" id="admin-btn" class="btn btn-sm btn-outline-warning" title="Администрирование"><i class="fa fa-shield-alt"></i></a>
       <?php endif; ?>
     </div>

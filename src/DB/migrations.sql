@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `signature`       VARCHAR(300),
   `nick_color`      CHAR(7) DEFAULT '#ffffff',
   `text_color`      CHAR(7) DEFAULT '#dee2e6',
-  `global_role`     ENUM('admin','moderator','user') NOT NULL DEFAULT 'user',
+  `global_role`     ENUM('platform_owner','admin','moderator','user') NOT NULL DEFAULT 'user',
   `oauth_provider`  VARCHAR(20),
   `oauth_id`        VARCHAR(100),
   `can_create_room` TINYINT(1) DEFAULT 0,
