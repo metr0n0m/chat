@@ -1,0 +1,14 @@
+# Docker volumes
+chat_db_data/
+
+# Environment files
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/

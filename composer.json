@@ -1,0 +1,21 @@
+{
+    "name": "chat/app",
+    "description": "Production-ready web chat application",
+    "type": "project",
+    "require": {
+        "php": "^8.4",
+        "react/socket": "^1.16",
+        "react/event-loop": "^1.5",
+        "react/http": "^1.10",
+        "cboden/ratchet": "^0.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Chat\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
