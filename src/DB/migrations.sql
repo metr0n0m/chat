@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS `oauth_tokens` (
   `access_token_encrypted`  TEXT NOT NULL,
   `refresh_token_encrypted` TEXT,
   `expires_at`              DATETIME,
+  UNIQUE KEY `unique_user_provider` (`user_id`, `provider`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

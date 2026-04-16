@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
-use Chat\Security\{HMAC, CSRF};
+use Chat\Security\HMAC;
 
 class MessageController
 {
@@ -26,18 +26,17 @@ class MessageController
             self::jsonError('Нет доступа.', 403);
         }
 
-        $db     = Connection::getInstance();
-        $params = [$roomId];
-        $where  = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type != ?';
-        $params[] = 'whisper';
+        $db = Connection::getInstance();
+        $params = [$roomId, 'whisper'];
+        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type != ?';
 
-        if ($beforeId) {
-            $where   .= ' AND m.id < ?';
+        if ($beforeId !== null) {
+            $where .= ' AND m.id < ?';
             $params[] = $beforeId;
         }
 
         $messages = $db->fetchAll(
-            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at,
+            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.content_hmac,
                     u.username, u.nick_color, u.text_color, u.avatar_url, u.global_role,
                     rm.room_role
              FROM messages m
@@ -49,57 +48,57 @@ class MessageController
             $params
         );
 
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'messages' => array_reverse($messages)]);
+        $messages = array_values(array_filter($messages, static function (array $message): bool {
+            return HMAC::verify((string) $message['content'], (string) $message['content_hmac']);
+        }));
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'messages' => array_reverse($messages)], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
     public static function send(int $roomId, int $actorId, array $actor, array $data): array
     {
-        if (!self::canPost($roomId, $actorId, $actor['global_role'])) {
+        if (!self::canPost($roomId, $actorId, (string) $actor['global_role'])) {
             return ['error' => 'Нет доступа к комнате.'];
         }
 
-        $raw = trim($data['content'] ?? '');
-        if (!$raw || mb_strlen($raw) > 2000) {
+        $raw = trim((string) ($data['content'] ?? ''));
+        if ($raw === '' || mb_strlen($raw) > 2000) {
             return ['error' => 'Сообщение пустое или слишком длинное.'];
         }
 
         $content = self::format($raw);
-        $hmac    = HMAC::sign($content);
-        $db      = Connection::getInstance();
+        $hmac = HMAC::sign($content);
+        $db = Connection::getInstance();
 
-        $embedData = null;
-        $embed     = EmbedProcessor::process($raw);
-        if ($embed) {
-            $embedData = json_encode($embed);
-        }
+        $embed = EmbedProcessor::process($raw);
+        $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
 
         $db->execute(
             'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
             [$roomId, $actorId, $content, $hmac, 'text', $embedData]
         );
-        $msgId = (int) $db->lastInsertId();
 
         return [
-            'id'         => $msgId,
-            'room_id'    => $roomId,
-            'user_id'    => $actorId,
-            'username'   => $actor['username'],
+            'id' => (int) $db->lastInsertId(),
+            'room_id' => $roomId,
+            'user_id' => $actorId,
+            'username' => $actor['username'],
             'nick_color' => $actor['nick_color'],
             'text_color' => $actor['text_color'],
             'avatar_url' => $actor['avatar_url'],
-            'global_role'=> $actor['global_role'],
-            'content'    => $content,
+            'global_role' => $actor['global_role'],
+            'content' => $content,
             'embed_data' => $embed,
-            'type'       => 'text',
+            'type' => 'text',
             'created_at' => date('Y-m-d H:i:s.000'),
         ];
     }
 
     public static function delete(int $messageId, int $actorId, array $actor): array
     {
-        $db  = Connection::getInstance();
+        $db = Connection::getInstance();
         $msg = $db->fetchOne(
             'SELECT id, room_id, user_id FROM messages WHERE id = ? AND is_deleted = 0',
             [$messageId]
@@ -113,23 +112,28 @@ class MessageController
             return ['error' => 'Нет прав.'];
         }
 
-        $db->execute(
-            'UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE id = ?',
-            [$actorId, $messageId]
-        );
+        $db->execute('UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE id = ?', [$actorId, $messageId]);
 
         return ['deleted' => true, 'message_id' => $messageId, 'room_id' => (int) $msg['room_id']];
     }
 
     private static function canDelete(array $msg, int $actorId, array $actor): bool
     {
-        if (in_array($actor['global_role'], ['admin', 'moderator'], true)) {
+        $globalRole = (string) ($actor['global_role'] ?? 'user');
+        if (in_array($globalRole, ['platform_owner', 'admin'], true)) {
             return true;
         }
-        $db       = Connection::getInstance();
+
+        if ($globalRole === 'moderator') {
+            $db = Connection::getInstance();
+            $room = $db->fetchOne('SELECT type FROM rooms WHERE id = ?', [(int) $msg['room_id']]);
+            return $room && $room['type'] === 'public';
+        }
+
+        $db = Connection::getInstance();
         $roomRole = $db->fetchOne(
             'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
-            [$msg['room_id'], $actorId]
+            [(int) $msg['room_id'], $actorId]
         )['room_role'] ?? null;
 
         return in_array($roomRole, ['owner', 'local_admin', 'local_moderator'], true);
@@ -137,11 +141,21 @@ class MessageController
 
     private static function canPost(int $roomId, int $userId, string $globalRole): bool
     {
-        $db  = Connection::getInstance();
+        $db = Connection::getInstance();
         $room = $db->fetchOne('SELECT type, is_closed FROM rooms WHERE id = ?', [$roomId]);
-        if (!$room || $room['is_closed']) {
+
+        if (!$room || (int) $room['is_closed'] === 1) {
             return false;
         }
+
+        if ($room['type'] === 'public') {
+            $member = $db->fetchOne(
+                'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+                [$roomId, $userId]
+            );
+            return !$member || $member['room_role'] !== 'banned';
+        }
+
         $member = $db->fetchOne(
             'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
             [$roomId, $userId]
@@ -149,35 +163,48 @@ class MessageController
         if (!$member || $member['room_role'] === 'banned') {
             return false;
         }
-        if ($room['type'] === 'numer' && $globalRole !== 'user') {
-            // admins/mods only if explicitly member
-            return true;
+
+        if ($room['type'] === 'numer' && $globalRole === 'moderator') {
+            return false;
         }
+
         return true;
     }
 
     private static function canAccess(int $roomId, int $userId, string $globalRole): bool
     {
-        $db   = Connection::getInstance();
+        $db = Connection::getInstance();
         $room = $db->fetchOne('SELECT type, is_closed FROM rooms WHERE id = ?', [$roomId]);
-        if (!$room) {
+
+        if (!$room || (int) $room['is_closed'] === 1) {
             return false;
         }
-        if ($globalRole === 'admin') {
+
+        if (in_array($globalRole, ['platform_owner', 'admin'], true)) {
             return true;
         }
+
+        if ($room['type'] === 'public') {
+            $member = $db->fetchOne(
+                'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+                [$roomId, $userId]
+            );
+            return !$member || $member['room_role'] !== 'banned';
+        }
+
         $member = $db->fetchOne(
             'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
             [$roomId, $userId]
         );
+
         return $member && $member['room_role'] !== 'banned';
     }
 
-    private static function jsonError(string $msg, int $code = 400): never
+    private static function jsonError(string $message, int $code = 400): never
     {
         http_response_code($code);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => $msg]);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
