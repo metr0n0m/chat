@@ -244,13 +244,11 @@ body { overflow: hidden; height: 100vh; }
 #chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 #chat-header { padding: 10px 16px; border-bottom: 1px solid var(--bs-border-color); display: flex; align-items: center; gap: 10px; }
 #messages-container { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
-.msg { display: flex; gap: 10px; padding: 4px 0; }
-.msg-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.msg-avatar-placeholder { width: 36px; height: 36px; border-radius: 50%; background: var(--bs-secondary-bg); display: flex; align-items: center; justify-content: center; font-size: .75rem; flex-shrink: 0; }
-.msg-body { flex: 1; min-width: 0; }
-.msg-meta { font-size: .8rem; color: var(--bs-secondary-color); }
-.msg-username { font-weight: 600; margin-right: 6px; }
-.msg-content { font-size: .93rem; word-break: break-word; }
+.msg { padding: 4px 0; }
+.msg-body { min-width: 0; }
+.msg-meta { font-size: .8rem; color: var(--bs-secondary-color); display: flex; align-items: center; gap: 8px; }
+.msg-username { font-weight: 600; }
+.msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; }
 .msg-system { text-align: center; font-style: italic; color: var(--bs-secondary-color); font-size: .82rem; padding: 2px 0; }
 .msg-whisper { background: rgba(108,117,125,.08); border-left: 3px solid #6c757d; padding: 4px 10px; border-radius: 0 6px 6px 0; font-style: italic; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
@@ -269,12 +267,16 @@ body { overflow: hidden; height: 100vh; }
 /* Right panel */
 #panel-right { width: var(--right-panel-w); min-width: var(--right-panel-w); border-left: 1px solid var(--bs-border-color); overflow-y: auto; background: var(--bs-body-bg); }
 #panel-right .panel-header { padding: 10px 12px; border-bottom: 1px solid var(--bs-border-color); font-size: .85rem; font-weight: 600; }
-.online-user { padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.online-user { padding: 10px 12px; display: grid; grid-template-columns: 42px 1fr; gap: 8px 10px; align-items: start; }
 .online-user:hover { background: var(--bs-secondary-bg); }
-.online-user-avatar { position: relative; }
-.online-user-avatar img, .online-user-avatar .avatar-ph { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.online-user-avatar .avatar-ph { background: var(--bs-secondary-bg); display: flex; align-items: center; justify-content: center; font-size: .7rem; }
-.whisper-icon { position: absolute; bottom: -2px; right: -4px; font-size: .6rem; color: var(--bs-secondary-color); cursor: pointer; }
+.online-user-avatar { position: relative; width: 42px; cursor: pointer; }
+.online-user-avatar img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; display: block; }
+.online-user-main { min-width: 0; cursor: pointer; }
+.online-user-name { font-size: .9rem; font-weight: 600; line-height: 1.2; }
+.online-user-role { margin-top: 4px; }
+.online-user-actions { grid-column: 1 / span 2; display: flex; gap: 6px; padding-top: 2px; }
+.user-action-btn { width: 28px; height: 28px; border: 1px solid var(--bs-border-color); background: transparent; border-radius: 6px; color: var(--bs-secondary-color); display: inline-flex; align-items: center; justify-content: center; }
+.user-action-btn:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); }
 
 /* Embeds */
 .embed-yt { position: relative; display: inline-block; max-width: 300px; }
@@ -602,12 +604,15 @@ $('#themeToggle').on('click', function() {
 // ════════════════════════════════════════════════
 let ws = null;
 let currentRoomId = null;
+let currentRoomRole = null;
+let currentOnlineUsers = [];
 let whisperToId   = null;
 let whisperToName = null;
 let isScrolledToBottom = true;
 let oldestMessageId = null;
 let rooms = [];
 let numera = [];
+const ignoredUserIds = new Set();
 const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 
 // ════════════════════════════════════════════════
@@ -646,6 +651,7 @@ function initUser() {
   $('#my-username').text(CURRENT_USER.username).css('color', CURRENT_USER.nick_color);
   $('#my-role-badge').text(roleLabel(CURRENT_USER.global_role));
   $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
+  $('#my-avatar').off('error').on('error', function(){ this.onerror = null; this.src = DEFAULT_AVATAR_URL; });
 }
 
 
@@ -726,10 +732,7 @@ function loadRooms() {
     rooms = resp.rooms;
     const $list = $('#rooms-list').empty();
     rooms.forEach(r => {
-      const $item = $(`<div class="room-item" data-id="${r.id}">
-        <span class="room-name">${esc(r.name)}</span>
-        <span class="badge bg-secondary ms-1">${r.member_count||0}</span>
-      </div>`);
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span></div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id));
       $list.append($item);
@@ -743,10 +746,8 @@ function loadRooms() {
     numera = resp.numera;
     const $list = $('#numera-list').empty();
     numera.forEach(r => {
-      const $item = $(`<div class="room-item" data-id="${r.id}">
-        <span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span>
-        <span class="badge bg-secondary ms-1">${r.member_count||0}</span>
-      </div>`);
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span></div>`);
+      if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id, true));
       $list.append($item);
     });
@@ -754,21 +755,19 @@ function loadRooms() {
 }
 
 function joinRoom(roomId, isNumer) {
+  if (currentRoomId === roomId) return;
   if (currentRoomId) wsSend('leave_room', {room_id: currentRoomId});
   currentRoomId = roomId;
+  currentRoomRole = null;
   oldestMessageId = null;
   clearWhisperMode();
   $('#messages-list').empty();
   $('#load-more-btn-wrap').addClass('d-none');
 
-  // Update active
   $('.room-item').removeClass('active');
   $(`.room-item[data-id="${roomId}"]`).addClass('active');
 
-  // Load history
   loadHistory(roomId);
-
-  // Join via WS
   wsSend('join_room', {room_id: roomId});
 }
 
@@ -783,10 +782,11 @@ function loadHistory(roomId, before) {
     if (msgs.length > 0) oldestMessageId = msgs[0].id;
 
     if (before) {
-      // Prepend
       const $list = $('#messages-list');
       const prevScrollH = $('#messages-container')[0].scrollHeight;
-      msgs.forEach(m => $list.prepend(buildMessage(m)));
+      msgs.forEach(m => {
+        if (shouldRenderMessage(m)) $list.prepend(buildMessage(m));
+      });
       const newScrollH = $('#messages-container')[0].scrollHeight;
       $('#messages-container').scrollTop(newScrollH - prevScrollH);
     } else {
@@ -803,16 +803,15 @@ $('#load-more-btn').on('click', function() {
 });
 
 function onRoomJoined(data) {
-  const room = rooms.find(r => r.id === data.room_id) || numera.find(r => r.id === data.room_id) || {name: 'Нумер'};
+  const room = rooms.find(r => r.id === data.room_id) || numera.find(r => r.id === data.room_id) || {name: 'Комната'};
+  currentRoomRole = data.my_role || null;
   $('#room-title').text(room.name || 'Комната');
   renderOnlineList(data.online || []);
-  $('#panel-online-count').text((data.online||[]).length);
-  $('#room-online-count').text((data.online||[]).length + ' онлайн');
+  $('#panel-online-count').text((data.online || []).length);
+  $('#room-online-count').text(`${(data.online || []).length} онлайн`);
 
-  const canManage = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) ||
-    ['owner','local_admin','local_moderator'].includes(data.my_role);
+  const canManage = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || ['owner', 'local_admin', 'local_moderator'].includes(data.my_role);
   $('#room-manage-btn').toggleClass('d-none', !canManage);
-  $('#send-btn').prop('disabled', $('#msg-input').val().trim().length === 0);
   $('#send-btn').prop('disabled', $('#msg-input').val().trim().length === 0);
 }
 
@@ -830,35 +829,28 @@ function onUserLeft(data) {
 //  MESSAGES
 // ════════════════════════════════════════════════
 function buildMessage(m) {
+  if (m.type === 'system') {
+    return `<div class="msg-system">${esc(m.content)}</div>`;
+  }
+
   const time = dayjs(m.created_at).format('HH:mm:ss');
-  const avatarHtml = `<img src="${esc(m.avatar_url || DEFAULT_AVATAR_URL)}" class="msg-avatar" alt="" referrerpolicy="no-referrer">`;
-
-  const roleBadge = m.global_role && m.global_role !== 'user'
-    ? `<span class="badge bg-${m.global_role==='platform_owner'?'dark':(m.global_role==='admin'?'danger':'warning')} me-1" style="font-size:.65rem">${roleLabel(m.global_role)}</span>`
-    : '';
-  const roomRoleBadge = m.room_role && !['member','banned'].includes(m.room_role)
-    ? `<span class="badge bg-info me-1" style="font-size:.65rem">${roomRoleLabel(m.room_role)}</span>`
-    : '';
-
-  const canDelete = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) || m.user_id === CURRENT_USER.id;
+  const canDelete = canDeleteMessage(m);
   const deleteBtn = canDelete ? `<span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
 
   let embed = '';
   if (m.embed_data) {
     const ed = typeof m.embed_data === 'string' ? JSON.parse(m.embed_data) : m.embed_data;
-    embed = `<div class="mt-1">${ed.html||''}</div>`;
+    embed = `<div class="mt-1">${ed.html || ''}</div>`;
   }
 
   return `<div class="msg" id="msg-${m.id}">
-    ${avatarHtml}
     <div class="msg-body">
       <div class="msg-meta">
-        ${roleBadge}${roomRoleBadge}
-        <span class="msg-username" style="color:${esc(m.nick_color||'inherit')}">${esc(m.username)}</span>
+        <span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span>
         <span>${time}</span>
         ${deleteBtn}
       </div>
-      <div class="msg-content" style="color:${esc(m.text_color||'inherit')}">${m.content}</div>
+      <div class="msg-content" style="color:${esc(m.text_color || 'inherit')}">${m.content}</div>
       ${embed}
     </div>
   </div>`;
@@ -869,8 +861,8 @@ function buildWhisperMessage(m, isSent) {
   const from = m.from || {};
   const to   = m.to   || {};
   const label = isSent
-    ? `🤫 шёпот для <strong>@${esc(to.username||'')}</strong>`
-    : `🤫 шёпот от <strong>@${esc(from.username||'')}</strong>`;
+    ? `🤫 шёпот для <strong>@${esc(to.username || '')}</strong>`
+    : `🤫 шёпот от <strong>@${esc(from.username || '')}</strong>`;
   return `<div class="msg" id="msg-${m.message_id}">
     <div class="msg-whisper flex-1">
       <div class="msg-meta small">${label} · ${time}</div>
@@ -880,6 +872,7 @@ function buildWhisperMessage(m, isSent) {
 }
 
 function appendMessage(m) {
+  if (!shouldRenderMessage(m)) return;
   const $container = $('#messages-container');
   const atBottom = isScrolledToBottom;
   $('#messages-list').append(buildMessage(m));
@@ -907,9 +900,45 @@ function onSystemMessage(m) {
 
 function onWhisperMessage(m, isSent) {
   if (m.room_id !== currentRoomId) return;
-  const html = buildWhisperMessage(m, isSent);
-  $('#messages-list').append(html);
+  $('#messages-list').append(buildWhisperMessage(m, isSent));
   if (isScrolledToBottom) scrollToBottom();
+}
+
+function shouldRenderMessage(m) {
+  if (!m || m.type === 'system') return true;
+  const userId = Number(m.user_id || 0);
+  return !ignoredUserIds.has(userId) || userId === Number(CURRENT_USER.id);
+}
+
+function canDeleteMessage(m) {
+  if (['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role)) return true;
+  if (m.user_id === CURRENT_USER.id) return true;
+  return ['owner', 'local_admin', 'local_moderator'].includes(currentRoomRole);
+}
+
+function avatarMarkup(url, size = 42) {
+  return `<img src="${esc(url || DEFAULT_AVATAR_URL)}" width="${size}" height="${size}" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR_URL}'">`;
+}
+
+function visibleRoleLabel(u) {
+  if (u.room_role && !['member', 'banned'].includes(u.room_role)) return roomRoleLabel(u.room_role);
+  if (u.global_role && u.global_role !== 'user') return roleLabel(u.global_role);
+  return '';
+}
+
+function visibleRoleClass(u) {
+  if (u.room_role && !['member', 'banned'].includes(u.room_role)) return 'bg-info';
+  if (u.global_role === 'platform_owner') return 'bg-dark';
+  if (u.global_role === 'admin') return 'bg-danger';
+  if (u.global_role === 'moderator') return 'bg-warning text-dark';
+  return 'bg-secondary';
+}
+
+function insertMention(username) {
+  const $input = $('#msg-input');
+  const base = $input.val();
+  const mention = `@${username} `;
+  $input.val(base ? `${base}${base.endsWith(' ') ? '' : ' '}${mention}` : mention).trigger('input').focus();
 }
 
 // Delete message
@@ -1009,96 +1038,199 @@ function clearWhisperMode() {
 //  ONLINE USERS LIST
 // ════════════════════════════════════════════════
 function renderOnlineList(users) {
+  currentOnlineUsers = users.slice();
   const $list = $('#online-users-list').empty();
-  $('#panel-online-count, #room-online-count').text(users.length);
+  $('#panel-online-count').text(users.length);
+  $('#room-online-count').text(`${users.length} онлайн`);
   users.forEach(u => $list.append(buildOnlineUser(u)));
 }
 
 function addToOnlineList(u) {
   if ($(`#online-user-${u.id}`).length) return;
+  currentOnlineUsers = currentOnlineUsers.filter(item => item.id !== u.id).concat([u]);
   $('#online-users-list').append(buildOnlineUser(u));
-  const cnt = parseInt($('#panel-online-count').text()) + 1;
-  $('#panel-online-count, #room-online-count').text(cnt);
+  const cnt = Math.max(0, currentOnlineUsers.length);
+  $('#panel-online-count').text(cnt);
+  $('#room-online-count').text(`${cnt} онлайн`);
 }
 
 function removeFromOnlineList(userId) {
+  currentOnlineUsers = currentOnlineUsers.filter(item => Number(item.id) !== Number(userId));
   $(`#online-user-${userId}`).remove();
-  const cnt = Math.max(0, parseInt($('#panel-online-count').text()) - 1);
-  $('#panel-online-count, #room-online-count').text(cnt);
+  const cnt = Math.max(0, currentOnlineUsers.length);
+  $('#panel-online-count').text(cnt);
+  $('#room-online-count').text(`${cnt} онлайн`);
 }
 
 function buildOnlineUser(u) {
-  const avatar = `<img src="${esc(u.avatar_url || DEFAULT_AVATAR_URL)}" referrerpolicy="no-referrer" alt="">`;
-  const roleBadge = u.global_role && u.global_role !== 'user'
-    ? `<span class="badge bg-${u.global_role==='platform_owner'?'dark':(u.global_role==='admin'?'danger':'warning')}" style="font-size:.6rem">${roleLabel(u.global_role)}</span>`
-    : '';
+  const role = visibleRoleLabel(u);
+  const roleBadge = role ? `<span class="badge ${visibleRoleClass(u)}" style="font-size:.65rem">${role}</span>` : '';
+  const ignored = ignoredUserIds.has(Number(u.id));
   return `<div class="online-user" id="online-user-${u.id}" data-id="${u.id}" data-username="${esc(u.username)}">
-    <div class="online-user-avatar">
-      ${avatar}
-      <span class="whisper-icon" title="Шепнуть" data-id="${u.id}" data-name="${esc(u.username)}"><i class="fa fa-comment-slash"></i></span>
+    <div class="online-user-avatar" data-action="mention">${avatarMarkup(u.avatar_url, 42)}</div>
+    <div class="online-user-main" data-action="mention">
+      <div class="online-user-name" style="color:${esc(u.nick_color || 'inherit')}">${esc(u.username)}</div>
+      <div class="online-user-role">${roleBadge}</div>
     </div>
-    <div>
-      <div style="color:${esc(u.nick_color||'inherit')};font-size:.88rem;font-weight:600">${esc(u.username)}</div>
-      ${roleBadge}
+    <div class="online-user-actions">
+      <button type="button" class="user-action-btn" title="Личное обращение" data-action="mention" data-id="${u.id}" data-name="${esc(u.username)}"><i class="fa fa-at"></i></button>
+      <button type="button" class="user-action-btn" title="Шёпот" data-action="whisper" data-id="${u.id}" data-name="${esc(u.username)}"><i class="fa fa-user-secret"></i></button>
+      <button type="button" class="user-action-btn" title="Пригласить в нумер" data-action="invite" data-id="${u.id}"><i class="fa fa-door-open"></i></button>
+      <button type="button" class="user-action-btn" title="${ignored ? 'Убрать игнор' : 'Игнор'}" data-action="ignore" data-id="${u.id}" data-name="${esc(u.username)}"><i class="fa ${ignored ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+      <button type="button" class="user-action-btn" title="Информация" data-action="info" data-id="${u.id}" data-name="${esc(u.username)}"><i class="fa fa-circle-info"></i></button>
     </div>
   </div>`;
 }
 
-// Click username → context menu
-$('#online-users-list').on('click', '.online-user', function(e) {
-  if ($(e.target).closest('.whisper-icon').length) return;
-  const uid = $(this).data('id');
-  const uname = $(this).data('username');
-  showUserCtxMenu(e, uid, uname);
+$('#online-users-list').on('click', '.online-user-avatar, .online-user-main', function(e) {
+  if ($(e.target).closest('.user-action-btn').length) return;
+  const $user = $(this).closest('.online-user');
+  const uid = Number($user.data('id'));
+  const uname = $user.data('username');
+  if (uid !== Number(CURRENT_USER.id)) insertMention(uname);
 });
 
-// Click whisper icon
-$('#online-users-list').on('click', '.whisper-icon', function(e) {
+$('#online-users-list').on('click', '.user-action-btn', function(e) {
+  e.preventDefault();
   e.stopPropagation();
-  const uid   = $(this).data('id');
+  const action = $(this).data('action');
+  const uid = Number($(this).data('id'));
   const uname = $(this).data('name');
-  if (uid !== CURRENT_USER.id) activateWhisperMode(uid, uname);
+
+  switch (action) {
+    case 'mention':
+      if (uid !== Number(CURRENT_USER.id)) insertMention(uname);
+      break;
+    case 'whisper':
+      if (uid !== Number(CURRENT_USER.id)) activateWhisperMode(uid, uname);
+      break;
+    case 'invite':
+      wsSend('invite_user', {to_user_id: uid});
+      break;
+    case 'ignore':
+      toggleIgnoreUser(uid, uname);
+      break;
+    case 'info':
+      showUserCtxMenu(e, uid, uname);
+      break;
+  }
 });
 
 function showUserCtxMenu(e, uid, uname) {
   e.preventDefault();
   const $menu = $('#ctx-menu').empty();
-  if (uid !== CURRENT_USER.id) {
-    $menu.append(`<a class="dropdown-item" href="#" data-action="whisper" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-secret me-2"></i>Шепнуть</a>`);
-    $menu.append(`<a class="dropdown-item" href="#" data-action="invite" data-id="${uid}"><i class="fa fa-door-open me-2"></i>Пригласить в нумер</a>`);
-    $menu.append(`<a class="dropdown-item" href="#" data-action="friend" data-id="${uid}"><i class="fa fa-user-plus me-2"></i>Добавить в друзья</a>`);
-    if (['platform_owner','admin','moderator'].includes(CURRENT_USER.global_role)) {
-      $menu.append('<div class="dropdown-divider"></div>');
-      $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="ban-global" data-id="${uid}"><i class="fa fa-ban me-2"></i>Забанить глобально</a>`);
+  if (uid === Number(CURRENT_USER.id)) return;
+
+  $menu.append(`<a class="dropdown-item" href="#" data-action="mention" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-at me-2"></i>Личное обращение</a>`);
+  $menu.append(`<a class="dropdown-item" href="#" data-action="whisper" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-secret me-2"></i>Шёпот</a>`);
+  $menu.append(`<a class="dropdown-item" href="#" data-action="invite" data-id="${uid}"><i class="fa fa-door-open me-2"></i>Пригласить в нумер</a>`);
+  $menu.append(`<a class="dropdown-item" href="#" data-action="friend" data-id="${uid}"><i class="fa fa-user-plus me-2"></i>Добавить в друзья</a>`);
+  $menu.append(`<a class="dropdown-item" href="#" data-action="ignore" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-slash me-2"></i>${ignoredUserIds.has(uid) ? 'Убрать игнор' : 'Игнор'}</a>`);
+
+  if (canModerateCurrentRoom()) {
+    $menu.append('<div class="dropdown-divider"></div>');
+    $menu.append(`<a class="dropdown-item text-warning" href="#" data-action="room-kick" data-id="${uid}"><i class="fa fa-user-minus me-2"></i>Удалить из комнаты</a>`);
+    $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="room-ban" data-id="${uid}"><i class="fa fa-ban me-2"></i>Забанить в комнате</a>`);
+    if (canAssignLocalModerator()) {
+      $menu.append(`<a class="dropdown-item" href="#" data-action="set-local-moderator" data-id="${uid}"><i class="fa fa-gavel me-2"></i>Назначить модератором</a>`);
+      $menu.append(`<a class="dropdown-item" href="#" data-action="set-member" data-id="${uid}"><i class="fa fa-user me-2"></i>Снять локальную роль</a>`);
+    }
+    if (canAssignLocalAdmin()) {
+      $menu.append(`<a class="dropdown-item" href="#" data-action="set-local-admin" data-id="${uid}"><i class="fa fa-user-shield me-2"></i>Назначить локальным админом</a>`);
     }
   }
+
+  if (['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role)) {
+    $menu.append('<div class="dropdown-divider"></div>');
+    $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="ban-global" data-id="${uid}"><i class="fa fa-skull-crossbones me-2"></i>Глобальный бан</a>`);
+  }
+
   $menu.css({top: e.clientY, left: e.clientX}).show();
 }
 
 $(document).on('click', '#ctx-menu a', function(e) {
   e.preventDefault();
   const action = $(this).data('action');
-  const uid    = $(this).data('id');
-  const uname  = $(this).data('name');
+  const uid = Number($(this).data('id'));
+  const uname = $(this).data('name');
   $('#ctx-menu').hide();
 
   switch (action) {
+    case 'mention':
+      insertMention(uname);
+      break;
     case 'whisper':
-      activateWhisperMode(uid, uname); break;
+      activateWhisperMode(uid, uname);
+      break;
     case 'invite':
-      wsSend('invite_user', {to_user_id: uid}); break;
+      wsSend('invite_user', {to_user_id: uid});
+      break;
     case 'friend':
-      $.post('/api/friends', {csrf_token: CSRF_TOKEN, to_user_id: uid}, () => showToast('Запрос отправлен.')); break;
+      $.post('/api/friends', {csrf_token: CSRF_TOKEN, to_user_id: uid}, () => showToast('Запрос отправлен.'));
+      break;
+    case 'ignore':
+      toggleIgnoreUser(uid, uname);
+      break;
+    case 'room-kick':
+      executeRoomAction('kick', uid, 'Удалить пользователя из комнаты?');
+      break;
+    case 'room-ban':
+      executeRoomAction('ban', uid, 'Забанить пользователя в комнате?');
+      break;
+    case 'set-local-moderator':
+      executeRoomAction('set_role', uid, null, {role: 'local_moderator'});
+      break;
+    case 'set-local-admin':
+      executeRoomAction('set_role', uid, null, {role: 'local_admin'});
+      break;
+    case 'set-member':
+      executeRoomAction('set_role', uid, null, {role: 'member'});
+      break;
     case 'ban-global':
-      if (confirm('Забанить глобально?')) {
-        $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Забанен.'));
-      } break;
+      if (confirm('Забанить пользователя глобально?')) {
+        $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Пользователь заблокирован.'));
+      }
+      break;
   }
 });
 
 $(document).on('click', function(e) {
-  if (!$(e.target).closest('#ctx-menu, .online-user').length) $('#ctx-menu').hide();
+  if (!$(e.target).closest('#ctx-menu, .online-user, .user-action-btn').length) $('#ctx-menu').hide();
 });
+
+function toggleIgnoreUser(uid, uname) {
+  if (ignoredUserIds.has(uid)) {
+    ignoredUserIds.delete(uid);
+    showToast(`Игнор снят: ${uname}`);
+  } else {
+    ignoredUserIds.add(uid);
+    showToast(`Пользователь в игноре: ${uname}`);
+  }
+  if (currentRoomId) {
+    $('#messages-list').empty();
+    loadHistory(currentRoomId);
+  }
+  renderOnlineList(currentOnlineUsers);
+}
+
+function canModerateCurrentRoom() {
+  return ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) || ['owner', 'local_admin', 'local_moderator'].includes(currentRoomRole);
+}
+
+function canAssignLocalModerator() {
+  return ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || ['owner', 'local_admin'].includes(currentRoomRole);
+}
+
+function canAssignLocalAdmin() {
+  return ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || currentRoomRole === 'owner';
+}
+
+function executeRoomAction(action, targetUserId, confirmText = null, extra = {}) {
+  if (!currentRoomId) return;
+  if (confirmText && !confirm(confirmText)) return;
+  wsSend('room_action', {room_id: currentRoomId, action, target_user_id: targetUserId, ...extra});
+}
+
 
 // ════════════════════════════════════════════════
 //  НУМЕРА
@@ -1142,7 +1274,7 @@ function onInviteReceived(inv) {
       <button class="btn btn-outline-secondary flex-1" id="decline-invite" data-id="${inv.invitation_id}">Отклонить</button>
     </div>
   `);
-  new bootstrap.Modal('#inviteModal').show();
+  new bootstrap.Modal(document.getElementById('inviteModal')).show();
 
   const timer = setTimeout(() => {
     $('#inviteModal').modal && bootstrap.Modal.getInstance(document.getElementById('inviteModal'))?.hide();
@@ -1213,7 +1345,7 @@ $('#friend-search').on('input', function() { loadFriends(); });
 // ════════════════════════════════════════════════
 function initSettings() {
   $('#my-username').parent().closest('.sidebar-bottom').on('click', '#my-username', function() {
-    const modal = new bootstrap.Modal('#settingsModal');
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
     $('[name="username"]').val(CURRENT_USER.username);
     $('[name="signature"]').val(CURRENT_USER.signature || '');
     $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
@@ -1263,7 +1395,7 @@ function initSettings() {
         }
       },
       error: function(xhr) {
-        const err = xhr.responseJSON?.error || '?????? ??????????';
+        const err = xhr.responseJSON?.error || 'Ошибка сохранения';
         $('#settings-error').text(err).removeClass('d-none');
       }
     });
@@ -1273,21 +1405,66 @@ function initSettings() {
 // ════════════════════════════════════════════════
 //  SIDEBAR TOGGLE
 // ════════════════════════════════════════════════
+
 function initSidebar() {
   $('#my-username').css('cursor','pointer');
-  $('#my-username').on('click', () => new bootstrap.Modal('#settingsModal').show());
+  $('#my-username').on('click', () => new bootstrap.Modal(document.getElementById('settingsModal')).show());
+
+  $('#room-manage-btn').on('click', function() {
+    if (!currentRoomId) return;
+    const room = rooms.find(r => r.id === currentRoomId) || numera.find(r => r.id === currentRoomId);
+    const canRenameDelete = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || currentRoomRole === 'owner';
+    const canAssignRoles = canAssignLocalModerator() || canAssignLocalAdmin();
+    let html = '';
+    if (canRenameDelete && room) {
+      html += `<div class="mb-3"><label class="form-label">Название комнаты</label><div class="input-group"><input type="text" class="form-control" id="room-manage-name" value="${esc(room.name)}"><button class="btn btn-primary" id="room-rename-btn">Сохранить</button></div></div>`;
+      html += `<div class="mb-3"><button class="btn btn-outline-danger" id="room-delete-btn">Удалить комнату</button></div>`;
+    }
+    html += '<div class="fw-semibold mb-2">Сейчас в комнате</div>';
+    html += '<div class="list-group">';
+    currentOnlineUsers.forEach(u => {
+      if (Number(u.id) === Number(CURRENT_USER.id)) return;
+      const role = visibleRoleLabel(u);
+      html += `<div class="list-group-item"><div class="d-flex align-items-center gap-2 mb-2">${avatarMarkup(u.avatar_url, 32)}<div class="flex-1"><div>${esc(u.username)}</div>${role ? `<div class="small text-muted">${role}</div>` : ''}</div></div><div class="d-flex flex-wrap gap-2"><button class="btn btn-sm btn-outline-secondary room-action-btn" data-action="kick" data-id="${u.id}">Удалить</button><button class="btn btn-sm btn-outline-danger room-action-btn" data-action="ban" data-id="${u.id}">Бан</button>${canAssignRoles ? `<button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="local_moderator" data-id="${u.id}">Модератор</button><button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="member" data-id="${u.id}">Участник</button>` : ''}${canAssignLocalAdmin() ? `<button class="btn btn-sm btn-outline-warning room-action-btn" data-action="set_role" data-role="local_admin" data-id="${u.id}">Локальный админ</button>` : ''}</div></div>`;
+    });
+    html += '</div>';
+    $('#room-manage-body').html(html || '<div class="text-muted">Нет доступных действий.</div>');
+    new bootstrap.Modal(document.getElementById('roomManageModal')).show();
+  });
+
+  $(document).on('click', '#room-rename-btn', function() {
+    const name = $('#room-manage-name').val().trim();
+    if (!name) return;
+    wsSend('room_action', {room_id: currentRoomId, action: 'rename', name});
+    showToast('Название отправлено на сохранение.');
+  });
+
+  $(document).on('click', '#room-delete-btn', function() {
+    if (!confirm('Удалить комнату?')) return;
+    wsSend('room_action', {room_id: currentRoomId, action: 'delete'});
+  });
+
+  $(document).on('click', '.room-action-btn', function() {
+    const action = $(this).data('action');
+    const uid = Number($(this).data('id'));
+    const role = $(this).data('role');
+    if (action === 'kick') {
+      executeRoomAction('kick', uid, 'Удалить пользователя из комнаты?');
+    } else if (action === 'ban') {
+      executeRoomAction('ban', uid, 'Забанить пользователя в комнате?');
+    } else if (action === 'set_role') {
+      executeRoomAction('set_role', uid, null, {role});
+    }
+  });
 }
 
-// ════════════════════════════════════════════════
-//  ADMIN PANEL
-// ════════════════════════════════════════════════
 function initAdmin() {
   if (!CURRENT_USER || !['platform_owner', 'admin'].includes(CURRENT_USER.global_role)) return;
 
   $('#admin-btn').on('click', function(e) {
     e.preventDefault();
     loadAdminDash();
-    new bootstrap.Modal('#adminModal').show();
+    new bootstrap.Modal(document.getElementById('adminModal')).show();
   });
 
   // Tab switch
@@ -1431,11 +1608,11 @@ function showToast(msg, type) {
 }
 
 function roleLabel(role) {
-  return {platform_owner:'Owner', admin:'Администратор', moderator:'Модератор', user:''}[role] || role;
+  return {platform_owner:'Владелец платформы', admin:'Администратор', moderator:'Модератор', user:''}[role] || role;
 }
 
 function roomRoleLabel(role) {
-  return {owner:'Владелец', local_admin:'Л.Админ', local_moderator:'Л.Мод', member:'', banned:'Забанен'}[role] || role;
+  return {owner:'Владелец комнаты', local_admin:'Локальный админ', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
 }
 
 <?php endif; ?>
