@@ -246,9 +246,10 @@ body { overflow: hidden; height: 100vh; }
 #messages-container { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
 .msg { padding: 4px 0; }
 .msg-body { min-width: 0; }
-.msg-meta { font-size: .8rem; color: var(--bs-secondary-color); display: flex; align-items: center; gap: 8px; }
+.msg-meta { font-size: .8rem; color: var(--bs-secondary-color); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .msg-username { font-weight: 600; }
-.msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; }
+.msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
+.msg-inline-content { color: var(--bs-body-color); }
 .msg-system { text-align: center; font-style: italic; color: var(--bs-secondary-color); font-size: .82rem; padding: 2px 0; }
 .msg-whisper { background: rgba(108,117,125,.08); border-left: 3px solid #6c757d; padding: 4px 10px; border-radius: 0 6px 6px 0; font-style: italic; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
@@ -493,6 +494,12 @@ body { overflow: hidden; height: 100vh; }
                 <div class="color-preview-box" id="text-preview-dark" style="background:#212529;margin-top:2px">Текст</div>
               </div>
               <div id="text-color-feedback" class="small"></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="showSystemMessagesSetting">
+              <label class="form-check-label" for="showSystemMessagesSetting">?????????? ????????? ????????? ? ????</label>
             </div>
           </div>
           <div class="col-12">
@@ -785,7 +792,9 @@ function loadHistory(roomId, before) {
       const $list = $('#messages-list');
       const prevScrollH = $('#messages-container')[0].scrollHeight;
       msgs.forEach(m => {
-        if (shouldRenderMessage(m)) $list.prepend(buildMessage(m));
+        if (!shouldRenderMessage(m)) return;
+        const html = buildMessage(m);
+        if (html) $list.prepend(html);
       });
       const newScrollH = $('#messages-container')[0].scrollHeight;
       $('#messages-container').scrollTop(newScrollH - prevScrollH);
@@ -830,7 +839,7 @@ function onUserLeft(data) {
 // ════════════════════════════════════════════════
 function buildMessage(m) {
   if (m.type === 'system') {
-    return `<div class="msg-system">${esc(m.content)}</div>`;
+    return shouldShowSystemMessages() ? `<div class="msg-system">${esc(m.content)}</div>` : '';
   }
 
   const time = dayjs(m.created_at).format('HH:mm:ss');
@@ -848,9 +857,9 @@ function buildMessage(m) {
       <div class="msg-meta">
         <span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span>
         <span>${time}</span>
+        <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')}">${m.content}</span>
         ${deleteBtn}
       </div>
-      <div class="msg-content" style="color:${esc(m.text_color || 'inherit')}">${m.content}</div>
       ${embed}
     </div>
   </div>`;
@@ -873,9 +882,11 @@ function buildWhisperMessage(m, isSent) {
 
 function appendMessage(m) {
   if (!shouldRenderMessage(m)) return;
+  const html = buildMessage(m);
+  if (!html) return;
   const $container = $('#messages-container');
   const atBottom = isScrolledToBottom;
-  $('#messages-list').append(buildMessage(m));
+  $('#messages-list').append(html);
   if (atBottom) {
     scrollToBottom();
   } else {
@@ -894,6 +905,7 @@ function onMessageDeleted(data) {
 
 function onSystemMessage(m) {
   if (m.room_id !== currentRoomId) return;
+  if (!shouldShowSystemMessages()) return;
   $('#messages-list').append(`<div class="msg-system">${esc(m.content)}</div>`);
   if (isScrolledToBottom) scrollToBottom();
 }
@@ -914,6 +926,10 @@ function canDeleteMessage(m) {
   if (['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role)) return true;
   if (m.user_id === CURRENT_USER.id) return true;
   return ['owner', 'local_admin', 'local_moderator'].includes(currentRoomRole);
+}
+
+function shouldShowSystemMessages() {
+  return localStorage.getItem('show_system_messages') !== '0';
 }
 
 function avatarMarkup(url, size = 42) {
@@ -1350,6 +1366,7 @@ function initSettings() {
     $('[name="signature"]').val(CURRENT_USER.signature || '');
     $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
     $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
+    $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
     modal.show();
   });
 
@@ -1387,9 +1404,13 @@ function initSettings() {
       success: function(resp) {
         if (resp.success) {
           if (resp.user) { Object.assign(CURRENT_USER, resp.user); }
+          localStorage.setItem('show_system_messages', $('#showSystemMessagesSetting').is(':checked') ? '1' : '0');
           $('#settings-success').removeClass('d-none');
           initUser();
-          setTimeout(() => location.reload(), 500);
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
+          setTimeout(() => location.reload(), 250);
         } else {
           $('#settings-error').text(resp.error).removeClass('d-none');
         }
@@ -1505,13 +1526,14 @@ function loadAdminUsers(page) {
   const search = $('#admin-user-search').val();
   $.get('/api/admin/users', {page, search}, function(resp) {
     if (!resp.success) return;
-    let html = '<table class="table table-sm table-hover"><thead><tr><th>ID</th><th>Имя</th><th>Email</th><th>Роль</th><th>Бан</th><th>Комнаты</th><th></th></tr></thead><tbody>';
+    let html = '<table class="table table-sm table-hover"><thead><tr><th>ID</th><th>????????????</th><th>Email</th><th>?????????? ????</th><th>???</th><th>???????? ??????</th><th></th></tr></thead><tbody>';
     resp.users.forEach(u => {
       html += `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.email||'')}</td>
         <td><select class="form-select form-select-sm user-role-sel" data-id="${u.id}" style="width:auto">
-          <option ${u.global_role==='user'?'selected':''}>user</option>
-          <option ${u.global_role==='moderator'?'selected':''}>moderator</option>
-          <option ${u.global_role==='admin'?'selected':''}>admin</option>
+          <option value="user" ${u.global_role==='user'?'selected':''}>????????????</option>
+          <option value="moderator" ${u.global_role==='moderator'?'selected':''}>?????????? ?????????</option>
+          <option value="admin" ${u.global_role==='admin'?'selected':''}>?????????? ?????????????</option>
+          <option value="platform_owner" ${u.global_role==='platform_owner'?'selected':''}>???????? ?????????</option>
         </select></td>
         <td><input type="checkbox" class="form-check-input user-ban-cb" data-id="${u.id}" ${u.is_banned?'checked':''}></td>
         <td><input type="checkbox" class="form-check-input user-room-cb" data-id="${u.id}" ${u.can_create_room?'checked':''}></td>
@@ -1524,7 +1546,20 @@ function loadAdminUsers(page) {
 
 $('#admin-users-table').on('change', '.user-role-sel', function() {
   const id = $(this).data('id');
-  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, global_role: $(this).val()}, () => showToast('Роль обновлена.'));
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, global_role: $(this).val()}, () => showToast('?????????? ???? ?????????.'));
+});
+$('#admin-users-table').on('change', '.user-ban-cb', function() {
+  const id = $(this).data('id');
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, is_banned: this.checked ? 1 : 0}, () => showToast('?????? ???? ????????.'));
+});
+$('#admin-users-table').on('change', '.user-room-cb', function() {
+  const id = $(this).data('id');
+  $.post(`/api/admin/users/${id}`, {csrf_token: CSRF_TOKEN, can_create_room: this.checked ? 1 : 0}, () => showToast('????? ?????????.'));
+});
+$('#admin-users-table').on('click', '.user-del-btn', function() {
+  const id = $(this).data('id');
+  if (!confirm('??????? ?????????????')) return;
+  $.ajax({url:`/api/admin/users/${id}`,method:'DELETE',data:{csrf_token:CSRF_TOKEN},success:()=>{ showToast('???????????? ??????.'); loadAdminUsers(); }});
 });
 $('#admin-users-table').on('change', '.user-ban-cb', function() {
   const id = $(this).data('id');
@@ -1608,7 +1643,7 @@ function showToast(msg, type) {
 }
 
 function roleLabel(role) {
-  return {platform_owner:'Владелец платформы', admin:'Администратор', moderator:'Модератор', user:''}[role] || role;
+  return {platform_owner:'Владелец платформы', admin:'Глобальный администратор', moderator:'Глобальный модератор', user:''}[role] || role;
 }
 
 function roomRoleLabel(role) {

@@ -39,6 +39,7 @@ class EventRouter
     {
         $roomId = (int) ($data['room_id'] ?? 0);
         $userId = (int) $session['id'];
+        $alreadyInRoom = $this->cm->isInRoom($userId, $roomId);
 
         $db   = Connection::getInstance();
         $room = $db->fetchOne(
@@ -69,7 +70,9 @@ class EventRouter
             }
         }
 
-        $this->cm->joinRoom($conn, $roomId);
+        if (!$alreadyInRoom) {
+            $this->cm->joinRoom($conn, $roomId);
+        }
 
         $online = $this->getOnlineList($roomId, $db);
         $this->cm->sendToConnection($conn, [
@@ -79,7 +82,7 @@ class EventRouter
             'online'    => $online,
         ]);
 
-        if ($room['type'] === 'public') {
+        if ($room['type'] === 'public' && !$alreadyInRoom) {
             $this->cm->sendToRoom($roomId, [
                 'event'    => 'user_joined',
                 'room_id'  => $roomId,
@@ -94,6 +97,10 @@ class EventRouter
     {
         $roomId = (int) ($data['room_id'] ?? 0);
         $userId = (int) $session['id'];
+
+        if (!$this->cm->isInRoom($userId, $roomId)) {
+            return;
+        }
 
         $this->cm->leaveRoom($userId, $roomId);
 
