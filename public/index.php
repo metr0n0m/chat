@@ -263,7 +263,6 @@ body { overflow: hidden; height: 100vh; }
 .md-toolbar { display: flex; gap: 4px; margin-bottom: 4px; }
 .md-btn { border: 1px solid var(--bs-border-color); background: transparent; color: var(--bs-body-color); border-radius: 4px; padding: 1px 8px; font-size: .82rem; cursor: pointer; }
 .md-btn:hover { background: var(--bs-secondary-bg); }
-#msg-preview { display: none; background: var(--bs-secondary-bg); border-radius: 6px; padding: 8px 12px; margin-top: 6px; font-size: .9rem; }
 .char-counter { font-size: .75rem; color: var(--bs-secondary-color); text-align: right; }
 .char-counter.over { color: #dc3545; }
 
@@ -327,7 +326,7 @@ body { overflow: hidden; height: 100vh; }
         <form id="loginForm">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
           <div class="mb-3"><label class="form-label">Email</label>
-            <input type="email" class="form-control" name="email" required></div>
+            <input type="text" class="form-control" name="email" required></div>
           <div class="mb-3"><label class="form-label">Пароль</label>
             <input type="password" class="form-control" name="password" required></div>
           <button type="submit" class="btn btn-primary w-100">Войти</button>
@@ -383,8 +382,7 @@ body { overflow: hidden; height: 100vh; }
     </div>
 
     <div class="sidebar-bottom">
-      <img id="my-avatar" src="" alt="" class="rounded-circle" width="32" height="32" style="display:none;object-fit:cover">
-      <div class="avatar-ph rounded-circle bg-secondary d-flex align-items-center justify-content-center" id="my-avatar-ph" style="width:32px;height:32px;font-size:.7rem"></div>
+      <img id="my-avatar" src="/assets/avatar-default.svg" alt="" class="rounded-circle" width="32" height="32" style="object-fit:cover">
       <div class="flex-1 overflow-hidden">
         <div id="my-username" class="fw-semibold text-truncate" style="font-size:.9rem"></div>
         <div id="my-role-badge" class="badge bg-secondary" style="font-size:.68rem"></div>
@@ -426,10 +424,8 @@ body { overflow: hidden; height: 100vh; }
         <button class="md-btn" data-md="_" title="Курсив"><i>I</i></button>
         <button class="md-btn" data-md="__" title="Подчёркнутый"><u>U</u></button>
         <button class="md-btn" data-md="~~" title="Зачёркнутый"><s>S</s></button>
-        <button class="btn btn-sm btn-outline-secondary ms-auto" id="preview-toggle">Предпросмотр</button>
       </div>
       <textarea id="msg-input" class="form-control" rows="1" placeholder="Сообщение..." maxlength="2000" style="resize:none"></textarea>
-      <div id="msg-preview" class="mt-1"></div>
       <div class="d-flex justify-content-between align-items-center mt-1">
         <div class="char-counter"><span id="char-count">0</span>/2000</div>
         <button id="send-btn" class="btn btn-primary btn-sm" disabled><i class="fa fa-paper-plane"></i></button>
@@ -612,6 +608,7 @@ let isScrolledToBottom = true;
 let oldestMessageId = null;
 let rooms = [];
 let numera = [];
+const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 
 // ════════════════════════════════════════════════
 //  INIT
@@ -648,13 +645,9 @@ function initUser() {
   if (!CURRENT_USER) return;
   $('#my-username').text(CURRENT_USER.username).css('color', CURRENT_USER.nick_color);
   $('#my-role-badge').text(roleLabel(CURRENT_USER.global_role));
-  if (CURRENT_USER.avatar_url) {
-    $('#my-avatar').attr('src', CURRENT_USER.avatar_url).show();
-    $('#my-avatar-ph').hide();
-  } else {
-    $('#my-avatar-ph').text(CURRENT_USER.username.charAt(0).toUpperCase()).show();
-  }
+  $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
 }
+
 
 // ════════════════════════════════════════════════
 //  WEBSOCKET
@@ -741,6 +734,9 @@ function loadRooms() {
       $item.on('click', () => joinRoom(r.id));
       $list.append($item);
     });
+    if (!currentRoomId && rooms.length > 0) {
+      joinRoom(rooms[0].id);
+    }
   });
   $.get('/api/numera', function(resp) {
     if (!resp.success) return;
@@ -813,9 +809,11 @@ function onRoomJoined(data) {
   $('#panel-online-count').text((data.online||[]).length);
   $('#room-online-count').text((data.online||[]).length + ' онлайн');
 
-  const canManage = CURRENT_USER.global_role === 'admin' ||
+  const canManage = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) ||
     ['owner','local_admin','local_moderator'].includes(data.my_role);
   $('#room-manage-btn').toggleClass('d-none', !canManage);
+  $('#send-btn').prop('disabled', $('#msg-input').val().trim().length === 0);
+  $('#send-btn').prop('disabled', $('#msg-input').val().trim().length === 0);
 }
 
 function onUserJoined(data) {
@@ -832,19 +830,17 @@ function onUserLeft(data) {
 //  MESSAGES
 // ════════════════════════════════════════════════
 function buildMessage(m) {
-  const time = dayjs(m.created_at).format('HH:mm');
-  const avatarHtml = m.avatar_url
-    ? `<img src="${esc(m.avatar_url)}" class="msg-avatar" alt="" referrerpolicy="no-referrer">`
-    : `<div class="msg-avatar-placeholder">${esc(m.username||'?').charAt(0).toUpperCase()}</div>`;
+  const time = dayjs(m.created_at).format('HH:mm:ss');
+  const avatarHtml = `<img src="${esc(m.avatar_url || DEFAULT_AVATAR_URL)}" class="msg-avatar" alt="" referrerpolicy="no-referrer">`;
 
   const roleBadge = m.global_role && m.global_role !== 'user'
-    ? `<span class="badge bg-${m.global_role==='admin'?'danger':'warning'} me-1" style="font-size:.65rem">${roleLabel(m.global_role)}</span>`
+    ? `<span class="badge bg-${m.global_role==='platform_owner'?'dark':(m.global_role==='admin'?'danger':'warning')} me-1" style="font-size:.65rem">${roleLabel(m.global_role)}</span>`
     : '';
   const roomRoleBadge = m.room_role && !['member','banned'].includes(m.room_role)
     ? `<span class="badge bg-info me-1" style="font-size:.65rem">${roomRoleLabel(m.room_role)}</span>`
     : '';
 
-  const canDelete = CURRENT_USER.global_role === 'admin' || CURRENT_USER.global_role === 'moderator' || m.user_id === CURRENT_USER.id;
+  const canDelete = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) || m.user_id === CURRENT_USER.id;
   const deleteBtn = canDelete ? `<span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
 
   let embed = '';
@@ -869,7 +865,7 @@ function buildMessage(m) {
 }
 
 function buildWhisperMessage(m, isSent) {
-  const time = dayjs(m.created_at).format('HH:mm');
+  const time = dayjs(m.created_at).format('HH:mm:ss');
   const from = m.from || {};
   const to   = m.to   || {};
   const label = isSent
@@ -936,7 +932,6 @@ function initInput() {
     $('.char-counter').toggleClass('over', len > 2000);
     $send.prop('disabled', len === 0 || len > 2000 || !currentRoomId);
     autosize.update(this);
-    updatePreview();
   });
 
   $input.on('keydown', function(e) {
@@ -954,21 +949,6 @@ function initInput() {
     wrapSelection($input[0], md);
     $input.trigger('input');
   });
-
-  // Preview toggle
-  $('#preview-toggle').on('click', function() {
-    const $prev = $('#msg-preview');
-    const visible = $prev.is(':visible');
-    if (!visible) {
-      updatePreview();
-      $prev.show();
-      $(this).text('Скрыть');
-    } else {
-      $prev.hide();
-      $(this).text('Предпросмотр');
-    }
-  });
-
   // Cancel whisper
   $('#cancel-whisper').on('click', clearWhisperMode);
 }
@@ -993,8 +973,6 @@ function sendMessage() {
 
   $('#msg-input').val('').trigger('input');
   autosize.update(document.getElementById('msg-input'));
-  $('#msg-preview').hide();
-  $('#preview-toggle').text('Предпросмотр');
 }
 
 function wrapSelection(el, marker) {
@@ -1008,15 +986,6 @@ function wrapSelection(el, marker) {
   el.focus();
 }
 
-function updatePreview() {
-  const raw = $('#msg-input').val();
-  let html = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  html = html.replace(/\*\*(.*?)\*\*/gs,'<strong>$1</strong>')
-             .replace(/__(.*?)__/gs,'<u>$1</u>')
-             .replace(/_(.*?)_/gs,'<em>$1</em>')
-             .replace(/~~(.*?)~~/gs,'<del>$1</del>');
-  $('#msg-preview').html(html);
-}
 
 // ════════════════════════════════════════════════
 //  WHISPER MODE
@@ -1059,11 +1028,9 @@ function removeFromOnlineList(userId) {
 }
 
 function buildOnlineUser(u) {
-  const avatar = u.avatar_url
-    ? `<img src="${esc(u.avatar_url)}" referrerpolicy="no-referrer" alt="">`
-    : `<div class="avatar-ph">${esc(u.username||'?').charAt(0).toUpperCase()}</div>`;
+  const avatar = `<img src="${esc(u.avatar_url || DEFAULT_AVATAR_URL)}" referrerpolicy="no-referrer" alt="">`;
   const roleBadge = u.global_role && u.global_role !== 'user'
-    ? `<span class="badge bg-${u.global_role==='admin'?'danger':'warning'}" style="font-size:.6rem">${roleLabel(u.global_role)}</span>`
+    ? `<span class="badge bg-${u.global_role==='platform_owner'?'dark':(u.global_role==='admin'?'danger':'warning')}" style="font-size:.6rem">${roleLabel(u.global_role)}</span>`
     : '';
   return `<div class="online-user" id="online-user-${u.id}" data-id="${u.id}" data-username="${esc(u.username)}">
     <div class="online-user-avatar">
@@ -1100,7 +1067,7 @@ function showUserCtxMenu(e, uid, uname) {
     $menu.append(`<a class="dropdown-item" href="#" data-action="whisper" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-secret me-2"></i>Шепнуть</a>`);
     $menu.append(`<a class="dropdown-item" href="#" data-action="invite" data-id="${uid}"><i class="fa fa-door-open me-2"></i>Пригласить в нумер</a>`);
     $menu.append(`<a class="dropdown-item" href="#" data-action="friend" data-id="${uid}"><i class="fa fa-user-plus me-2"></i>Добавить в друзья</a>`);
-    if (['admin','moderator'].includes(CURRENT_USER.global_role)) {
+    if (['platform_owner','admin','moderator'].includes(CURRENT_USER.global_role)) {
       $menu.append('<div class="dropdown-divider"></div>');
       $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="ban-global" data-id="${uid}"><i class="fa fa-ban me-2"></i>Забанить глобально</a>`);
     }
@@ -1287,11 +1254,18 @@ function initSettings() {
       contentType: false,
       success: function(resp) {
         if (resp.success) {
+          if (resp.user) { Object.assign(CURRENT_USER, resp.user); }
           $('#settings-success').removeClass('d-none');
+          initUser();
+          setTimeout(() => location.reload(), 500);
         } else {
           $('#settings-error').text(resp.error).removeClass('d-none');
         }
       },
+      error: function(xhr) {
+        const err = xhr.responseJSON?.error || '?????? ??????????';
+        $('#settings-error').text(err).removeClass('d-none');
+      }
     });
   });
 }
@@ -1308,7 +1282,7 @@ function initSidebar() {
 //  ADMIN PANEL
 // ════════════════════════════════════════════════
 function initAdmin() {
-  if (!CURRENT_USER || CURRENT_USER.global_role !== 'admin') return;
+  if (!CURRENT_USER || !['platform_owner', 'admin'].includes(CURRENT_USER.global_role)) return;
 
   $('#admin-btn').on('click', function(e) {
     e.preventDefault();
@@ -1457,7 +1431,7 @@ function showToast(msg, type) {
 }
 
 function roleLabel(role) {
-  return {admin:'Администратор', moderator:'Модератор', user:''}[role] || role;
+  return {platform_owner:'Owner', admin:'Администратор', moderator:'Модератор', user:''}[role] || role;
 }
 
 function roomRoleLabel(role) {
