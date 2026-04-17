@@ -43,3 +43,5 @@
 - Updated migrations:
   - adds optional profile fields to `users`
   - adds `muted_until`, `mute_reason` to `room_members`.
+- Added safety guard for old databases:
+  - if `room_members.muted_until/mute_reason` columns are missing, `mute` action returns explicit migration error instead of SQL crash.
