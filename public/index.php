@@ -222,7 +222,7 @@ $userJson = $user ? json_encode([
     'can_create_room'=> (bool) $user['can_create_room'],
 ]) : 'null';
 
-header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; img-src * data:; connect-src 'self' ws: wss:; font-src cdn.jsdelivr.net cdnjs.cloudflare.com;");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src-attr 'unsafe-inline'; img-src * data:; connect-src 'self' ws: wss:; font-src cdn.jsdelivr.net cdnjs.cloudflare.com;");
 ?><!DOCTYPE html>
 <html lang="ru" data-bs-theme="auto">
 <head>

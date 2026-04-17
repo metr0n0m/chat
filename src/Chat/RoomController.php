@@ -124,7 +124,11 @@ class RoomController
                 if ($permission['level'] < 3 && !in_array($actor['global_role'], ['platform_owner', 'admin'], true)) {
                     return ['error' => 'Недостаточно прав.'];
                 }
-                $db->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
+                try {
+                    self::deleteRoomWithDependencies($db, $roomId);
+                } catch (\Throwable) {
+                    return ['error' => 'Не удалось удалить комнату.'];
+                }
                 return ['deleted' => true];
 
             case 'set_role':
@@ -274,5 +278,20 @@ class RoomController
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    private static function deleteRoomWithDependencies(Connection $db, int $roomId): void
+    {
+        $db->beginTransaction();
+        try {
+            $db->execute('DELETE FROM messages WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM room_members WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM invitations WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
     }
 }

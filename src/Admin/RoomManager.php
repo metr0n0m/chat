@@ -65,7 +65,18 @@ class RoomManager
         if (!CSRF::verifyRequest()) {
             self::jsonError('CSRF.', 403);
         }
-        Connection::getInstance()->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
+        $db = Connection::getInstance();
+        $db->beginTransaction();
+        try {
+            $db->execute('DELETE FROM messages WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM room_members WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM invitations WHERE room_id = ?', [$roomId]);
+            $db->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
+            $db->commit();
+        } catch (\Throwable) {
+            $db->rollBack();
+            self::jsonError('Не удалось удалить комнату.');
+        }
         self::jsonSuccess(['deleted' => true]);
     }
 
