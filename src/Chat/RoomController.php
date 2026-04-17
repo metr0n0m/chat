@@ -126,6 +126,10 @@ class RoomController
                 if ($permission['level'] < 3 && !in_array($actor['global_role'], ['platform_owner', 'admin'], true)) {
                     return ['error' => 'Недостаточно прав.'];
                 }
+                $roomMeta = $db->fetchOne('SELECT room_category FROM rooms WHERE id = ?', [$roomId]);
+                if (($roomMeta['room_category'] ?? 'user') === 'permanent') {
+                    return ['error' => 'Постоянные комнаты нельзя удалить.'];
+                }
                 try {
                     self::deleteRoomWithDependencies($db, $roomId);
                 } catch (\Throwable) {

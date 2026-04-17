@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
-use Chat\Security\HMAC;
 
 class MessageController
 {
@@ -36,7 +35,7 @@ class MessageController
         }
 
         $messages = $db->fetchAll(
-            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.content_hmac,
+            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at,
                     u.username, u.custom_status, u.nick_color, u.text_color, u.avatar_url, u.global_role,
                     rm.room_role
              FROM messages m
@@ -47,10 +46,6 @@ class MessageController
              LIMIT ' . self::PAGE_SIZE,
             $params
         );
-
-        $messages = array_values(array_filter($messages, static function (array $message): bool {
-            return HMAC::verify((string) $message['content'], (string) $message['content_hmac']);
-        }));
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'messages' => array_reverse($messages)], JSON_UNESCAPED_UNICODE);
@@ -78,13 +73,12 @@ class MessageController
         }
 
         $content = self::format($raw);
-        $hmac = HMAC::sign($content);
         $embed = EmbedProcessor::process($raw);
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
 
         $db->execute(
-            'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
-            [$roomId, $actorId, $content, $hmac, 'text', $embedData]
+            'INSERT INTO messages (room_id, user_id, content, type, embed_data) VALUES (?, ?, ?, ?, ?)',
+            [$roomId, $actorId, $content, 'text', $embedData]
         );
 
         return [

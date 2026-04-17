@@ -22,12 +22,16 @@ class RoomManager
         $offset = max(0, ($page - 1) * 50);
 
         $rooms = $db->fetchAll(
-            "SELECT r.id, r.name, r.type, r.is_closed, r.created_at,
+            "SELECT r.id, r.name, r.type,
+                    COALESCE(r.room_category, 'user') AS room_category,
+                    r.is_closed, r.created_at,
+                    TIMESTAMPDIFF(DAY, r.created_at, NOW()) AS days_running,
                     u.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
                     (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id AND m.is_deleted = 0) AS message_count
              FROM rooms r
              LEFT JOIN users u ON u.id = r.owner_id
+             WHERE r.type = 'public'
              ORDER BY r.id DESC
              LIMIT 50 OFFSET $offset"
         );
@@ -65,7 +69,14 @@ class RoomManager
         if (!CSRF::verifyRequest()) {
             self::jsonError('CSRF.', 403);
         }
-        $db = Connection::getInstance();
+        $db   = Connection::getInstance();
+        $room = $db->fetchOne('SELECT room_category FROM rooms WHERE id = ?', [$roomId]);
+        if (!$room) {
+            self::jsonError('Комната не найдена.', 404);
+        }
+        if (($room['room_category'] ?? 'user') === 'permanent') {
+            self::jsonError('Постоянные комнаты нельзя удалить.', 403);
+        }
         $db->beginTransaction();
         try {
             $db->execute('DELETE FROM messages WHERE room_id = ?', [$roomId]);
@@ -78,6 +89,35 @@ class RoomManager
             self::jsonError('Не удалось удалить комнату.');
         }
         self::jsonSuccess(['deleted' => true]);
+    }
+
+    /**
+     * Активные нумера (не закрытые) с расширенной информацией.
+     */
+    public static function numeraActive(int $page = 1): void
+    {
+        $db     = Connection::getInstance();
+        $offset = max(0, ($page - 1) * 50);
+
+        $numera = $db->fetchAll(
+            "SELECT r.id, r.name, r.created_at,
+                    TIMESTAMPDIFF(MINUTE, r.created_at, NOW()) AS minutes_running,
+                    u.username AS owner_username,
+                    (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
+                    GROUP_CONCAT(u2.username ORDER BY rm2.joined_at SEPARATOR ', ') AS participants
+             FROM rooms r
+             LEFT JOIN users u ON u.id = r.owner_id
+             LEFT JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.room_role != 'banned'
+             LEFT JOIN users u2 ON u2.id = rm2.user_id
+             WHERE r.type = 'numer' AND r.is_closed = 0
+             GROUP BY r.id
+             ORDER BY r.created_at DESC
+             LIMIT 50 OFFSET $offset"
+        );
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'numera' => $numera, 'page' => $page], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     /**

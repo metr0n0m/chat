@@ -147,12 +147,22 @@ ALTER TABLE `room_members`
   ADD COLUMN IF NOT EXISTS `muted_until` DATETIME NULL AFTER `banned_by`,
   ADD COLUMN IF NOT EXISTS `mute_reason` VARCHAR(255) NULL AFTER `muted_until`;
 
+ALTER TABLE `rooms`
+  ADD COLUMN IF NOT EXISTS `room_category`
+    ENUM('permanent','user','commercial') NOT NULL DEFAULT 'user' AFTER `type`;
+
+ALTER TABLE `messages`
+  MODIFY COLUMN `content_hmac` CHAR(64) NULL DEFAULT NULL;
+
 SET foreign_key_checks = 1;
 
 INSERT IGNORE INTO `app_settings` (`name`, `value`) VALUES
 ('allow_admin_status_override', '0');
 
--- Seed: default public rooms
-INSERT IGNORE INTO `rooms` (`id`, `name`, `description`, `type`) VALUES
-(1, 'Общий', 'Главный публичный чат', 'public'),
-(2, 'Флудилка', 'Разговоры обо всём', 'public');
+-- Seed: default public rooms (permanent)
+INSERT IGNORE INTO `rooms` (`id`, `name`, `description`, `type`, `room_category`) VALUES
+(1, 'Общий', 'Главный публичный чат', 'public', 'permanent'),
+(2, 'Флудилка', 'Разговоры обо всём', 'public', 'permanent');
+
+-- Mark existing seeded rooms as permanent on re-run
+UPDATE `rooms` SET `room_category` = 'permanent' WHERE `id` IN (1, 2);

@@ -4,207 +4,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Chat\Security\{Session, CSRF};
-use Chat\Auth\{LoginHandler, RegisterHandler, VKOAuth, GoogleOAuth};
-use Chat\Chat\{RoomController, MessageController, WhisperController};
-use Chat\Admin\{AdminPanel, UserManager, RoomManager};
+use Chat\Security\CSRF;
 use Chat\Support\Lang;
 
 Lang::init(APP_LOCALE);
 
-// ─── Router ──────────────────────────────────────────────────────────────────
-
-$method = $_SERVER['REQUEST_METHOD'];
-$path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-$path   = '/' . trim($path, '/');
-
-// Serve avatars from storage
-if (str_starts_with($path, '/storage/avatars/')) {
-    $file = AVATAR_PATH . '/' . basename($path);
-    if (is_file($file)) {
-        header('Content-Type: image/jpeg');
-        header('Cache-Control: public, max-age=604800');
-        readfile($file);
-    } else {
-        http_response_code(404);
-    }
-    exit;
-}
-
-// Auth routes (no session required)
-if ($method === 'POST' && $path === '/auth/login') {
-    LoginHandler::handle();
-}
-if ($method === 'POST' && $path === '/auth/register') {
-    RegisterHandler::handle();
-}
-if ($path === '/auth/vk') {
-    VKOAuth::redirect();
-}
-if ($path === '/auth/vk/callback') {
-    VKOAuth::callback();
-}
-if ($path === '/auth/google') {
-    GoogleOAuth::redirect();
-}
-if ($path === '/auth/google/callback') {
-    GoogleOAuth::callback();
-}
-
-// All routes below require authentication
-$user = Session::current();
-
-if ($path === '/auth/logout') {
-    if ($user) {
-        Session::destroy($_COOKIE['chat_session'] ?? '');
-    }
-    Session::clearCookie();
-    header('Location: /');
-    exit;
-}
-
-// API routes (authenticated)
-if ($user) {
-    header('Vary: Accept');
-
-    // Rooms
-    if ($method === 'GET' && $path === '/api/rooms') {
-        RoomController::list((int)$user['id'], $user['global_role']);
-    }
-    if ($method === 'GET' && $path === '/api/numera') {
-        RoomController::numera((int)$user['id']);
-    }
-    if ($method === 'POST' && $path === '/api/rooms') {
-        RoomController::create((int)$user['id'], $user);
-    }
-
-    // Messages
-    if ($method === 'GET' && preg_match('~^/api/rooms/(\d+)/messages$~', $path, $m)) {
-        $before = isset($_GET['before']) ? (int)$_GET['before'] : null;
-        MessageController::history((int)$m[1], (int)$user['id'], $user['global_role'], $before);
-    }
-
-    // User profile & settings
-    if ($method === 'GET' && preg_match('~^/api/users/(\d+)$~', $path, $m)) {
-        UserManager::profile((int)$m[1]);
-    }
-    if ($method === 'POST' && $path === '/api/settings') {
-        UserManager::updateSettings((int)$user['id'], $_POST, $_FILES);
-    }
-
-    // Friends
-    if ($method === 'GET' && $path === '/api/friends') {
-        $db      = \Chat\DB\Connection::getInstance();
-        $friends = $db->fetchAll(
-            "SELECT u.id, u.username, u.nick_color, u.avatar_url, u.last_seen_at,
-                    f.status,
-                    (SELECT r.name FROM rooms r
-                     JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.user_id = u.id
-                     WHERE r.type = 'public' AND r.is_closed = 0 LIMIT 1) AS current_room
-             FROM friendships f
-             JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
-             WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
-             ORDER BY u.username",
-            [(int)$user['id'], (int)$user['id'], (int)$user['id']]
-        );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'friends' => $friends]);
-        exit;
-    }
-    if ($method === 'POST' && $path === '/api/friends') {
-        if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error'=>'CSRF']); exit; }
-        $toId = (int)($_POST['to_user_id'] ?? 0);
-        $db   = \Chat\DB\Connection::getInstance();
-        $db->execute(
-            'INSERT IGNORE INTO friendships (requester_id, addressee_id) VALUES (?, ?)',
-            [(int)$user['id'], $toId]
-        );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true]);
-        exit;
-    }
-    if ($method === 'POST' && preg_match('~^/api/friends/(\d+)/respond$~', $path, $m)) {
-        if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error'=>'CSRF']); exit; }
-        $response = $_POST['response'] ?? '';
-        $db = \Chat\DB\Connection::getInstance();
-        $status = $response === 'accept' ? 'accepted' : 'declined';
-        $db->execute(
-            'UPDATE friendships SET status = ?, updated_at = NOW() WHERE id = ? AND addressee_id = ?',
-            [$status, (int)$m[1], (int)$user['id']]
-        );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true]);
-        exit;
-    }
-
-    // Color contrast check
-    if ($method === 'POST' && $path === '/api/color-check') {
-        $error = \Chat\Security\ColorContrast::validate($_POST['color'] ?? '');
-        $ratios = \Chat\Security\ColorContrast::ratios($_POST['color'] ?? '#ffffff');
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['valid' => !$error, 'error' => $error, 'ratios' => $ratios]);
-        exit;
-    }
-
-    // Admin routes
-    if (str_starts_with($path, '/admin') || str_starts_with($path, '/api/admin')) {
-        $admin = AdminPanel::requireAdmin();
-
-        if ($method === 'GET' && $path === '/api/admin/dashboard') {
-            AdminPanel::dashboard();
-        }
-        if ($method === 'GET' && $path === '/api/admin/users') {
-            UserManager::list((int)($_GET['page'] ?? 1), $_GET['search'] ?? '');
-        }
-        if ($method === 'POST' && preg_match('~^/api/admin/users/(\d+)$~', $path, $m)) {
-            UserManager::update((int)$m[1], $_POST);
-        }
-        if ($method === 'DELETE' && preg_match('~^/api/admin/users/(\d+)$~', $path, $m)) {
-            UserManager::delete((int)$m[1]);
-        }
-        if ($method === 'GET' && $path === '/api/admin/rooms') {
-            RoomManager::list((int)($_GET['page'] ?? 1));
-        }
-        if ($method === 'POST' && preg_match('~^/api/admin/rooms/(\d+)/rename$~', $path, $m)) {
-            RoomManager::rename((int)$m[1], $_POST['name'] ?? '');
-        }
-        if ($method === 'DELETE' && preg_match('~^/api/admin/rooms/(\d+)$~', $path, $m)) {
-            RoomManager::delete((int)$m[1]);
-        }
-        if ($method === 'GET' && preg_match('~^/api/admin/rooms/(\d+)/members$~', $path, $m)) {
-            RoomManager::members((int)$m[1]);
-        }
-        if ($method === 'GET' && $path === '/api/admin/numera') {
-            RoomManager::numeraArchive((int)($_GET['page'] ?? 1), $_GET);
-        }
-        if ($method === 'GET' && preg_match('~^/api/admin/numera/(\d+)/messages$~', $path, $m)) {
-            RoomManager::numeraMessages((int)$m[1]);
-        }
-        if ($method === 'GET' && $path === '/api/admin/whispers') {
-            WhisperController::archive((int)($_GET['page'] ?? 1), $_GET);
-        }
-        if ($method === 'GET' && $path === '/api/admin/moderators') {
-            AdminPanel::globalModerators();
-        }
-        if ($method === 'GET' && $path === '/api/admin/room-creators') {
-            AdminPanel::roomCreators();
-        }
-        if ($method === 'GET' && $path === '/api/admin/status-override-settings') {
-            AdminPanel::statusOverrideSettings();
-        }
-        if ($method === 'POST' && $path === '/api/admin/status-override-settings') {
-            if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
-            AdminPanel::updateStatusOverrideSettings($admin, $_POST);
-        }
-    }
-}
-
-// ─── CSRF token endpoint ──────────────────────────────────────────────────────
-if ($path === '/api/csrf') {
-    header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode(['token' => CSRF::token()]);
-    exit;
-}
+$router = new \Chat\Http\Router();
+$router->dispatch();
+$user = $router->getUser();
 
 // ─── Main HTML page ───────────────────────────────────────────────────────────
 $nonce = base64_encode(random_bytes(16));
@@ -800,7 +607,8 @@ function loadRooms() {
     rooms = resp.rooms;
     const $list = $('#rooms-list').empty();
     rooms.forEach(r => {
-      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span></div>`);
+      const countBadge = r.member_count > 0 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span>${countBadge}</div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id));
       $list.append($item);
@@ -814,7 +622,8 @@ function loadRooms() {
     numera = resp.numera;
     const $list = $('#numera-list').empty();
     numera.forEach(r => {
-      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span></div>`);
+      const countBadge = r.member_count > 0 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span>${countBadge}</div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id, true));
       $list.append($item);
@@ -1313,7 +1122,8 @@ function openUserInfo(uid, uname = '') {
           </div>
           <div class="small text-muted mb-2">Последний вход: ${esc(lastSeenText)}</div>
           <div class="mb-2"><strong>Статус:</strong> ${esc(u.custom_status || '—')}</div>
-          <div class="mb-2"><strong>О себе:</strong> ${esc(u.bio || u.signature || '—')}</div>
+          ${u.signature ? `<div class="mb-2"><strong>Подпись:</strong> ${esc(u.signature)}</div>` : ''}
+          <div class="mb-2"><strong>О себе:</strong> ${esc(u.bio || '—')}</div>
           <div class="mb-2"><strong>Друзей:</strong> ${Number(u.friend_count || 0)}</div>
           <div><strong>Контакты:</strong> ${contacts.length ? contacts.join(' · ') : '—'}</div>
         </div>
@@ -1993,7 +1803,7 @@ $('#admin-users-table').off('click', '.user-del-btn').on('click', '.user-del-btn
   $.ajax({
     url: `/api/admin/users/${id}`,
     method: 'DELETE',
-    data: {csrf_token: CSRF_TOKEN},
+    headers: {'X-CSRF-Token': CSRF_TOKEN},
     success: function(resp) {
       if (resp.success) {
         showToast('Пользователь удалён.', 'success');
@@ -2011,11 +1821,23 @@ $('#admin-users-table').off('click', '.user-del-btn').on('click', '.user-del-btn
 function loadAdminRooms() {
   $.get('/api/admin/rooms', function(resp) {
     if (!resp.success) return;
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Название</th><th>Тип</th><th>Участников</th><th>Владелец</th><th></th></tr></thead><tbody>';
+    const catLabel = {permanent:'Постоянная', user:'Пользовательская', commercial:'Коммерческая'};
+    const catColor = {permanent:'secondary', user:'primary', commercial:'warning'};
+    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Название</th><th>Категория</th><th>Участников</th><th>Сообщений</th><th>Владелец</th><th>Дней</th><th></th></tr></thead><tbody>';
     resp.rooms.forEach(r => {
-      html += `<tr><td>${r.id}</td><td>${esc(r.name)}</td><td><span class="badge bg-${r.type==='public'?'primary':'warning'}">${r.type}</span></td>
-        <td>${r.member_count}</td><td>${esc(r.owner_username||'')}</td>
-        <td><button class="btn btn-sm btn-danger room-del-btn" data-id="${r.id}"><i class="fa fa-trash"></i></button></td></tr>`;
+      const cat = r.room_category || 'user';
+      const delBtn = cat !== 'permanent'
+        ? `<button class="btn btn-sm btn-danger room-del-btn" data-id="${r.id}" title="Удалить"><i class="fa fa-trash"></i></button>`
+        : `<span class="text-muted small">—</span>`;
+      html += `<tr>
+        <td>${r.id}</td>
+        <td>${esc(r.name)}</td>
+        <td><span class="badge bg-${catColor[cat]||'secondary'}">${catLabel[cat]||cat}</span></td>
+        <td>${r.member_count}</td>
+        <td>${r.message_count}</td>
+        <td>${esc(r.owner_username||'—')}</td>
+        <td>${r.days_running ?? 0}</td>
+        <td>${delBtn}</td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-rooms-table').html(html);
@@ -2024,15 +1846,41 @@ function loadAdminRooms() {
 $('#admin-rooms-table').on('click', '.room-del-btn', function() {
   const id = $(this).data('id');
   if (!confirm('Удалить комнату?')) return;
-  $.ajax({url:`/api/admin/rooms/${id}`,method:'DELETE',data:{csrf_token:CSRF_TOKEN},success:()=>{ showToast('Удалена.'); loadAdminRooms(); }});
+  $.ajax({
+    url: `/api/admin/rooms/${id}`,
+    method: 'DELETE',
+    headers: {'X-CSRF-Token': CSRF_TOKEN},
+    success: () => { showToast('Удалена.', 'success'); loadAdminRooms(); },
+    error: (xhr) => showToast(xhr.responseJSON?.error || 'Не удалось удалить.', 'danger'),
+  });
 });
 
 function loadAdminNumera() {
   $.get('/api/admin/numera', function(resp) {
     if (!resp.success) return;
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Участники</th><th>Сообщений</th><th>Закрыт</th></tr></thead><tbody>';
+    if (!resp.numera.length) {
+      $('#admin-numera-table').html('<div class="text-muted p-2">Активных нумеров нет.</div>');
+      return;
+    }
+    const fmtDuration = (min) => {
+      if (min < 60) return `${min} мин`;
+      const h = Math.floor(min / 60), m = min % 60;
+      return `${h}ч ${m}м`;
+    };
+    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th></tr></thead><tbody>';
     resp.numera.forEach(r => {
-      html += `<tr><td>${r.id}</td><td>${esc(r.participants)}</td><td>${r.message_count}</td><td>${r.closed_at||''}</td></tr>`;
+      const started = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '—';
+      const duration = fmtDuration(Number(r.minutes_running) || 0);
+      const statusDot = Number(r.member_count) > 0
+        ? '<span class="badge bg-success">Активен</span>'
+        : '<span class="badge bg-warning text-dark">Завис</span>';
+      html += `<tr>
+        <td>${r.id}</td>
+        <td>${started}</td>
+        <td>${esc(r.owner_username||'—')}</td>
+        <td class="small">${esc(r.participants||'—')}</td>
+        <td>${statusDot} ${r.member_count}</td>
+        <td>${duration}</td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-numera-table').html(html);
