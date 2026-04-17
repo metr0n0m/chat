@@ -870,7 +870,7 @@ function buildMessage(m) {
       <div class="msg-meta">
         <span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span>
         <span>${time}</span>
-        <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')}">${m.content}</span>
+        <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>
         ${deleteBtn}
       </div>
       ${embed}
@@ -975,11 +975,24 @@ function visibleRoleClass(u) {
   return 'bg-secondary';
 }
 
-function insertMention(username, prefix = '') {
+function appendInputToken(token) {
   const $input = $('#msg-input');
   const base = $input.val();
-  const mention = `${prefix}${username} `;
-  $input.val(base ? `${base}${base.endsWith(' ') ? '' : ' '}${mention}` : mention).trigger('input').focus();
+  const normalizedBase = String(base || '');
+  if (normalizedBase.endsWith(token)) {
+    $input.focus();
+    return;
+  }
+  const next = normalizedBase ? `${normalizedBase}${normalizedBase.endsWith(' ') ? '' : ' '}${token}` : token;
+  $input.val(next).trigger('input').focus();
+}
+
+function insertDirectAddress(username) {
+  appendInputToken(`${username}, `);
+}
+
+function insertWhisperTarget(username) {
+  appendInputToken(`@p+${username} `);
 }
 
 // Delete message
@@ -1127,7 +1140,7 @@ $('#online-users-list').on('click', '.online-user-avatar, .online-user-main', fu
   if ($(e.target).closest('.user-action-btn').length) return;
   const $user = $(this).closest('.online-user');
   const uname = $user.data('username');
-  insertMention(uname);
+  insertDirectAddress(uname);
 });
 
 $('#online-users-list').on('click', '.user-action-btn', function(e) {
@@ -1139,14 +1152,13 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
 
   switch (action) {
     case 'mention':
-      insertMention(uname);
+      insertDirectAddress(uname);
       break;
     case 'whisper':
       if (uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя отправить шёпот самому себе.', 'warning');
-        insertMention(uname);
       } else {
-        insertMention(uname, '@p+');
+        insertWhisperTarget(uname);
         activateWhisperMode(uid, uname);
       }
       break;
@@ -1207,15 +1219,14 @@ $(document).on('click', '#ctx-menu a', function(e) {
 
   switch (action) {
     case 'mention':
-      insertMention(uname);
+      insertDirectAddress(uname);
       break;
     case 'whisper':
       if (uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя отправить шёпот самому себе.', 'warning');
-        insertMention(uname);
         break;
       }
-      insertMention(uname, '@p+');
+      insertWhisperTarget(uname);
       activateWhisperMode(uid, uname);
       break;
     case 'invite':
