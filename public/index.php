@@ -607,7 +607,7 @@ function loadRooms() {
     rooms = resp.rooms;
     const $list = $('#rooms-list').empty();
     rooms.forEach(r => {
-      const countBadge = r.member_count > 0 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
+      const countBadge = r.member_count > 1 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
       const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span>${countBadge}</div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id));
@@ -622,7 +622,7 @@ function loadRooms() {
     numera = resp.numera;
     const $list = $('#numera-list').empty();
     numera.forEach(r => {
-      const countBadge = r.member_count > 0 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
+      const countBadge = r.member_count > 1 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
       const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span>${countBadge}</div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id, true));
@@ -1443,6 +1443,37 @@ $('#friend-search').on('input', function() { loadFriends(); });
 // ════════════════════════════════════════════════
 //  SETTINGS
 // ════════════════════════════════════════════════
+function openSettingsModal() {
+  const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+  $('[name="username"]').val(CURRENT_USER.username);
+  $('[name="signature"]').val(CURRENT_USER.signature || '');
+  $('[name="bio"]').val(CURRENT_USER.bio || '');
+  $('[name="social_telegram"]').val(CURRENT_USER.social_telegram || '');
+  $('[name="social_whatsapp"]').val(CURRENT_USER.social_whatsapp || '');
+  $('[name="social_vk"]').val(CURRENT_USER.social_vk || '');
+  $('[name="custom_status"]').val(CURRENT_USER.custom_status || '');
+  $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
+  $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
+  $('#hideLastSeenSetting').prop('checked', Number(CURRENT_USER.hide_last_seen || 0) === 1);
+  $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
+  modal.show();
+
+  $.get(`/api/users/${CURRENT_USER.id}`, function(resp) {
+    if (!resp || !resp.success || !resp.user) return;
+    Object.assign(CURRENT_USER, resp.user);
+    $('[name="signature"]').val(resp.user.signature || '');
+    $('[name="bio"]').val(resp.user.bio || '');
+    $('[name="social_telegram"]').val(resp.user.social_telegram || '');
+    $('[name="social_whatsapp"]').val(resp.user.social_whatsapp || '');
+    $('[name="social_vk"]').val(resp.user.social_vk || '');
+    $('[name="custom_status"]').val(resp.user.custom_status || '');
+    $('#hideLastSeenSetting').prop('checked', Number(resp.user.hide_last_seen || 0) === 1);
+  });
+
+  $('[name="nick_color"]').trigger('input');
+  $('[name="text_color"]').trigger('input');
+}
+
 function initSettings() {
   const colorValidity = { nick_color: true, text_color: true };
 
@@ -1450,42 +1481,6 @@ function initSettings() {
     const ok = colorValidity.nick_color && colorValidity.text_color;
     $('#settings-save-btn').prop('disabled', !ok);
   }
-
-  function openSettingsModal() {
-    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
-    $('[name="username"]').val(CURRENT_USER.username);
-    $('[name="signature"]').val(CURRENT_USER.signature || '');
-    $('[name="bio"]').val(CURRENT_USER.bio || '');
-    $('[name="social_telegram"]').val(CURRENT_USER.social_telegram || '');
-    $('[name="social_whatsapp"]').val(CURRENT_USER.social_whatsapp || '');
-    $('[name="social_vk"]').val(CURRENT_USER.social_vk || '');
-    $('[name="custom_status"]').val(CURRENT_USER.custom_status || '');
-    $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
-    $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
-    $('#hideLastSeenSetting').prop('checked', Number(CURRENT_USER.hide_last_seen || 0) === 1);
-    $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
-    modal.show();
-
-    $.get(`/api/users/${CURRENT_USER.id}`, function(resp) {
-      if (!resp || !resp.success || !resp.user) return;
-      Object.assign(CURRENT_USER, resp.user);
-      $('[name="signature"]').val(resp.user.signature || '');
-      $('[name="bio"]').val(resp.user.bio || '');
-      $('[name="social_telegram"]').val(resp.user.social_telegram || '');
-      $('[name="social_whatsapp"]').val(resp.user.social_whatsapp || '');
-      $('[name="social_vk"]').val(resp.user.social_vk || '');
-      $('[name="custom_status"]').val(resp.user.custom_status || '');
-      $('#hideLastSeenSetting').prop('checked', Number(resp.user.hide_last_seen || 0) === 1);
-    });
-
-    $('[name="nick_color"]').trigger('input');
-    $('[name="text_color"]').trigger('input');
-    syncSettingsSaveState();
-  }
-
-  $('#my-username').parent().closest('.sidebar-bottom').on('click', '#my-username', function() {
-    openSettingsModal();
-  });
 
   function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
     $(`[name="${pickerName}"]`).off('input.colorcheck').on('input.colorcheck', function() {

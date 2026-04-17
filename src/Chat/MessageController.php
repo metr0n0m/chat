@@ -26,8 +26,8 @@ class MessageController
         }
 
         $db = Connection::getInstance();
-        $params = [$roomId, 'whisper', 'system'];
-        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type NOT IN (?, ?)';
+        $params = [$roomId, 'whisper'];
+        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type != ?';
 
         if ($beforeId !== null) {
             $where .= ' AND m.id < ?';
@@ -77,8 +77,8 @@ class MessageController
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
 
         $db->execute(
-            'INSERT INTO messages (room_id, user_id, content, type, embed_data) VALUES (?, ?, ?, ?, ?)',
-            [$roomId, $actorId, $content, 'text', $embedData]
+            'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
+            [$roomId, $actorId, $content, '', 'text', $embedData]
         );
 
         return [

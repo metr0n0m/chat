@@ -102,7 +102,7 @@ class EventRouter
                 'user'     => $this->userPayload($session),
             ], $userId);
 
-            $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату');
+            $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату', $userId);
         }
     }
 
@@ -122,7 +122,7 @@ class EventRouter
             'room_id' => $roomId,
             'user_id' => $userId,
         ]);
-        $this->broadcastSystemMessage($roomId, $session['username'] . ' покинул(а) комнату');
+        $this->broadcastSystemMessage($roomId, $session['username'] . ' покинул(а) комнату', $userId);
     }
 
     private function onSendMessage(ConnectionInterface $conn, array $session, array $data): void
@@ -393,13 +393,21 @@ class EventRouter
         $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $result]);
     }
 
-    private function broadcastSystemMessage(int $roomId, string $text): void
+    private function broadcastSystemMessage(int $roomId, string $text, int $fromUserId): void
     {
         $content = htmlspecialchars($text, ENT_QUOTES);
+
+        $db = Connection::getInstance();
+        $db->execute(
+            'INSERT INTO messages (room_id, user_id, content, content_hmac, type) VALUES (?, ?, ?, ?, ?)',
+            [$roomId, $fromUserId, $content, '', 'system']
+        );
+        $msgId = (int) $db->lastInsertId();
+
         $this->cm->sendToRoom($roomId, [
             'event'   => 'system_message',
             'room_id' => $roomId,
-            'message' => ['id' => 0, 'content' => $content, 'type' => 'system', 'created_at' => date('Y-m-d H:i:s')],
+            'message' => ['id' => $msgId, 'content' => $content, 'type' => 'system', 'created_at' => date('Y-m-d H:i:s')],
         ]);
     }
 
