@@ -26,8 +26,8 @@ class MessageController
         }
 
         $db = Connection::getInstance();
-        $params = [$roomId, 'whisper'];
-        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type != ?';
+        $params = [$roomId, 'whisper', 'system'];
+        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type NOT IN (?, ?)';
 
         if ($beforeId !== null) {
             $where .= ' AND m.id < ?';
