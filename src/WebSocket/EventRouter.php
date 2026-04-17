@@ -381,6 +381,14 @@ class EventRouter
             ]);
             $this->cm->leaveRoom((int) $result['target_user_id'], $roomId);
         }
+        if ($result['muted'] ?? false) {
+            $this->cm->sendToUser((int) $result['target_user_id'], [
+                'event' => 'muted_in_room',
+                'room_id' => $roomId,
+                'muted_until' => $result['muted_until'] ?? null,
+                'reason' => $result['reason'] ?? null,
+            ]);
+        }
 
         $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $result]);
     }

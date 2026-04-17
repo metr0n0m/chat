@@ -59,6 +59,15 @@ class MessageController
 
     public static function send(int $roomId, int $actorId, array $actor, array $data): array
     {
+        $db = Connection::getInstance();
+        $memberState = $db->fetchOne(
+            'SELECT muted_until FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, $actorId]
+        );
+        if (!empty($memberState['muted_until']) && strtotime((string)$memberState['muted_until']) > time()) {
+            return ['error' => 'У вас кляп до ' . date('H:i:s', strtotime((string)$memberState['muted_until'])) . '.'];
+        }
+
         if (!self::canPost($roomId, $actorId, (string) $actor['global_role'])) {
             return ['error' => 'Нет доступа к комнате.'];
         }
@@ -70,8 +79,6 @@ class MessageController
 
         $content = self::format($raw);
         $hmac = HMAC::sign($content);
-        $db = Connection::getInstance();
-
         $embed = EmbedProcessor::process($raw);
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
 

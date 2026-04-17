@@ -16,6 +16,9 @@ class UserManager
         'admin' => 3,
         'platform_owner' => 4,
     ];
+
+    /** @var array<string,true>|null */
+    private static ?array $usersColumnCache = null;
     public static function list(int $page = 1, string $search = ''): void
     {
         $db = Connection::getInstance();
@@ -134,11 +137,19 @@ class UserManager
     public static function profile(int $userId): void
     {
         $db = Connection::getInstance();
+
+        $select = [
+            'id', 'username', 'email', 'avatar_url', 'signature', 'custom_status', 'nick_color', 'text_color',
+            'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
+        ];
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
+            if (self::hasUsersColumn($db, $optional)) {
+                $select[] = $optional;
+            }
+        }
+
         $user = $db->fetchOne(
-            'SELECT id, username, email, avatar_url, signature, custom_status, nick_color, text_color,
-                    global_role, can_create_room, is_banned, created_at, last_seen_at
-             FROM users
-             WHERE id = ?',
+            'SELECT ' . implode(', ', $select) . ' FROM users WHERE id = ?',
             [$userId]
         );
 
@@ -152,6 +163,12 @@ class UserManager
              WHERE (requester_id = ? OR addressee_id = ?) AND status = 'accepted'",
             [$userId, $userId]
         )['c'];
+
+        $user['bio'] = (string)($user['bio'] ?? '');
+        $user['social_telegram'] = (string)($user['social_telegram'] ?? '');
+        $user['social_whatsapp'] = (string)($user['social_whatsapp'] ?? '');
+        $user['social_vk'] = (string)($user['social_vk'] ?? '');
+        $user['hide_last_seen'] = (int)($user['hide_last_seen'] ?? 0);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'user' => $user], JSON_UNESCAPED_UNICODE);
@@ -196,6 +213,35 @@ class UserManager
             $signature = mb_substr(trim((string) $post['signature']), 0, 300);
             $set[] = 'signature = ?';
             $params[] = $signature;
+        }
+
+        if (self::hasUsersColumn($db, 'bio') && array_key_exists('bio', $post)) {
+            $bio = mb_substr(trim((string)$post['bio']), 0, 500);
+            $set[] = 'bio = ?';
+            $params[] = $bio === '' ? null : $bio;
+        }
+
+        if (self::hasUsersColumn($db, 'social_telegram') && array_key_exists('social_telegram', $post)) {
+            $value = mb_substr(trim((string)$post['social_telegram']), 0, 255);
+            $set[] = 'social_telegram = ?';
+            $params[] = $value === '' ? null : $value;
+        }
+
+        if (self::hasUsersColumn($db, 'social_whatsapp') && array_key_exists('social_whatsapp', $post)) {
+            $value = mb_substr(trim((string)$post['social_whatsapp']), 0, 255);
+            $set[] = 'social_whatsapp = ?';
+            $params[] = $value === '' ? null : $value;
+        }
+
+        if (self::hasUsersColumn($db, 'social_vk') && array_key_exists('social_vk', $post)) {
+            $value = mb_substr(trim((string)$post['social_vk']), 0, 255);
+            $set[] = 'social_vk = ?';
+            $params[] = $value === '' ? null : $value;
+        }
+
+        if (self::hasUsersColumn($db, 'hide_last_seen') && array_key_exists('hide_last_seen', $post)) {
+            $set[] = 'hide_last_seen = ?';
+            $params[] = (int)(bool)$post['hide_last_seen'];
         }
 
         if (array_key_exists('custom_status', $post)) {
@@ -272,11 +318,18 @@ class UserManager
         $params[] = $userId;
         $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
 
+        $select = [
+            'id', 'username', 'email', 'avatar_url', 'signature', 'custom_status', 'nick_color', 'text_color',
+            'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
+        ];
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
+            if (self::hasUsersColumn($db, $optional)) {
+                $select[] = $optional;
+            }
+        }
+
         $updated = $db->fetchOne(
-            'SELECT id, username, email, avatar_url, signature, custom_status, nick_color, text_color,
-                    global_role, can_create_room, is_banned, created_at, last_seen_at
-             FROM users
-             WHERE id = ?',
+            'SELECT ' . implode(', ', $select) . ' FROM users WHERE id = ?',
             [$userId]
         );
 
@@ -417,6 +470,21 @@ class UserManager
         }
 
         return $headers;
+    }
+
+    private static function hasUsersColumn(Connection $db, string $column): bool
+    {
+        if (self::$usersColumnCache === null) {
+            self::$usersColumnCache = [];
+            $rows = $db->fetchAll('SHOW COLUMNS FROM users');
+            foreach ($rows as $row) {
+                $name = (string)($row['Field'] ?? '');
+                if ($name !== '') {
+                    self::$usersColumnCache[$name] = true;
+                }
+            }
+        }
+        return isset(self::$usersColumnCache[$column]);
     }
 
     private static function jsonError(string $message, int $code = 400): never

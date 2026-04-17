@@ -146,6 +146,8 @@ class RoomController
 
             case 'ban':
                 return self::ban($roomId, (int) ($data['target_user_id'] ?? 0), $actorId, $actor, $permission, $db);
+            case 'mute':
+                return self::mute($roomId, (int) ($data['target_user_id'] ?? 0), $actorId, $actor, $permission, $db, $data);
 
             default:
                 return ['error' => 'Неизвестное действие.'];
@@ -219,6 +221,45 @@ class RoomController
         );
 
         return ['banned' => true, 'target_user_id' => $targetId, 'room_id' => $roomId];
+    }
+
+    private static function mute(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db, array $data): array
+    {
+        if ($permission['level'] < 2 && !in_array($actor['global_role'], ['platform_owner', 'admin', 'moderator'], true)) {
+            return ['error' => 'Нет прав.'];
+        }
+
+        $target = $db->fetchOne(
+            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, $targetId]
+        );
+        if (!$target || $target['room_role'] === 'owner' || $target['room_role'] === 'banned') {
+            return ['error' => 'Нельзя выдать кляп этому пользователю.'];
+        }
+
+        $minutes = (int)($data['minutes'] ?? 15);
+        $minutes = max(1, min(1440, $minutes));
+        $reason = mb_substr(trim((string)($data['reason'] ?? '')), 0, 255);
+
+        $db->execute(
+            'UPDATE room_members
+             SET muted_until = DATE_ADD(NOW(), INTERVAL ? MINUTE), mute_reason = ?
+             WHERE room_id = ? AND user_id = ?',
+            [$minutes, $reason !== '' ? $reason : null, $roomId, $targetId]
+        );
+
+        $row = $db->fetchOne(
+            'SELECT muted_until, mute_reason FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, $targetId]
+        );
+
+        return [
+            'muted' => true,
+            'target_user_id' => $targetId,
+            'room_id' => $roomId,
+            'muted_until' => $row['muted_until'] ?? null,
+            'reason' => $row['mute_reason'] ?? null,
+        ];
     }
 
     private static function resolvePermission(int $roomId, int $userId, array $actor): ?array

@@ -24,3 +24,22 @@
   - cancels pending timer if user reconnects
   - emits `user_left` only after grace period if user is still offline
 - Expected behavior: F5/reload no longer creates repeated `admin вошёл(а) в комнату` spam.
+
+## 2026-04-17 (user info modal + moderation)
+- Reworked `i` action semantics in `public/index.php`:
+  - `i` now opens dedicated user info modal (`#userInfoModal`) instead of profile settings.
+  - Modal shows avatar, role, status, bio/signature, friend count, last seen (with hide flag support), social links.
+  - Added action buttons in modal:
+    - mention / whisper / invite to numer
+    - room kick / room ban / room mute (for moderators/admins with room rights)
+    - global ban (for global staff)
+- Added room mute ("кляп") backend:
+  - `RoomController::manage()` supports `action='mute'` with `minutes` + `reason`.
+  - `EventRouter` sends `muted_in_room` event to target user.
+  - `MessageController::send()` blocks message sending while `muted_until` is active.
+- Extended profile/settings data model support (backward compatible with old DB):
+  - optional fields: `bio`, `social_telegram`, `social_whatsapp`, `social_vk`, `hide_last_seen`.
+  - `UserManager` now detects existing columns dynamically (`SHOW COLUMNS`) to avoid crashes before migration.
+- Updated migrations:
+  - adds optional profile fields to `users`
+  - adds `muted_until`, `mute_reason` to `room_members`.

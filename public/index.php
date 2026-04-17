@@ -486,6 +486,22 @@ body { overflow: hidden; height: 100vh; }
             <label class="form-label">Подпись (до 300 символов)</label>
             <textarea class="form-control" name="signature" maxlength="300" rows="2"></textarea>
           </div>
+          <div class="col-12">
+            <label class="form-label">О себе (до 500 символов)</label>
+            <textarea class="form-control" name="bio" maxlength="500" rows="2"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Telegram (ссылка)</label>
+            <input type="url" class="form-control" name="social_telegram" placeholder="https://t.me/...">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">WhatsApp (ссылка)</label>
+            <input type="url" class="form-control" name="social_whatsapp" placeholder="https://wa.me/...">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">VK (ссылка)</label>
+            <input type="url" class="form-control" name="social_vk" placeholder="https://vk.com/...">
+          </div>
           <div class="col-md-6">
             <label class="form-label">Отображаемый статус (до 80 символов)</label>
             <input type="text" class="form-control" name="custom_status" maxlength="80" placeholder="Например: В отпуске">
@@ -516,6 +532,12 @@ body { overflow: hidden; height: 100vh; }
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="showSystemMessagesSetting">
               <label class="form-check-label" for="showSystemMessagesSetting">Показывать сервисные сообщения в чате</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="hideLastSeenSetting" name="hide_last_seen" value="1">
+              <label class="form-check-label" for="hideLastSeenSetting">Скрывать последний вход от обычных пользователей</label>
             </div>
           </div>
           <div class="col-12">
@@ -581,6 +603,23 @@ body { overflow: hidden; height: 100vh; }
   </div></div>
 </div>
 
+<!-- User info modal -->
+<div class="modal fade" id="userInfoModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header">
+      <h5 class="modal-title"><i class="fa fa-circle-info me-2"></i>Информация о пользователе</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body" id="user-info-body">
+      <div class="text-muted">Загрузка...</div>
+    </div>
+    <div class="modal-footer d-flex justify-content-between">
+      <div id="user-info-actions" class="d-flex flex-wrap gap-2"></div>
+      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
+    </div>
+  </div></div>
+</div>
+
 <!-- Invite modal -->
 <div class="modal fade" id="inviteModal" tabindex="-1">
   <div class="modal-dialog modal-sm"><div class="modal-content">
@@ -631,6 +670,8 @@ let currentRoomRole = null;
 let currentOnlineUsers = [];
 let whisperToId   = null;
 let whisperToName = null;
+let infoUserId = null;
+let infoUsername = '';
 let isScrolledToBottom = true;
 let oldestMessageId = null;
 let rooms = [];
@@ -734,6 +775,7 @@ function handleWS(data) {
     case 'numer_destroyed': onNumerDestroyed(data); break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onKickedFromRoom(data); break;
+    case 'muted_in_room':    onMutedInRoom(data); break;
     case 'room_deleted':     onRoomDeleted(data); break;
     case 'room_updated':     loadRooms(); break;
     case 'friend_online':
@@ -1192,11 +1234,7 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       toggleIgnoreUser(uid, uname);
       break;
     case 'info':
-      if (uid === Number(CURRENT_USER.id)) {
-        new bootstrap.Modal(document.getElementById('settingsModal')).show();
-      } else {
-        showUserCtxMenu(e, uid, uname || (`ID ${uid}`));
-      }
+      openUserInfo(uid, uname || (`ID ${uid}`));
       break;
   }
 });
@@ -1236,6 +1274,113 @@ function showUserCtxMenu(e, uid, uname) {
 
   $menu.css({top: e.clientY, left: e.clientX}).show();
 }
+
+function openUserInfo(uid, uname = '') {
+  infoUserId = Number(uid || 0);
+  infoUsername = String(uname || '').trim();
+  if (!infoUserId) return;
+
+  const $body = $('#user-info-body');
+  const $actions = $('#user-info-actions');
+  $body.html('<div class="text-muted">Загрузка...</div>');
+  $actions.empty();
+
+  $.get(`/api/users/${infoUserId}`, function(resp) {
+    if (!resp || !resp.success || !resp.user) {
+      $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
+      return;
+    }
+
+    const u = resp.user;
+    const showLastSeen = !(Number(u.hide_last_seen || 0) === 1) || canModerateCurrentRoom() || ['platform_owner', 'admin'].includes(CURRENT_USER.global_role);
+    const roleText = roleLabel(u.global_role) || roomRoleLabel(u.room_role || '') || 'Пользователь';
+    const lastSeenText = showLastSeen
+      ? (u.last_seen_at ? dayjs(u.last_seen_at).format('YYYY-MM-DD HH:mm:ss') : 'нет данных')
+      : 'скрыт';
+
+    const contacts = [];
+    if (u.social_telegram) contacts.push(`<a href="${esc(u.social_telegram)}" target="_blank" rel="noopener noreferrer">Telegram</a>`);
+    if (u.social_whatsapp) contacts.push(`<a href="${esc(u.social_whatsapp)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`);
+    if (u.social_vk) contacts.push(`<a href="${esc(u.social_vk)}" target="_blank" rel="noopener noreferrer">VK</a>`);
+
+    $body.html(`
+      <div class="d-flex gap-3 align-items-start">
+        <div>${avatarMarkup(u.avatar_url, 72)}</div>
+        <div class="flex-1">
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+            <strong style="color:${esc(u.nick_color || '#fff')}">${esc(u.username || infoUsername || ('ID ' + infoUserId))}</strong>
+            <span class="badge bg-secondary">${esc(roleText)}</span>
+          </div>
+          <div class="small text-muted mb-2">Последний вход: ${esc(lastSeenText)}</div>
+          <div class="mb-2"><strong>Статус:</strong> ${esc(u.custom_status || '—')}</div>
+          <div class="mb-2"><strong>О себе:</strong> ${esc(u.bio || u.signature || '—')}</div>
+          <div class="mb-2"><strong>Друзей:</strong> ${Number(u.friend_count || 0)}</div>
+          <div><strong>Контакты:</strong> ${contacts.length ? contacts.join(' · ') : '—'}</div>
+        </div>
+      </div>
+    `);
+
+    const isSelf = Number(infoUserId) === Number(CURRENT_USER.id);
+    const canModRoom = canModerateCurrentRoom() && !isSelf;
+    const canGlobal = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) && !isSelf;
+
+    $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="mention">Обратиться</button>`);
+    $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="whisper">Шёпот</button>`);
+    $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="invite">В нумер</button>`);
+
+    if (canModRoom) {
+      $actions.append(`<button type="button" class="btn btn-sm btn-outline-warning user-info-action-btn" data-action="room-kick">Удалить из комнаты</button>`);
+      $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-ban">Бан в комнате</button>`);
+      $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-mute">Кляп</button>`);
+    }
+    if (canGlobal) {
+      $actions.append(`<button type="button" class="btn btn-sm btn-danger user-info-action-btn" data-action="ban-global">Глобальный бан</button>`);
+    }
+  }).fail(function() {
+    $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
+  });
+
+  new bootstrap.Modal(document.getElementById('userInfoModal')).show();
+}
+
+$('#user-info-actions').on('click', '.user-info-action-btn', function() {
+  const action = String($(this).data('action') || '');
+  const uid = Number(infoUserId || 0);
+  const uname = infoUsername || (`ID ${uid}`);
+  if (!uid) return;
+
+  switch (action) {
+    case 'mention':
+      insertDirectAddress(uname);
+      break;
+    case 'whisper':
+      activateWhisperMode(uid, uname);
+      break;
+    case 'invite':
+      wsSend('invite_user', {to_user_id: uid});
+      showToast(`Запрос в нумер: ${uname}`);
+      break;
+    case 'room-kick':
+      executeRoomAction('kick', uid, 'Удалить пользователя из комнаты?');
+      break;
+    case 'room-ban':
+      executeRoomAction('ban', uid, 'Забанить пользователя в комнате?');
+      break;
+    case 'room-mute': {
+      const minutesRaw = prompt('Кляп на сколько минут? (1-1440)', '15');
+      if (minutesRaw === null) return;
+      const minutes = Math.max(1, Math.min(1440, Number(minutesRaw) || 15));
+      const reason = prompt('Причина кляпа (необязательно):', '') || '';
+      executeRoomAction('mute', uid, null, {minutes, reason});
+      break;
+    }
+    case 'ban-global':
+      if (confirm('Забанить пользователя глобально?')) {
+        $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Пользователь заблокирован.'));
+      }
+      break;
+  }
+});
 
 $(document).on('click', '#ctx-menu a', function(e) {
   e.preventDefault();
@@ -1444,6 +1589,13 @@ function onKickedFromRoom(data) {
   }
 }
 
+function onMutedInRoom(data) {
+  if (data.room_id !== currentRoomId) return;
+  const until = data.muted_until ? dayjs(data.muted_until).format('HH:mm:ss') : '';
+  const reason = data.reason ? ` Причина: ${data.reason}` : '';
+  showToast(`Вам выдан кляп${until ? ` до ${until}` : ''}.${reason}`, 'warning');
+}
+
 function onRoomDeleted(data) {
   if (data.room_id === currentRoomId) {
     showToast('Комната была удалена.', 'warning');
@@ -1489,18 +1641,40 @@ function initSettings() {
     $('#settings-save-btn').prop('disabled', !ok);
   }
 
-  $('#my-username').parent().closest('.sidebar-bottom').on('click', '#my-username', function() {
+  function openSettingsModal() {
     const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
     $('[name="username"]').val(CURRENT_USER.username);
     $('[name="signature"]').val(CURRENT_USER.signature || '');
+    $('[name="bio"]').val(CURRENT_USER.bio || '');
+    $('[name="social_telegram"]').val(CURRENT_USER.social_telegram || '');
+    $('[name="social_whatsapp"]').val(CURRENT_USER.social_whatsapp || '');
+    $('[name="social_vk"]').val(CURRENT_USER.social_vk || '');
     $('[name="custom_status"]').val(CURRENT_USER.custom_status || '');
     $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
     $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
+    $('#hideLastSeenSetting').prop('checked', Number(CURRENT_USER.hide_last_seen || 0) === 1);
     $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
     modal.show();
+
+    $.get(`/api/users/${CURRENT_USER.id}`, function(resp) {
+      if (!resp || !resp.success || !resp.user) return;
+      Object.assign(CURRENT_USER, resp.user);
+      $('[name="signature"]').val(resp.user.signature || '');
+      $('[name="bio"]').val(resp.user.bio || '');
+      $('[name="social_telegram"]').val(resp.user.social_telegram || '');
+      $('[name="social_whatsapp"]').val(resp.user.social_whatsapp || '');
+      $('[name="social_vk"]').val(resp.user.social_vk || '');
+      $('[name="custom_status"]').val(resp.user.custom_status || '');
+      $('#hideLastSeenSetting').prop('checked', Number(resp.user.hide_last_seen || 0) === 1);
+    });
+
     $('[name="nick_color"]').trigger('input');
     $('[name="text_color"]').trigger('input');
     syncSettingsSaveState();
+  }
+
+  $('#my-username').parent().closest('.sidebar-bottom').on('click', '#my-username', function() {
+    openSettingsModal();
   });
 
   function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
@@ -1540,6 +1714,7 @@ function initSettings() {
 
     const fd = new FormData(this);
     fd.set('csrf_token', CSRF_TOKEN);
+    fd.set('hide_last_seen', $('#hideLastSeenSetting').is(':checked') ? '1' : '0');
     $('#settings-error').addClass('d-none');
     $('#settings-success').addClass('d-none');
     $.ajax({
@@ -1577,7 +1752,7 @@ function initSettings() {
 
 function initSidebar() {
   $('#my-username').css('cursor','pointer');
-  $('#my-username').on('click', () => new bootstrap.Modal(document.getElementById('settingsModal')).show());
+  $('#my-username').on('click', openSettingsModal);
 
   $('#room-manage-btn').on('click', function() {
     if (!currentRoomId) return;

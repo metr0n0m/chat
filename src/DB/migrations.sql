@@ -136,6 +136,17 @@ CREATE TABLE IF NOT EXISTS `avatar_uploads` (
 ALTER TABLE `users`
   ADD COLUMN IF NOT EXISTS `custom_status` VARCHAR(80) DEFAULT NULL AFTER `signature`;
 
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `bio` VARCHAR(500) DEFAULT NULL AFTER `signature`,
+  ADD COLUMN IF NOT EXISTS `social_telegram` VARCHAR(255) DEFAULT NULL AFTER `bio`,
+  ADD COLUMN IF NOT EXISTS `social_whatsapp` VARCHAR(255) DEFAULT NULL AFTER `social_telegram`,
+  ADD COLUMN IF NOT EXISTS `social_vk` VARCHAR(255) DEFAULT NULL AFTER `social_whatsapp`,
+  ADD COLUMN IF NOT EXISTS `hide_last_seen` TINYINT(1) DEFAULT 0 AFTER `last_seen_at`;
+
+ALTER TABLE `room_members`
+  ADD COLUMN IF NOT EXISTS `muted_until` DATETIME NULL AFTER `banned_by`,
+  ADD COLUMN IF NOT EXISTS `mute_reason` VARCHAR(255) NULL AFTER `muted_until`;
+
 SET foreign_key_checks = 1;
 
 INSERT IGNORE INTO `app_settings` (`name`, `value`) VALUES
