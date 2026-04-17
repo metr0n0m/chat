@@ -1048,10 +1048,15 @@ function sendMessage() {
   if (!content || !currentRoomId) return;
 
   if (whisperToId) {
+    const whisperContent = normalizeWhisperContent(content, whisperToName);
+    if (!whisperContent) {
+      showToast('Введите текст шёпота.', 'warning');
+      return;
+    }
     wsSend('send_whisper', {
       room_id:     currentRoomId,
       to_user_id:  whisperToId,
-      content:     content,
+      content:     whisperContent,
     });
     clearWhisperMode();
   } else {
@@ -1063,6 +1068,21 @@ function sendMessage() {
 
   $('#msg-input').val('').trigger('input');
   autosize.update(document.getElementById('msg-input'));
+}
+
+function normalizeWhisperContent(content, username) {
+  let text = String(content || '').trim();
+  if (!text) return '';
+
+  const target = String(username || '').trim();
+  if (target) {
+    const escTarget = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(`^@p\\+${escTarget}\\s+`, 'iu'), '');
+    text = text.replace(new RegExp(`^${escTarget},\\s*`, 'iu'), '');
+  }
+
+  text = text.replace(/^@p\+\S+\s+/iu, '').trim();
+  return text;
 }
 
 function wrapSelection(el, marker) {

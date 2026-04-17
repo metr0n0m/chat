@@ -32,7 +32,7 @@ class WhisperController
             return ['error' => Lang::get('errors.whisper.user_not_in_room')];
         }
 
-        $raw = trim($rawContent);
+        $raw = self::normalizeInput($rawContent, (string) ($toMember['username'] ?? ''));
         if ($raw === '' || mb_strlen($raw) > 2000) {
             return ['error' => Lang::get('errors.whisper.empty_or_too_long')];
         }
@@ -115,5 +115,26 @@ class WhisperController
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'whispers' => $items, 'page' => $page], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    /**
+     * Убирает служебные whisper-префиксы из текста перед сохранением.
+     * Last updated: 2026-04-17.
+     */
+    private static function normalizeInput(string $raw, string $toUsername): string
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return '';
+        }
+
+        if ($toUsername !== '') {
+            $quoted = preg_quote($toUsername, '/');
+            $text = (string) preg_replace('/^@p\+' . $quoted . '\s+/iu', '', $text);
+            $text = (string) preg_replace('/^' . $quoted . ',\s*/iu', '', $text);
+        }
+
+        $text = (string) preg_replace('/^@p\+\S+\s+/iu', '', $text);
+        return trim($text);
     }
 }
