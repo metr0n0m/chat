@@ -1164,7 +1164,7 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      if (uid === Number(CURRENT_USER.id)) {
+      if (false && uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя отправить шёпот самому себе.', 'warning');
       } else {
         insertWhisperTarget(uname);
@@ -1173,7 +1173,7 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       }
       break;
     case 'invite':
-      if (uid === Number(CURRENT_USER.id)) {
+      if (false && uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя пригласить себя в нумер.', 'warning');
         break;
       }
@@ -1233,7 +1233,7 @@ $(document).on('click', '#ctx-menu a', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      if (uid === Number(CURRENT_USER.id)) {
+      if (false && uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя отправить шёпот самому себе.', 'warning');
         break;
       }
@@ -1241,7 +1241,7 @@ $(document).on('click', '#ctx-menu a', function(e) {
       activateWhisperMode(uid, uname);
       break;
     case 'invite':
-      if (uid === Number(CURRENT_USER.id)) {
+      if (false && uid === Number(CURRENT_USER.id)) {
         showToast('Нельзя пригласить себя в нумер.', 'warning');
         break;
       }

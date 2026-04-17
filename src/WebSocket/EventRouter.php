@@ -210,6 +210,19 @@ class EventRouter
             return;
         }
 
+        if (!empty($result['self_created'])) {
+            $roomId = (int) ($result['room_id'] ?? 0);
+            if ($roomId > 0 && !$this->cm->isInRoom($fromId, $roomId)) {
+                $this->cm->joinRoom($conn, $roomId);
+            }
+            $this->cm->sendToConnection($conn, [
+                'event'   => 'numer_joined',
+                'room_id' => $roomId,
+                'members' => $result['members'] ?? [],
+            ]);
+            return;
+        }
+
         $this->cm->sendToConnection($conn, ['event' => 'invite_sent', 'invitation' => $result]);
 
         $this->cm->sendToUser($toId, [

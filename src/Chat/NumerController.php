@@ -9,11 +9,17 @@ class NumerController
 {
     public static function invite(int $fromId, array $from, int $toId): array
     {
-        if ($fromId === $toId) {
-            return ['error' => 'Нельзя пригласить себя.'];
-        }
-
         $db = Connection::getInstance();
+        $numerId = self::findOrCreateOwnedNumer($db, $fromId);
+
+        // Разрешаем создавать нумер в одиночку (invite на самого себя).
+        if ($fromId === $toId) {
+            return [
+                'self_created' => true,
+                'room_id' => $numerId,
+                'members' => self::roomMembers($db, $numerId),
+            ];
+        }
 
         $pendingCount = (int) $db->fetchOne(
             "SELECT COUNT(*) AS c FROM invitations WHERE from_user_id = ? AND status = 'pending'",
@@ -27,32 +33,8 @@ class NumerController
             'SELECT id, username, is_banned FROM users WHERE id = ?',
             [$toId]
         );
-        if (!$toUser || $toUser['is_banned']) {
+        if (!$toUser || (int) $toUser['is_banned'] === 1) {
             return ['error' => 'Пользователь не найден.'];
-        }
-
-        // Find or create numer where from is owner and it's open and has < 4 members
-        $numer = $db->fetchOne(
-            "SELECT r.id FROM rooms r
-             JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = ? AND rm.room_role = 'owner'
-             WHERE r.type = 'numer' AND r.is_closed = 0
-             HAVING (SELECT COUNT(*) FROM room_members WHERE room_id = r.id AND room_role != 'banned') < 4
-             LIMIT 1",
-            [$fromId]
-        );
-
-        if (!$numer) {
-            $db->execute(
-                "INSERT INTO rooms (name, type, owner_id, max_members) VALUES (?, 'numer', ?, 4)",
-                ['Нумер #' . $fromId, $fromId]
-            );
-            $numerId = (int) $db->lastInsertId();
-            $db->execute(
-                'INSERT INTO room_members (room_id, user_id, room_role) VALUES (?, ?, ?)',
-                [$numerId, $fromId, 'owner']
-            );
-        } else {
-            $numerId = (int) $numer['id'];
         }
 
         $expiresAt = date('Y-m-d H:i:s', time() + 30);
@@ -110,19 +92,11 @@ class NumerController
             [$roomId, $userId, 'member']
         );
 
-        $members = $db->fetchAll(
-            'SELECT u.id, u.username, u.nick_color, u.avatar_url
-             FROM room_members rm
-             JOIN users u ON u.id = rm.user_id
-             WHERE rm.room_id = ?',
-            [$roomId]
-        );
-
         return [
             'accepted'      => true,
             'invitation_id' => $invId,
             'room_id'       => $roomId,
-            'members'       => $members,
+            'members'       => self::roomMembers($db, $roomId),
         ];
     }
 
@@ -194,10 +168,50 @@ class NumerController
             'new_owner_id' => $newOwnerId,
         ];
     }
+
     public static function expireInvitations(): void
     {
         Connection::getInstance()->execute(
             "UPDATE invitations SET status = 'expired' WHERE status = 'pending' AND expires_at <= NOW()"
+        );
+    }
+
+    private static function findOrCreateOwnedNumer(Connection $db, int $ownerId): int
+    {
+        $numer = $db->fetchOne(
+            "SELECT r.id FROM rooms r
+             JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = ? AND rm.room_role = 'owner'
+             WHERE r.type = 'numer' AND r.is_closed = 0
+             HAVING (SELECT COUNT(*) FROM room_members WHERE room_id = r.id AND room_role != 'banned') < 4
+             LIMIT 1",
+            [$ownerId]
+        );
+
+        if ($numer) {
+            return (int) $numer['id'];
+        }
+
+        $db->execute(
+            "INSERT INTO rooms (name, type, owner_id, max_members) VALUES (?, 'numer', ?, 4)",
+            ['Нумер #' . $ownerId, $ownerId]
+        );
+        $numerId = (int) $db->lastInsertId();
+        $db->execute(
+            'INSERT INTO room_members (room_id, user_id, room_role) VALUES (?, ?, ?)',
+            [$numerId, $ownerId, 'owner']
+        );
+
+        return $numerId;
+    }
+
+    private static function roomMembers(Connection $db, int $roomId): array
+    {
+        return $db->fetchAll(
+            'SELECT u.id, u.username, u.nick_color, u.avatar_url
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ?',
+            [$roomId]
         );
     }
 }

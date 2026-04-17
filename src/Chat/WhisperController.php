@@ -10,10 +10,6 @@ class WhisperController
 {
     public static function send(int $roomId, int $fromId, array $from, int $toId, string $rawContent): array
     {
-        if ($fromId === $toId) {
-            return ['error' => 'Нельзя шептать самому себе.'];
-        }
-
         $db = Connection::getInstance();
 
         $toMember = $db->fetchOne(
