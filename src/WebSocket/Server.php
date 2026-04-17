@@ -3,19 +3,25 @@ declare(strict_types=1);
 
 namespace Chat\WebSocket;
 
-use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
+use Ratchet\MessageComponentInterface;
 use Chat\Security\Session;
-use Chat\DB\Connection;
+use React\EventLoop\Loop;
+use React\EventLoop\TimerInterface;
 
 class Server implements MessageComponentInterface
 {
+    private const RECONNECT_GRACE_SECONDS = 12;
+
     private ConnectionManager $cm;
     private EventRouter $router;
 
+    /** @var array<int, TimerInterface> */
+    private array $pendingDisconnectTimers = [];
+
     public function __construct()
     {
-        $this->cm     = new ConnectionManager();
+        $this->cm = new ConnectionManager();
         $this->router = new EventRouter($this->cm);
 
         echo '[WS] Server started on port ' . WS_PORT . PHP_EOL;
@@ -49,17 +55,22 @@ class Server implements MessageComponentInterface
         }
 
         $this->cm->add($conn, $session);
+        $userId = (int) $session['id'];
+        if (isset($this->pendingDisconnectTimers[$userId])) {
+            Loop::cancelTimer($this->pendingDisconnectTimers[$userId]);
+            unset($this->pendingDisconnectTimers[$userId]);
+        }
 
         $conn->send(json_encode([
             'event' => 'connected',
-            'user'  => [
-                'id'             => $session['id'],
-                'username'       => $session['username'],
-                'nick_color'     => $session['nick_color'],
-                'text_color'     => $session['text_color'],
-                'avatar_url'     => $session['avatar_url'],
-                'global_role'    => $session['global_role'],
-                'can_create_room'=> (bool) $session['can_create_room'],
+            'user' => [
+                'id' => $session['id'],
+                'username' => $session['username'],
+                'nick_color' => $session['nick_color'],
+                'text_color' => $session['text_color'],
+                'avatar_url' => $session['avatar_url'],
+                'global_role' => $session['global_role'],
+                'can_create_room' => (bool) $session['can_create_room'],
             ],
         ]));
 
@@ -72,28 +83,63 @@ class Server implements MessageComponentInterface
         if (!is_array($data) || !isset($data['event'])) {
             return;
         }
+
         try {
             $this->router->route($from, $data);
         } catch (\Throwable $e) {
             echo '[WS] Error: ' . $e->getMessage() . PHP_EOL;
-            $this->cm->sendToConnection($from, ['event' => 'error', 'message' => 'Внутренняя ошибка.']);
+            $this->cm->sendToConnection($from, [
+                'event' => 'error',
+                'message' => 'Внутренняя ошибка.',
+            ]);
         }
     }
 
     public function onClose(ConnectionInterface $conn): void
     {
-        $session = $this->cm->remove($conn);
-        if ($session) {
-            echo '[WS] Disconnected: ' . $session['username'] . ' (' . $conn->resourceId . ')' . PHP_EOL;
+        $removed = $this->cm->remove($conn);
+        if (!$removed) {
+            return;
+        }
 
-            foreach ($this->cm->getUserRooms((int) $session['id']) as $roomId) {
-                $this->cm->sendToRoom((int) $roomId, [
-                    'event'   => 'user_left',
+        $session = $removed['session'] ?? null;
+        if (!is_array($session)) {
+            return;
+        }
+
+        $userId = (int) ($session['id'] ?? 0);
+        echo '[WS] Disconnected: ' . ($session['username'] ?? 'unknown') . ' (' . $conn->resourceId . ')' . PHP_EOL;
+
+        if (empty($removed['went_offline']) || $userId <= 0) {
+            return;
+        }
+
+        if (isset($this->pendingDisconnectTimers[$userId])) {
+            Loop::cancelTimer($this->pendingDisconnectTimers[$userId]);
+            unset($this->pendingDisconnectTimers[$userId]);
+        }
+
+        $rooms = array_map('intval', (array) ($removed['rooms'] ?? []));
+        $this->pendingDisconnectTimers[$userId] = Loop::addTimer(self::RECONNECT_GRACE_SECONDS, function () use ($userId, $rooms) {
+            unset($this->pendingDisconnectTimers[$userId]);
+
+            // User reconnected during grace period: keep room presence untouched.
+            if ($this->cm->isUserOnline($userId)) {
+                return;
+            }
+
+            foreach ($rooms as $roomId) {
+                if ($roomId <= 0 || !$this->cm->isInRoom($userId, $roomId)) {
+                    continue;
+                }
+                $this->cm->leaveRoom($userId, $roomId);
+                $this->cm->sendToRoom($roomId, [
+                    'event' => 'user_left',
                     'room_id' => $roomId,
-                    'user_id' => $session['id'],
+                    'user_id' => $userId,
                 ]);
             }
-        }
+        });
     }
 
     public function onError(ConnectionInterface $conn, \Exception $e): void
@@ -116,9 +162,9 @@ class Server implements MessageComponentInterface
             if (!$part) {
                 continue;
             }
-            $pos  = strpos($part, '=');
+            $pos = strpos($part, '=');
             $name = $pos !== false ? substr($part, 0, $pos) : $part;
-            $val  = $pos !== false ? substr($part, $pos + 1) : '';
+            $val = $pos !== false ? substr($part, $pos + 1) : '';
             $cookies[trim($name)] = urldecode(trim($val));
         }
         return $cookies;

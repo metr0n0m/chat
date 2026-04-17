@@ -53,19 +53,19 @@ class ConnectionManager
             $this->userConnections[$userId][$connId]
         );
 
+        $rooms = array_keys($this->userRooms[$userId] ?? []);
+        $wentOffline = false;
+
         if (empty($this->userConnections[$userId])) {
             unset($this->userConnections[$userId]);
+            $wentOffline = true;
         }
 
-        foreach (array_keys($this->userRooms[$userId] ?? []) as $roomId) {
-            unset($this->roomMembers[$roomId][$userId]);
-            if (empty($this->roomMembers[$roomId])) {
-                unset($this->roomMembers[$roomId]);
-            }
-        }
-        unset($this->userRooms[$userId]);
-
-        return $session;
+        return [
+            'session' => $session,
+            'rooms' => $rooms,
+            'went_offline' => $wentOffline,
+        ];
     }
 
     public function getSession(ConnectionInterface $conn): ?array
@@ -87,6 +87,12 @@ class ConnectionManager
     public function leaveRoom(int $userId, int $roomId): void
     {
         unset($this->roomMembers[$roomId][$userId], $this->userRooms[$userId][$roomId]);
+        if (empty($this->roomMembers[$roomId])) {
+            unset($this->roomMembers[$roomId]);
+        }
+        if (empty($this->userRooms[$userId])) {
+            unset($this->userRooms[$userId]);
+        }
     }
 
     public function isInRoom(int $userId, int $roomId): bool

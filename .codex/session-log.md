@@ -12,3 +12,15 @@
   1. Complete full UTF-8 cleanup in `public/index.php` + websocket/admin strings.
   2. Finish language key extraction into `config/lang/ru.php` and `Lang::get()` usage.
   3. Re-test chat actions in browser (info, whisper, invite, room admin actions).
+
+## 2026-04-17 (ws reconnect presence)
+- Fixed repeated `user joined` spam on page refresh by introducing reconnect grace flow in WS server.
+- `ConnectionManager::remove()` now keeps room membership when user briefly disconnects and reports:
+  - `session`
+  - `rooms`
+  - `went_offline`
+- `Server::onClose()` now:
+  - schedules delayed offline finalization (`12s`)
+  - cancels pending timer if user reconnects
+  - emits `user_left` only after grace period if user is still offline
+- Expected behavior: F5/reload no longer creates repeated `admin вошёл(а) в комнату` spam.
