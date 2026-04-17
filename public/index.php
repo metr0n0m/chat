@@ -186,7 +186,12 @@ body { overflow: hidden; height: 100vh; }
   <div id="sidebar-left">
     <div class="sidebar-header d-flex align-items-center justify-content-between">
       <span><i class="fa fa-comments me-2 text-primary"></i><?= htmlspecialchars(APP_NAME, ENT_QUOTES) ?></span>
-      <button id="themeToggle" class="btn btn-sm btn-outline-secondary" title="Сменить тему"><i class="fa fa-moon"></i></button>
+      <div class="d-flex gap-1">
+        <?php if ($user['can_create_room'] || in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
+        <button id="createRoomBtn" class="btn btn-sm btn-outline-primary" title="Создать комнату"><i class="fa fa-plus"></i></button>
+        <?php endif; ?>
+        <button id="themeToggle" class="btn btn-sm btn-outline-secondary" title="Сменить тему"><i class="fa fa-moon"></i></button>
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto">
@@ -315,25 +320,21 @@ body { overflow: hidden; height: 100vh; }
           </div>
           <div class="col-md-6">
             <label class="form-label">Цвет ника</label>
-            <div class="d-flex gap-2 align-items-center">
-              <input type="color" class="form-control form-control-color" name="nick_color" id="nickColorPicker">
-              <div>
-                <div class="color-preview-box" id="nick-preview-light" style="background:#f8f9fa">Ник</div>
-                <div class="color-preview-box" id="nick-preview-dark" style="background:#212529;margin-top:2px">Ник</div>
-              </div>
-              <div id="nick-color-feedback" class="small"></div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <input type="color" class="form-control form-control-color" name="nick_color" id="nickColorPicker" style="width:46px;height:38px;padding:2px">
+              <div class="color-preview-box" id="nick-preview-light" style="background:#f8f9fa">Ник</div>
+              <div class="color-preview-box" id="nick-preview-dark" style="background:#212529">Ник</div>
             </div>
+            <div id="nick-color-feedback" class="small"></div>
           </div>
           <div class="col-md-6">
             <label class="form-label">Цвет текста</label>
-            <div class="d-flex gap-2 align-items-center">
-              <input type="color" class="form-control form-control-color" name="text_color" id="textColorPicker">
-              <div>
-                <div class="color-preview-box" id="text-preview-light" style="background:#f8f9fa">Текст</div>
-                <div class="color-preview-box" id="text-preview-dark" style="background:#212529;margin-top:2px">Текст</div>
-              </div>
-              <div id="text-color-feedback" class="small"></div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <input type="color" class="form-control form-control-color" name="text_color" id="textColorPicker" style="width:46px;height:38px;padding:2px">
+              <div class="color-preview-box" id="text-preview-light" style="background:#f8f9fa">Текст</div>
+              <div class="color-preview-box" id="text-preview-dark" style="background:#212529">Текст</div>
             </div>
+            <div id="text-color-feedback" class="small"></div>
           </div>
           <div class="col-12">
             <div class="form-check">
@@ -363,6 +364,27 @@ body { overflow: hidden; height: 100vh; }
         <div id="settings-error" class="alert alert-danger mt-3 d-none"></div>
         <div id="settings-success" class="alert alert-success mt-3 d-none">Настройки сохранены.</div>
         <button type="submit" class="btn btn-primary mt-3" id="settings-save-btn">Сохранить</button>
+      </form>
+    </div>
+  </div></div>
+</div>
+
+<!-- Create room modal -->
+<div class="modal fade" id="createRoomModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Создать комнату</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <form id="createRoomForm">
+        <div class="mb-3">
+          <label class="form-label">Название (2–100 символов)</label>
+          <input type="text" class="form-control" name="name" minlength="2" maxlength="100" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Описание (необязательно)</label>
+          <input type="text" class="form-control" name="description" maxlength="300">
+        </div>
+        <div id="create-room-error" class="alert alert-danger d-none"></div>
+        <button type="submit" class="btn btn-primary w-100">Создать</button>
       </form>
     </div>
   </div></div>
@@ -485,6 +507,7 @@ let rooms = [];
 let numera = [];
 const ignoredUserIds = new Set();
 const pendingInviteRooms = new Map();
+const onlineCountsByRoom = new Map();
 const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 
 // ════════════════════════════════════════════════
@@ -601,18 +624,27 @@ function onWSConnected(data) {
 // ════════════════════════════════════════════════
 //  ROOMS
 // ════════════════════════════════════════════════
+function updateRoomBadge(roomId) {
+  const count = onlineCountsByRoom.get(Number(roomId)) || 0;
+  const $item = $(`.room-item[data-id="${roomId}"]`);
+  $item.find('.room-count-badge').remove();
+  if (count > 1) {
+    $item.append(`<span class="badge bg-secondary ms-1 room-count-badge" style="font-size:.65rem">${count}</span>`);
+  }
+}
+
 function loadRooms() {
   $.get('/api/rooms', function(resp) {
     if (!resp.success) return;
     rooms = resp.rooms;
     const $list = $('#rooms-list').empty();
     rooms.forEach(r => {
-      const countBadge = r.member_count > 1 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
-      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span>${countBadge}</div>`);
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span></div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id));
       $list.append($item);
     });
+    onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
     if (!currentRoomId && rooms.length > 0) {
       joinRoom(rooms[0].id);
     }
@@ -622,12 +654,12 @@ function loadRooms() {
     numera = resp.numera;
     const $list = $('#numera-list').empty();
     numera.forEach(r => {
-      const countBadge = r.member_count > 1 ? `<span class="badge bg-secondary ms-1" style="font-size:.65rem">${r.member_count}</span>` : '';
-      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span>${countBadge}</div>`);
+      const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span></div>`);
       if (r.id === currentRoomId) $item.addClass('active');
       $item.on('click', () => joinRoom(r.id, true));
       $list.append($item);
     });
+    onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
   });
 }
 
@@ -686,8 +718,8 @@ function onRoomJoined(data) {
   currentRoomRole = data.my_role || null;
   $('#room-title').text(room.name || 'Комната');
   renderOnlineList(data.online || []);
-  $('#panel-online-count').text((data.online || []).length);
-  $('#room-online-count').text(`${(data.online || []).length} онлайн`);
+  onlineCountsByRoom.set(Number(data.room_id), (data.online || []).length);
+  updateRoomBadge(data.room_id);
 
   const canManage = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || ['owner', 'local_admin', 'local_moderator'].includes(data.my_role);
   $('#room-manage-btn').toggleClass('d-none', !canManage);
@@ -697,11 +729,16 @@ function onRoomJoined(data) {
 function onUserJoined(data) {
   if (data.room_id !== currentRoomId) return;
   addToOnlineList(data.user);
+  onlineCountsByRoom.set(Number(data.room_id), (onlineCountsByRoom.get(Number(data.room_id)) || 0) + 1);
+  updateRoomBadge(data.room_id);
 }
 
 function onUserLeft(data) {
   if (data.room_id !== currentRoomId) return;
   removeFromOnlineList(data.user_id);
+  const cur = onlineCountsByRoom.get(Number(data.room_id)) || 0;
+  onlineCountsByRoom.set(Number(data.room_id), Math.max(0, cur - 1));
+  updateRoomBadge(data.room_id);
 }
 
 // ════════════════════════════════════════════════
@@ -1482,6 +1519,10 @@ function initSettings() {
     $('#settings-save-btn').prop('disabled', !ok);
   }
 
+  $('#showSystemMessagesSetting').on('change', function() {
+    localStorage.setItem('show_system_messages', $(this).is(':checked') ? '1' : '0');
+  });
+
   function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
     $(`[name="${pickerName}"]`).off('input.colorcheck').on('input.colorcheck', function() {
       const hex = $(this).val();
@@ -1558,6 +1599,37 @@ function initSettings() {
 function initSidebar() {
   $('#my-username').css('cursor','pointer');
   $('#my-username').on('click', openSettingsModal);
+
+  $('#createRoomBtn').on('click', function() {
+    $('#createRoomForm')[0].reset();
+    $('#create-room-error').addClass('d-none');
+    new bootstrap.Modal(document.getElementById('createRoomModal')).show();
+  });
+
+  $('#createRoomForm').on('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    fd.set('csrf_token', CSRF_TOKEN);
+    $.ajax({
+      url: '/api/rooms',
+      method: 'POST',
+      data: fd,
+      processData: false,
+      contentType: false,
+      success: function(resp) {
+        if (resp.success) {
+          bootstrap.Modal.getInstance(document.getElementById('createRoomModal'))?.hide();
+          loadRooms();
+          if (resp.room_id) setTimeout(() => joinRoom(resp.room_id), 300);
+        } else {
+          $('#create-room-error').text(resp.error || 'Ошибка').removeClass('d-none');
+        }
+      },
+      error: function(xhr) {
+        $('#create-room-error').text(xhr.responseJSON?.error || 'Не удалось создать комнату.').removeClass('d-none');
+      }
+    });
+  });
 
   $('#room-manage-btn').on('click', function() {
     if (!currentRoomId) return;

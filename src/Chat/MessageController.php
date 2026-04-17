@@ -9,6 +9,19 @@ class MessageController
 {
     private const PAGE_SIZE = 50;
 
+    private static ?bool $hasColorCols = null;
+
+    private static function hasMessageColorColumns(): bool
+    {
+        if (self::$hasColorCols === null) {
+            $db   = Connection::getInstance();
+            $rows = $db->fetchAll('SHOW COLUMNS FROM messages');
+            $cols = array_column($rows, 'Field');
+            self::$hasColorCols = in_array('nick_color', $cols, true);
+        }
+        return self::$hasColorCols;
+    }
+
     public static function format(string $raw): string
     {
         $text = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
@@ -34,9 +47,14 @@ class MessageController
             $params[] = $beforeId;
         }
 
+        $colorSelect = self::hasMessageColorColumns()
+            ? 'COALESCE(m.nick_color, u.nick_color) AS nick_color, COALESCE(m.text_color, u.text_color) AS text_color'
+            : 'u.nick_color, u.text_color';
+
         $messages = $db->fetchAll(
             'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at,
-                    u.username, u.custom_status, u.nick_color, u.text_color, u.avatar_url, u.global_role,
+                    u.username, u.custom_status, u.avatar_url, u.global_role,
+                    ' . $colorSelect . ',
                     rm.room_role
              FROM messages m
              JOIN users u ON u.id = m.user_id
@@ -76,10 +94,17 @@ class MessageController
         $embed = EmbedProcessor::process($raw);
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
 
-        $db->execute(
-            'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
-            [$roomId, $actorId, $content, '', 'text', $embedData]
-        );
+        if (self::hasMessageColorColumns()) {
+            $db->execute(
+                'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data, nick_color, text_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [$roomId, $actorId, $content, '', 'text', $embedData, $actor['nick_color'], $actor['text_color']]
+            );
+        } else {
+            $db->execute(
+                'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
+                [$roomId, $actorId, $content, '', 'text', $embedData]
+            );
+        }
 
         return [
             'id' => (int) $db->lastInsertId(),

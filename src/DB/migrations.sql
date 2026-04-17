@@ -154,6 +154,10 @@ ALTER TABLE `rooms`
 ALTER TABLE `messages`
   MODIFY COLUMN `content_hmac` CHAR(64) NULL DEFAULT NULL;
 
+ALTER TABLE `messages`
+  ADD COLUMN IF NOT EXISTS `nick_color` CHAR(7) NULL DEFAULT NULL AFTER `embed_data`,
+  ADD COLUMN IF NOT EXISTS `text_color` CHAR(7) NULL DEFAULT NULL AFTER `nick_color`;
+
 SET foreign_key_checks = 1;
 
 INSERT IGNORE INTO `app_settings` (`name`, `value`) VALUES
