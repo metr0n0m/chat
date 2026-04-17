@@ -257,7 +257,8 @@ body { overflow: hidden; height: 100vh; }
 .msg-meta { font-size: .8rem; color: var(--bs-secondary-color); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .msg-username { font-weight: 600; }
 .msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
-.msg-inline-content { color: var(--bs-body-color); }
+.msg-inline-content { color: var(--bs-body-color) !important; }
+.msg-inline-content * { color: inherit !important; }
 .msg-system { text-align: center; font-style: italic; color: var(--bs-secondary-color); font-size: .82rem; padding: 2px 0; }
 .msg-whisper { background: rgba(108,117,125,.08); border-left: 3px solid #6c757d; padding: 4px 10px; border-radius: 0 6px 6px 0; font-style: italic; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
@@ -974,7 +975,7 @@ function visibleRoleClass(u) {
   return 'bg-secondary';
 }
 
-function insertMention(username, prefix = '@i+') {
+function insertMention(username, prefix = '') {
   const $input = $('#msg-input');
   const base = $input.val();
   const mention = `${prefix}${username} `;
@@ -1125,9 +1126,8 @@ function buildOnlineUser(u) {
 $('#online-users-list').on('click', '.online-user-avatar, .online-user-main', function(e) {
   if ($(e.target).closest('.user-action-btn').length) return;
   const $user = $(this).closest('.online-user');
-  const uid = Number($user.data('id'));
   const uname = $user.data('username');
-  if (uid !== Number(CURRENT_USER.id)) insertMention(uname, '@i+');
+  insertMention(uname);
 });
 
 $('#online-users-list').on('click', '.user-action-btn', function(e) {
@@ -1139,12 +1139,22 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
 
   switch (action) {
     case 'mention':
-      if (uid !== Number(CURRENT_USER.id)) insertMention(uname, '@i+');
+      insertMention(uname);
       break;
     case 'whisper':
-      if (uid !== Number(CURRENT_USER.id)) { insertMention(uname, '@p+'); activateWhisperMode(uid, uname); }
+      if (uid === Number(CURRENT_USER.id)) {
+        showToast('Нельзя отправить шёпот самому себе.', 'warning');
+        insertMention(uname);
+      } else {
+        insertMention(uname, '@p+');
+        activateWhisperMode(uid, uname);
+      }
       break;
     case 'invite':
+      if (uid === Number(CURRENT_USER.id)) {
+        showToast('Нельзя пригласить себя в нумер.', 'warning');
+        break;
+      }
       wsSend('invite_user', {to_user_id: uid});
       break;
     case 'ignore':
@@ -1197,13 +1207,22 @@ $(document).on('click', '#ctx-menu a', function(e) {
 
   switch (action) {
     case 'mention':
-      insertMention(uname, '@i+');
+      insertMention(uname);
       break;
     case 'whisper':
+      if (uid === Number(CURRENT_USER.id)) {
+        showToast('Нельзя отправить шёпот самому себе.', 'warning');
+        insertMention(uname);
+        break;
+      }
       insertMention(uname, '@p+');
       activateWhisperMode(uid, uname);
       break;
     case 'invite':
+      if (uid === Number(CURRENT_USER.id)) {
+        showToast('Нельзя пригласить себя в нумер.', 'warning');
+        break;
+      }
       wsSend('invite_user', {to_user_id: uid});
       break;
     case 'friend':
