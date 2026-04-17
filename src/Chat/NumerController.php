@@ -134,6 +134,12 @@ class NumerController
             return ['error' => 'Нумер не найден.'];
         }
 
+        $member = $db->fetchOne(
+            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, $userId]
+        );
+        $wasOwner = $member && ($member['room_role'] ?? '') === 'owner';
+
         $db->execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', [$roomId, $userId]);
 
         $remaining = (int) $db->fetchOne(
@@ -149,9 +155,45 @@ class NumerController
             return ['left' => true, 'room_id' => $roomId, 'destroyed' => true];
         }
 
-        return ['left' => true, 'room_id' => $roomId, 'remaining' => $remaining];
-    }
+        $newOwnerId = null;
+        if ($wasOwner) {
+            $alreadyOwner = $db->fetchOne(
+                "SELECT user_id FROM room_members WHERE room_id = ? AND room_role = 'owner' LIMIT 1",
+                [$roomId]
+            );
 
+            if (!$alreadyOwner) {
+                $candidate = $db->fetchOne(
+                    "SELECT user_id
+                     FROM room_members
+                     WHERE room_id = ? AND room_role != 'banned'
+                     ORDER BY joined_at ASC, user_id ASC
+                     LIMIT 1",
+                    [$roomId]
+                );
+
+                if ($candidate) {
+                    $newOwnerId = (int) $candidate['user_id'];
+                    $db->execute(
+                        "UPDATE room_members SET room_role = 'owner' WHERE room_id = ? AND user_id = ?",
+                        [$roomId, $newOwnerId]
+                    );
+                    $db->execute(
+                        'UPDATE rooms SET owner_id = ? WHERE id = ?',
+                        [$newOwnerId, $roomId]
+                    );
+                }
+            }
+        }
+
+        return [
+            'left' => true,
+            'room_id' => $roomId,
+            'remaining' => $remaining,
+            'owner_transferred' => $newOwnerId !== null,
+            'new_owner_id' => $newOwnerId,
+        ];
+    }
     public static function expireInvitations(): void
     {
         Connection::getInstance()->execute(

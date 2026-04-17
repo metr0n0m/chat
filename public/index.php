@@ -725,6 +725,7 @@ function handleWS(data) {
     case 'numer_joined':    onNumerJoined(data); break;
     case 'numer_participant_joined': onNumerParticipantJoined(data); break;
     case 'numer_participant_left':   onNumerParticipantLeft(data); break;
+    case 'numer_owner_changed': onNumerOwnerChanged(data); break;
     case 'numer_destroyed': onNumerDestroyed(data); break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onKickedFromRoom(data); break;
@@ -1321,6 +1322,23 @@ function onNumerParticipantJoined(data) {
 function onNumerParticipantLeft(data) {
   if (data.room_id === currentRoomId) {
     removeFromOnlineList(data.user_id);
+  }
+}
+
+function onNumerOwnerChanged(data) {
+  if (data.room_id !== currentRoomId) return;
+  const owner = data.owner || {};
+  if (owner.id) {
+    currentOnlineUsers = currentOnlineUsers.map(u => {
+      if (Number(u.id) === Number(owner.id)) return {...u, room_role: 'owner'};
+      if (u.room_role === 'owner') return {...u, room_role: 'member'};
+      return u;
+    });
+    renderOnlineList(currentOnlineUsers);
+  }
+  loadRooms();
+  if (owner.username) {
+    showToast('Новый владелец нумера: ' + owner.username);
   }
 }
 

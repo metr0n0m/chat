@@ -309,6 +309,20 @@ class EventRouter
                 'room_id' => $roomId,
                 'user_id' => $userId,
             ]);
+
+            if (!empty($result['owner_transferred']) && !empty($result['new_owner_id'])) {
+                $newOwner = Connection::getInstance()->fetchOne(
+                    'SELECT id, username, custom_status, nick_color, avatar_url, global_role FROM users WHERE id = ?',
+                    [(int) $result['new_owner_id']]
+                );
+                if ($newOwner) {
+                    $this->cm->sendToRoom($roomId, [
+                        'event' => 'numer_owner_changed',
+                        'room_id' => $roomId,
+                        'owner' => $newOwner,
+                    ]);
+                }
+            }
         }
     }
 
