@@ -370,7 +370,7 @@ class EventRouter
         }
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
         return $db->fetchAll(
-            'SELECT u.id, u.username, u.nick_color, u.avatar_url, u.global_role,
+            'SELECT u.id, u.username, u.custom_status, u.nick_color, u.avatar_url, u.global_role,
                     rm.room_role
              FROM users u
              JOIN room_members rm ON rm.room_id = ? AND rm.user_id = u.id
@@ -385,6 +385,7 @@ class EventRouter
         return [
             'id'          => (int) $session['id'],
             'username'    => $session['username'],
+            'custom_status' => $session['custom_status'] ?? null,
             'nick_color'  => $session['nick_color'],
             'avatar_url'  => $session['avatar_url'],
             'global_role' => $session['global_role'],
@@ -425,4 +426,3 @@ class EventRouter
     }
 
 }
-

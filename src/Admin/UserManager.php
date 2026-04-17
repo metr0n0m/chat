@@ -31,7 +31,7 @@ class UserManager
 
         $total = (int) $db->fetchOne('SELECT COUNT(*) AS c FROM users WHERE ' . $where, $params)['c'];
         $users = $db->fetchAll(
-            'SELECT id, username, email, global_role, can_create_room, is_banned, created_at, last_seen_at
+            'SELECT id, username, email, global_role, custom_status, can_create_room, is_banned, created_at, last_seen_at
              FROM users
              WHERE ' . $where . '
              ORDER BY id DESC
@@ -58,11 +58,25 @@ class UserManager
             self::jsonError('Пользователь не найден.', 404);
         }
 
-        self::assertRoleManagementAllowed($actor, $target, $targetId, $data);
-
-        $allowed = ['global_role', 'is_banned', 'can_create_room'];
+        $allowed = ['global_role', 'is_banned', 'can_create_room', 'custom_status'];
         $set = [];
         $params = [];
+        $onlyCustomStatusUpdate = true;
+
+        foreach (['global_role', 'is_banned', 'can_create_room'] as $privilegedField) {
+            if (array_key_exists($privilegedField, $data)) {
+                $onlyCustomStatusUpdate = false;
+                break;
+            }
+        }
+
+        if (!$onlyCustomStatusUpdate) {
+            self::assertRoleManagementAllowed($actor, $target, $targetId, $data);
+        }
+
+        if (array_key_exists('custom_status', $data) && !self::canEditCustomStatus($actor)) {
+            self::jsonError('Недостаточно прав для изменения отображаемого статуса.', 403);
+        }
 
         foreach ($allowed as $field) {
             if (!array_key_exists($field, $data)) {
@@ -75,6 +89,10 @@ class UserManager
                 if (!in_array($value, ['platform_owner', 'admin', 'moderator', 'user'], true)) {
                     self::jsonError('Недопустимая роль.');
                 }
+            } elseif ($field === 'custom_status') {
+                $value = trim(strip_tags((string) $value));
+                $value = mb_substr($value, 0, 80);
+                $value = $value === '' ? null : $value;
             } else {
                 $value = (int) (bool) $value;
             }
@@ -117,7 +135,7 @@ class UserManager
     {
         $db = Connection::getInstance();
         $user = $db->fetchOne(
-            'SELECT id, username, email, avatar_url, signature, nick_color, text_color,
+            'SELECT id, username, email, avatar_url, signature, custom_status, nick_color, text_color,
                     global_role, can_create_room, is_banned, created_at, last_seen_at
              FROM users
              WHERE id = ?',
@@ -148,7 +166,7 @@ class UserManager
 
         $db = Connection::getInstance();
         $currentUser = $db->fetchOne(
-            'SELECT username, nick_color, text_color, avatar_url, signature
+            'SELECT username, nick_color, text_color, avatar_url, signature, custom_status
              FROM users
              WHERE id = ?',
             [$userId]
@@ -178,6 +196,13 @@ class UserManager
             $signature = mb_substr(trim((string) $post['signature']), 0, 300);
             $set[] = 'signature = ?';
             $params[] = $signature;
+        }
+
+        if (array_key_exists('custom_status', $post)) {
+            $customStatus = trim(strip_tags((string) $post['custom_status']));
+            $customStatus = mb_substr($customStatus, 0, 80);
+            $set[] = 'custom_status = ?';
+            $params[] = $customStatus === '' ? null : $customStatus;
         }
 
         if (isset($post['nick_color'])) {
@@ -248,7 +273,7 @@ class UserManager
         $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
 
         $updated = $db->fetchOne(
-            'SELECT id, username, email, avatar_url, signature, nick_color, text_color,
+            'SELECT id, username, email, avatar_url, signature, custom_status, nick_color, text_color,
                     global_role, can_create_room, is_banned, created_at, last_seen_at
              FROM users
              WHERE id = ?',
@@ -357,6 +382,19 @@ class UserManager
     {
         return self::GLOBAL_ROLE_LEVELS[$role] ?? 0;
     }
+
+    private static function canEditCustomStatus(array $actor): bool
+    {
+        $role = (string) ($actor['global_role'] ?? 'user');
+        if ($role === 'platform_owner') {
+            return true;
+        }
+        if ($role !== 'admin') {
+            return false;
+        }
+        return AdminPanel::isAdminStatusOverrideEnabled();
+    }
+
     private static function headRequest(string $url): array
     {
         $context = stream_context_create([

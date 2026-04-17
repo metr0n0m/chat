@@ -8,6 +8,13 @@ use Chat\Security\Session;
 
 class AdminPanel
 {
+    public static function isAdminStatusOverrideEnabled(): bool
+    {
+        $db = Connection::getInstance();
+        $row = $db->fetchOne('SELECT value FROM app_settings WHERE name = ?', ['allow_admin_status_override']);
+        return ((string) ($row['value'] ?? '0')) === '1';
+    }
+
     public static function requireAdmin(): array
     {
         $user = Session::current();
@@ -55,6 +62,41 @@ class AdminPanel
         );
         header('Content-Type: application/json');
         echo json_encode(['success' => true, 'users' => $users]);
+        exit;
+    }
+
+    public static function statusOverrideSettings(): void
+    {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'allow_admin_status_override' => self::isAdminStatusOverrideEnabled(),
+        ]);
+        exit;
+    }
+
+    public static function updateStatusOverrideSettings(array $actor, array $post): void
+    {
+        if (($actor['global_role'] ?? 'user') !== 'platform_owner') {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Недостаточно прав.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $enabled = (int) (!empty($post['allow_admin_status_override']));
+        $db = Connection::getInstance();
+        $db->execute(
+            'INSERT INTO app_settings (name, value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE value = VALUES(value)',
+            ['allow_admin_status_override', (string) $enabled]
+        );
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'allow_admin_status_override' => $enabled === 1,
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }

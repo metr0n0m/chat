@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `password_hash`   VARCHAR(255),
   `avatar_url`      VARCHAR(500),
   `signature`       VARCHAR(300),
+  `custom_status`   VARCHAR(80) DEFAULT NULL,
   `nick_color`      CHAR(7) DEFAULT '#ffffff',
   `text_color`      CHAR(7) DEFAULT '#dee2e6',
   `global_role`     ENUM('platform_owner','admin','moderator','user') NOT NULL DEFAULT 'user',
@@ -117,6 +118,12 @@ CREATE TABLE IF NOT EXISTS `oauth_tokens` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `app_settings` (
+  `name`       VARCHAR(100) PRIMARY KEY,
+  `value`      VARCHAR(255) NOT NULL,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `avatar_uploads` (
   `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `user_id`     INT UNSIGNED NOT NULL,
@@ -126,7 +133,13 @@ CREATE TABLE IF NOT EXISTS `avatar_uploads` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `custom_status` VARCHAR(80) DEFAULT NULL AFTER `signature`;
+
 SET foreign_key_checks = 1;
+
+INSERT IGNORE INTO `app_settings` (`name`, `value`) VALUES
+('allow_admin_status_override', '0');
 
 -- Seed: default public rooms
 INSERT IGNORE INTO `rooms` (`id`, `name`, `description`, `type`) VALUES

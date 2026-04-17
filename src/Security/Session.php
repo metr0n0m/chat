@@ -56,7 +56,7 @@ class Session
         $session = $db->fetchOne(
             'SELECT s.id AS session_id, s.expires_at,
                     u.id, u.username, u.email, u.avatar_url, u.signature,
-                    u.nick_color, u.text_color, u.global_role,
+                    u.custom_status, u.nick_color, u.text_color, u.global_role,
                     u.can_create_room, u.is_banned
              FROM sessions s
              JOIN users u ON u.id = s.user_id

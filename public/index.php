@@ -186,6 +186,13 @@ if ($user) {
         if ($method === 'GET' && $path === '/api/admin/room-creators') {
             AdminPanel::roomCreators();
         }
+        if ($method === 'GET' && $path === '/api/admin/status-override-settings') {
+            AdminPanel::statusOverrideSettings();
+        }
+        if ($method === 'POST' && $path === '/api/admin/status-override-settings') {
+            if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
+            AdminPanel::updateStatusOverrideSettings($admin, $_POST);
+        }
     }
 }
 
@@ -207,6 +214,7 @@ $userJson = $user ? json_encode([
     'text_color'     => $user['text_color'],
     'avatar_url'     => $user['avatar_url'],
     'signature'      => $user['signature'],
+    'custom_status'  => $user['custom_status'] ?? null,
     'global_role'    => $user['global_role'],
     'can_create_room'=> (bool) $user['can_create_room'],
 ]) : 'null';
@@ -475,6 +483,10 @@ body { overflow: hidden; height: 100vh; }
             <textarea class="form-control" name="signature" maxlength="300" rows="2"></textarea>
           </div>
           <div class="col-md-6">
+            <label class="form-label">Отображаемый статус (до 80 символов)</label>
+            <input type="text" class="form-control" name="custom_status" maxlength="80" placeholder="Например: В отпуске">
+          </div>
+          <div class="col-md-6">
             <label class="form-label">Цвет ника</label>
             <div class="d-flex gap-2 align-items-center">
               <input type="color" class="form-control form-control-color" name="nick_color" id="nickColorPicker">
@@ -656,7 +668,7 @@ $(function() {
 function initUser() {
   if (!CURRENT_USER) return;
   $('#my-username').text(CURRENT_USER.username).css('color', CURRENT_USER.nick_color);
-  $('#my-role-badge').text(roleLabel(CURRENT_USER.global_role));
+  $('#my-role-badge').text(displayStatusLabel(CURRENT_USER));
   $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
   $('#my-avatar').off('error').on('error', function(){ this.onerror = null; this.src = DEFAULT_AVATAR_URL; });
 }
@@ -942,8 +954,15 @@ function avatarMarkup(url, size = 42) {
 }
 
 function visibleRoleLabel(u) {
+  if (u.custom_status) return String(u.custom_status);
   if (u.room_role && !['member', 'banned'].includes(u.room_role)) return roomRoleLabel(u.room_role);
   if (u.global_role && u.global_role !== 'user') return roleLabel(u.global_role);
+  return '';
+}
+
+function displayStatusLabel(u) {
+  if (u && u.custom_status) return String(u.custom_status);
+  if (u && u.global_role) return roleLabel(u.global_role);
   return '';
 }
 
@@ -1377,6 +1396,7 @@ function initSettings() {
     const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
     $('[name="username"]').val(CURRENT_USER.username);
     $('[name="signature"]').val(CURRENT_USER.signature || '');
+    $('[name="custom_status"]').val(CURRENT_USER.custom_status || '');
     $('[name="nick_color"]').val(CURRENT_USER.nick_color || '#ffffff');
     $('[name="text_color"]').val(CURRENT_USER.text_color || '#dee2e6');
     $('#showSystemMessagesSetting').prop('checked', shouldShowSystemMessages());
@@ -1557,21 +1577,60 @@ function loadAdminUsers(page) {
   const search = $('#admin-user-search').val();
   $.get('/api/admin/users', {page, search}, function(resp) {
     if (!resp.success) return;
-    let html = '<table class="table table-sm table-hover"><thead><tr><th>ID</th><th>Пользователь</th><th>Email</th><th>Глобальная роль</th><th>Бан</th><th>Создание комнат</th><th></th></tr></thead><tbody>';
+    let html = `
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="small text-muted">Управление отображаемыми статусами пользователей</div>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="admin-status-override-toggle">
+          <label class="form-check-label" for="admin-status-override-toggle">Разрешить глобальным админам менять статусы</label>
+        </div>
+      </div>
+      <table class="table table-sm table-hover">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Пользователь</th>
+          <th>Email</th>
+          <th>Глобальная роль</th>
+          <th>Отображаемый статус</th>
+          <th>Бан</th>
+          <th>Создание комнат</th>
+          <th></th>
+        </tr>
+      </thead><tbody>`;
     resp.users.forEach(u => {
       html += `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.email||'')}</td>
         <td><select class="form-select form-select-sm user-role-sel" data-id="${u.id}" data-prev="${u.global_role}" style="width:auto">
           <option value="user" ${u.global_role==='user'?'selected':''}>Пользователь</option>
           <option value="moderator" ${u.global_role==='moderator'?'selected':''}>Глобальный модератор</option>
           <option value="admin" ${u.global_role==='admin'?'selected':''}>Глобальный администратор</option>
-          <option value="platform_owner" ${u.global_role==='platform_owner'?'selected':''}>Владелец платформы</option>
+          <option value="platform_owner" ${u.global_role==='platform_owner'?'selected':''}>Владелец</option>
         </select></td>
+        <td>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control user-status-input" data-id="${u.id}" value="${esc(u.custom_status || '')}" maxlength="80" placeholder="Статус">
+            <button class="btn btn-outline-primary user-status-save-btn" data-id="${u.id}" type="button">Сохранить</button>
+          </div>
+        </td>
         <td><input type="checkbox" class="form-check-input user-ban-cb" data-id="${u.id}" ${u.is_banned?'checked':''}></td>
         <td><input type="checkbox" class="form-check-input user-room-cb" data-id="${u.id}" ${u.can_create_room?'checked':''}></td>
         <td><button class="btn btn-sm btn-danger user-del-btn" data-id="${u.id}"><i class="fa fa-trash"></i></button></td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-users-table').html(html);
+    loadAdminStatusOverrideSetting();
+  });
+}
+
+function loadAdminStatusOverrideSetting() {
+  $.get('/api/admin/status-override-settings', function(resp) {
+    if (!resp.success) return;
+    const enabledForAdmins = !!resp.allow_admin_status_override;
+    $('#admin-status-override-toggle').prop('checked', enabledForAdmins);
+    const ownerCanToggle = CURRENT_USER.global_role === 'platform_owner';
+    $('#admin-status-override-toggle').prop('disabled', !ownerCanToggle);
+    const canEditStatuses = ownerCanToggle || (CURRENT_USER.global_role === 'admin' && enabledForAdmins);
+    $('.user-status-input, .user-status-save-btn').prop('disabled', !canEditStatuses);
   });
 }
 
@@ -1591,6 +1650,34 @@ $('#admin-users-table').off('change', '.user-role-sel').on('change', '.user-role
   }, 'json').fail(function(xhr) {
     $select.val(prev);
     showToast(xhr.responseJSON?.error || 'Не удалось изменить роль.', 'danger');
+  });
+});
+
+$('#admin-users-table').off('click', '.user-status-save-btn').on('click', '.user-status-save-btn', function() {
+  const userId = Number($(this).data('id'));
+  const value = $(`.user-status-input[data-id="${userId}"]`).val() || '';
+  $.post(`/api/admin/users/${userId}`, {csrf_token: CSRF_TOKEN, custom_status: value}, function(resp) {
+    if (resp.success) {
+      showToast('Статус пользователя обновлён.', 'success');
+    } else {
+      showToast(resp.error || 'Не удалось обновить статус.', 'danger');
+    }
+  }, 'json').fail(function(xhr) {
+    showToast(xhr.responseJSON?.error || 'Не удалось обновить статус.', 'danger');
+  });
+});
+
+$('#admin-users-table').off('change', '#admin-status-override-toggle').on('change', '#admin-status-override-toggle', function() {
+  const enabled = $(this).is(':checked') ? 1 : 0;
+  $.post('/api/admin/status-override-settings', {csrf_token: CSRF_TOKEN, allow_admin_status_override: enabled}, function(resp) {
+    if (resp.success) {
+      showToast('Правило изменения статусов обновлено.', 'success');
+    } else {
+      showToast(resp.error || 'Не удалось обновить правило.', 'danger');
+    }
+  }, 'json').fail(function(xhr) {
+    showToast(xhr.responseJSON?.error || 'Не удалось обновить правило.', 'danger');
+    loadAdminStatusOverrideSetting();
   });
 });
 
@@ -1717,7 +1804,7 @@ function showToast(msg, type) {
 }
 
 function roleLabel(role) {
-  return {platform_owner:'Владелец платформы', admin:'Глобальный администратор', moderator:'Глобальный модератор', user:''}[role] || role;
+  return {platform_owner:'Владелец', admin:'Глобальный администратор', moderator:'Глобальный модератор', user:''}[role] || role;
 }
 
 function roomRoleLabel(role) {

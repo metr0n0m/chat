@@ -37,7 +37,7 @@ class MessageController
 
         $messages = $db->fetchAll(
             'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.content_hmac,
-                    u.username, u.nick_color, u.text_color, u.avatar_url, u.global_role,
+                    u.username, u.custom_status, u.nick_color, u.text_color, u.avatar_url, u.global_role,
                     rm.room_role
              FROM messages m
              JOIN users u ON u.id = m.user_id
@@ -85,6 +85,7 @@ class MessageController
             'room_id' => $roomId,
             'user_id' => $actorId,
             'username' => $actor['username'],
+            'custom_status' => $actor['custom_status'] ?? null,
             'nick_color' => $actor['nick_color'],
             'text_color' => $actor['text_color'],
             'avatar_url' => $actor['avatar_url'],
