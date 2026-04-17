@@ -8,7 +8,10 @@ use Ratchet\Server\IoServer;
 use Ratchet\Http\HttpServer;
 use Ratchet\WebSocket\WsServer;
 use Chat\WebSocket\Server;
+use Chat\Support\Lang;
 use React\EventLoop\Loop;
+
+Lang::init(APP_LOCALE);
 
 $loop = Loop::get();
 

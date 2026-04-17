@@ -6,11 +6,24 @@ namespace Chat\WebSocket;
 use Ratchet\ConnectionInterface;
 use Chat\DB\Connection;
 use Chat\Chat\{MessageController, WhisperController, RoomController, NumerController};
+use Chat\Support\Lang;
 
+/**
+ * Маршрутизатор входящих WS-событий.
+ * Last updated: 2026-04-17.
+ */
 class EventRouter
 {
+    /**
+     * Инициализирует роутер WS-событий.
+     * Last updated: 2026-04-17.
+     */
     public function __construct(private ConnectionManager $cm) {}
 
+    /**
+     * Маршрутизирует событие текущего websocket-соединения.
+     * Last updated: 2026-04-17.
+     */
     public function route(ConnectionInterface $conn, array $data): void
     {
         $session = $this->cm->getSession($conn);
@@ -31,7 +44,7 @@ class EventRouter
             'leave_numer'     => $this->onLeaveNumer($conn, $session, $data),
             'room_action'     => $this->onRoomAction($conn, $session, $data),
             'ping'            => $conn->send(json_encode(['event' => 'pong'])),
-            default           => $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Неизвестное событие.']),
+            default           => $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.common.invalid_event')]),
         };
     }
 
@@ -47,7 +60,7 @@ class EventRouter
             [$roomId]
         );
         if (!$room || $room['is_closed']) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Комната не найдена.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.room.not_found')]);
             return;
         }
 
@@ -65,7 +78,7 @@ class EventRouter
                 }
                 $member = ['room_role' => 'member'];
             } else {
-                $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Нет доступа.']);
+                $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.common.access_denied')]);
                 return;
             }
         }
@@ -118,12 +131,12 @@ class EventRouter
         $userId = (int) $session['id'];
 
         if (!$this->cm->isInRoom($userId, $roomId)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Вы не в этой комнате.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.whisper.not_in_room')]);
             return;
         }
 
         if (!$this->cm->checkRateLimit($userId)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Слишком быстро. Подождите секунду.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.message.rate_limit')]);
             return;
         }
 
@@ -168,17 +181,17 @@ class EventRouter
         $fromId = (int) $session['id'];
 
         if (!$this->cm->isInRoom($fromId, $roomId)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Вы не в этой комнате.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.whisper.not_in_room')]);
             return;
         }
 
         if (!$this->cm->isInRoom($toId, $roomId)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Получатель не в комнате.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.whisper.user_not_in_room')]);
             return;
         }
 
         if (!$this->cm->checkWhisperLimit($fromId)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Превышен лимит шёпота (5 в минуту).']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.whisper.rate_limit')]);
             return;
         }
 
@@ -261,7 +274,7 @@ class EventRouter
         $userId   = (int) $session['id'];
 
         if (!in_array($response, ['accept', 'decline'], true)) {
-            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => 'Некорректный ответ.']);
+            $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.common.invalid_request')]);
             return;
         }
 

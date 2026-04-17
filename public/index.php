@@ -8,6 +8,9 @@ use Chat\Security\{Session, CSRF};
 use Chat\Auth\{LoginHandler, RegisterHandler, VKOAuth, GoogleOAuth};
 use Chat\Chat\{RoomController, MessageController, WhisperController};
 use Chat\Admin\{AdminPanel, UserManager, RoomManager};
+use Chat\Support\Lang;
+
+Lang::init(APP_LOCALE);
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +107,7 @@ if ($user) {
              ORDER BY u.username",
             [(int)$user['id'], (int)$user['id'], (int)$user['id']]
         );
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'friends' => $friends]);
         exit;
     }
@@ -116,7 +119,7 @@ if ($user) {
             'INSERT IGNORE INTO friendships (requester_id, addressee_id) VALUES (?, ?)',
             [(int)$user['id'], $toId]
         );
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -129,7 +132,7 @@ if ($user) {
             'UPDATE friendships SET status = ?, updated_at = NOW() WHERE id = ? AND addressee_id = ?',
             [$status, (int)$m[1], (int)$user['id']]
         );
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -138,7 +141,7 @@ if ($user) {
     if ($method === 'POST' && $path === '/api/color-check') {
         $error = \Chat\Security\ColorContrast::validate($_POST['color'] ?? '');
         $ratios = \Chat\Security\ColorContrast::ratios($_POST['color'] ?? '#ffffff');
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['valid' => !$error, 'error' => $error, 'ratios' => $ratios]);
         exit;
     }
@@ -198,7 +201,7 @@ if ($user) {
 
 // ─── CSRF token endpoint ──────────────────────────────────────────────────────
 if ($path === '/api/csrf') {
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=UTF-8');
     echo json_encode(['token' => CSRF::token()]);
     exit;
 }
@@ -724,9 +727,6 @@ function handleWS(data) {
     case 'invite_accepted': onInviteAccepted(data); break;
     case 'invite_declined': onInviteDeclined(data); break;
     case 'invite_expired':  onInviteExpired(data); break;
-    case 'invite_accepted': showToast('Приглашение принято: ' + (data.user?.username || '')); break;
-    case 'invite_declined': showToast('Приглашение отклонено.'); break;
-    case 'invite_expired':  showToast('Приглашение истекло.'); break;
     case 'numer_joined':    onNumerJoined(data); break;
     case 'numer_participant_joined': onNumerParticipantJoined(data); break;
     case 'numer_participant_left':   onNumerParticipantLeft(data); break;
@@ -1164,21 +1164,13 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      if (false && uid === Number(CURRENT_USER.id)) {
-        showToast('Нельзя отправить шёпот самому себе.', 'warning');
-      } else {
-        insertWhisperTarget(uname);
-        activateWhisperMode(uid, uname);
-        showToast(`Режим шёпота: @${uname}`);
-      }
+      insertWhisperTarget(uname);
+      activateWhisperMode(uid, uname);
+      showToast(`Режим шёпота: @${uname}`);
       break;
     case 'invite':
-      if (false && uid === Number(CURRENT_USER.id)) {
-        showToast('Нельзя пригласить себя в нумер.', 'warning');
-        break;
-      }
       wsSend('invite_user', {to_user_id: uid});
-      showToast(`Приглашение в нумер отправлено: ${uname}`);
+      showToast(`Запрос в нумер: ${uname}`);
       break;
     case 'ignore':
       toggleIgnoreUser(uid, uname);
@@ -1233,18 +1225,10 @@ $(document).on('click', '#ctx-menu a', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      if (false && uid === Number(CURRENT_USER.id)) {
-        showToast('Нельзя отправить шёпот самому себе.', 'warning');
-        break;
-      }
       insertWhisperTarget(uname);
       activateWhisperMode(uid, uname);
       break;
     case 'invite':
-      if (false && uid === Number(CURRENT_USER.id)) {
-        showToast('Нельзя пригласить себя в нумер.', 'warning');
-        break;
-      }
       wsSend('invite_user', {to_user_id: uid});
       break;
     case 'friend':

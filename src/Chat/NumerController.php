@@ -4,15 +4,24 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
+use Chat\Support\Lang;
 
+/**
+ * Управление приватными сессиями (нумера).
+ * Last updated: 2026-04-17.
+ */
 class NumerController
 {
+    /**
+     * Создает нумер (в т.ч. self-create) или отправляет приглашение.
+     * Last updated: 2026-04-17.
+     */
     public static function invite(int $fromId, array $from, int $toId): array
     {
         $db = Connection::getInstance();
         $numerId = self::findOrCreateOwnedNumer($db, $fromId);
 
-        // Разрешаем создавать нумер в одиночку (invite на самого себя).
+        // Self-create: пользователь создает/открывает нумер для ожидания приглашений.
         if ($fromId === $toId) {
             return [
                 'self_created' => true,
@@ -26,7 +35,7 @@ class NumerController
             [$fromId]
         )['c'];
         if ($pendingCount >= INVITE_PENDING_MAX) {
-            return ['error' => 'Слишком много ожидающих приглашений.'];
+            return ['error' => Lang::get('errors.numer.too_many_pending')];
         }
 
         $toUser = $db->fetchOne(
@@ -34,7 +43,7 @@ class NumerController
             [$toId]
         );
         if (!$toUser || (int) $toUser['is_banned'] === 1) {
-            return ['error' => 'Пользователь не найден.'];
+            return ['error' => Lang::get('errors.numer.user_not_found')];
         }
 
         $expiresAt = date('Y-m-d H:i:s', time() + 30);
@@ -46,24 +55,32 @@ class NumerController
 
         return [
             'invitation_id' => $invId,
-            'room_id'       => $numerId,
-            'from'          => ['id' => $fromId, 'username' => $from['username'], 'avatar_url' => $from['avatar_url'] ?? null],
-            'to_user_id'    => $toId,
-            'to_username'   => $toUser['username'],
-            'expires_at'    => $expiresAt,
+            'room_id' => $numerId,
+            'from' => [
+                'id' => $fromId,
+                'username' => $from['username'],
+                'avatar_url' => $from['avatar_url'] ?? null,
+            ],
+            'to_user_id' => $toId,
+            'to_username' => $toUser['username'],
+            'expires_at' => $expiresAt,
         ];
     }
 
+    /**
+     * Ответ на приглашение в нумер.
+     * Last updated: 2026-04-17.
+     */
     public static function respond(int $invId, int $userId, string $response): array
     {
-        $db  = Connection::getInstance();
+        $db = Connection::getInstance();
         $inv = $db->fetchOne(
             "SELECT * FROM invitations WHERE id = ? AND to_user_id = ? AND status = 'pending' AND expires_at > NOW()",
             [$invId, $userId]
         );
 
         if (!$inv) {
-            return ['error' => 'Приглашение не найдено или истекло.'];
+            return ['error' => Lang::get('errors.numer.invitation_not_found')];
         }
 
         $status = $response === 'accept' ? 'accepted' : 'declined';
@@ -77,14 +94,14 @@ class NumerController
         }
 
         $roomId = (int) $inv['room_id'];
-        $count  = (int) $db->fetchOne(
+        $count = (int) $db->fetchOne(
             "SELECT COUNT(*) AS c FROM room_members WHERE room_id = ? AND room_role != 'banned'",
             [$roomId]
         )['c'];
 
         if ($count >= 4) {
             $db->execute("UPDATE invitations SET status = 'expired' WHERE id = ?", [$invId]);
-            return ['error' => 'Нумер заполнен.'];
+            return ['error' => Lang::get('errors.numer.full')];
         }
 
         $db->execute(
@@ -93,19 +110,23 @@ class NumerController
         );
 
         return [
-            'accepted'      => true,
+            'accepted' => true,
             'invitation_id' => $invId,
-            'room_id'       => $roomId,
-            'members'       => self::roomMembers($db, $roomId),
+            'room_id' => $roomId,
+            'members' => self::roomMembers($db, $roomId),
         ];
     }
 
+    /**
+     * Выход из нумера с передачей owner первому вошедшему.
+     * Last updated: 2026-04-17.
+     */
     public static function leave(int $roomId, int $userId): array
     {
-        $db   = Connection::getInstance();
+        $db = Connection::getInstance();
         $room = $db->fetchOne("SELECT id, type FROM rooms WHERE id = ? AND type = 'numer'", [$roomId]);
         if (!$room) {
-            return ['error' => 'Нумер не найден.'];
+            return ['error' => Lang::get('errors.numer.not_found')];
         }
 
         $member = $db->fetchOne(
@@ -169,6 +190,10 @@ class NumerController
         ];
     }
 
+    /**
+     * Фоновое истечение pending приглашений.
+     * Last updated: 2026-04-17.
+     */
     public static function expireInvitations(): void
     {
         Connection::getInstance()->execute(
@@ -176,6 +201,10 @@ class NumerController
         );
     }
 
+    /**
+     * Находит открытый нумер владельца или создает новый.
+     * Last updated: 2026-04-17.
+     */
     private static function findOrCreateOwnedNumer(Connection $db, int $ownerId): int
     {
         $numer = $db->fetchOne(
@@ -200,10 +229,13 @@ class NumerController
             'INSERT INTO room_members (room_id, user_id, room_role) VALUES (?, ?, ?)',
             [$numerId, $ownerId, 'owner']
         );
-
         return $numerId;
     }
 
+    /**
+     * Список участников нумера для клиента.
+     * Last updated: 2026-04-17.
+     */
     private static function roomMembers(Connection $db, int $roomId): array
     {
         return $db->fetchAll(

@@ -9,6 +9,7 @@ define('DB_PASS', 'chat_pass');
 // Application
 define('APP_NAME', 'Chat');
 define('APP_URL', 'http://localhost:8080');
+define('APP_LOCALE', 'ru');
 // Generate: php -r "echo bin2hex(random_bytes(32));"
 define('APP_SECRET', 'REPLACE_WITH_64_HEX_CHARS_GENERATED_ABOVE');
 

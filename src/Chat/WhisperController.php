@@ -5,30 +5,40 @@ namespace Chat\Chat;
 
 use Chat\DB\Connection;
 use Chat\Security\HMAC;
+use Chat\Support\Lang;
 
+/**
+ * Логика whisper-сообщений и их архива.
+ * Last updated: 2026-04-17.
+ */
 class WhisperController
 {
+    /**
+     * Отправляет whisper в рамках комнаты (включая self-whisper).
+     * Last updated: 2026-04-17.
+     */
     public static function send(int $roomId, int $fromId, array $from, int $toId, string $rawContent): array
     {
         $db = Connection::getInstance();
 
         $toMember = $db->fetchOne(
-            "SELECT rm.room_role, u.username FROM room_members rm
+            "SELECT rm.room_role, u.username
+             FROM room_members rm
              JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id = ? AND rm.user_id = ? AND rm.room_role != 'banned'",
             [$roomId, $toId]
         );
         if (!$toMember) {
-            return ['error' => 'Получатель не в этой комнате.'];
+            return ['error' => Lang::get('errors.whisper.user_not_in_room')];
         }
 
         $raw = trim($rawContent);
-        if (!$raw || mb_strlen($raw) > 2000) {
-            return ['error' => 'Сообщение пустое или слишком длинное.'];
+        if ($raw === '' || mb_strlen($raw) > 2000) {
+            return ['error' => Lang::get('errors.whisper.empty_or_too_long')];
         }
 
         $content = MessageController::format($raw);
-        $hmac    = HMAC::sign($content);
+        $hmac = HMAC::sign($content);
 
         $db->execute(
             'INSERT INTO messages (room_id, user_id, content, content_hmac, type, whisper_to) VALUES (?, ?, ?, ?, ?, ?)',
@@ -42,46 +52,50 @@ class WhisperController
         );
 
         return [
-            'message_id'  => $msgId,
-            'room_id'     => $roomId,
-            'from'        => [
-                'id'         => $fromId,
-                'username'   => $from['username'],
+            'message_id' => $msgId,
+            'room_id' => $roomId,
+            'from' => [
+                'id' => $fromId,
+                'username' => $from['username'],
                 'custom_status' => $from['custom_status'] ?? null,
                 'nick_color' => $from['nick_color'],
                 'avatar_url' => $from['avatar_url'],
             ],
             'to' => $toUser,
-            'content'     => $content,
-            'created_at'  => date('Y-m-d H:i:s.000'),
+            'content' => $content,
+            'created_at' => date('Y-m-d H:i:s.000'),
         ];
     }
 
+    /**
+     * Возвращает архив whisper для админ-панели.
+     * Last updated: 2026-04-17.
+     */
     public static function archive(int $page = 1, array $filters = []): void
     {
-        $db     = Connection::getInstance();
-        $offset = ($page - 1) * 50;
-        $where  = ["m.type = 'whisper'"];
+        $db = Connection::getInstance();
+        $offset = max(0, ($page - 1) * 50);
+        $where = ["m.type = 'whisper'"];
         $params = [];
 
         if (!empty($filters['room_id'])) {
-            $where[]  = 'm.room_id = ?';
+            $where[] = 'm.room_id = ?';
             $params[] = (int) $filters['room_id'];
         }
         if (!empty($filters['from_username'])) {
-            $where[]  = 'sender.username LIKE ?';
+            $where[] = 'sender.username LIKE ?';
             $params[] = '%' . $filters['from_username'] . '%';
         }
         if (!empty($filters['to_username'])) {
-            $where[]  = 'recipient.username LIKE ?';
+            $where[] = 'recipient.username LIKE ?';
             $params[] = '%' . $filters['to_username'] . '%';
         }
         if (!empty($filters['date_from'])) {
-            $where[]  = 'DATE(m.created_at) >= ?';
+            $where[] = 'DATE(m.created_at) >= ?';
             $params[] = $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $where[]  = 'DATE(m.created_at) <= ?';
+            $where[] = 'DATE(m.created_at) <= ?';
             $params[] = $filters['date_to'];
         }
 
@@ -98,8 +112,8 @@ class WhisperController
                 LIMIT 50 OFFSET ' . $offset;
 
         $items = $db->fetchAll($sql, $params);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'whispers' => $items, 'page' => $page]);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'whispers' => $items, 'page' => $page], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
