@@ -257,7 +257,7 @@ body { overflow: hidden; height: 100vh; }
 .msg-meta { font-size: .8rem; color: var(--bs-secondary-color); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .msg-username { font-weight: 600; }
 .msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
-.msg-inline-content { color: var(--bs-body-color) !important; }
+.msg-inline-content { color: inherit; }
 .msg-inline-content * { color: inherit !important; }
 .msg-system { text-align: center; font-style: italic; color: var(--bs-secondary-color); font-size: .82rem; padding: 2px 0; }
 .msg-whisper { background: rgba(108,117,125,.08); border-left: 3px solid #6c757d; padding: 4px 10px; border-radius: 0 6px 6px 0; font-style: italic; color: var(--bs-secondary-color); }
@@ -633,6 +633,7 @@ let oldestMessageId = null;
 let rooms = [];
 let numera = [];
 const ignoredUserIds = new Set();
+const pendingInviteRooms = new Map();
 const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 
 // ════════════════════════════════════════════════
@@ -719,6 +720,10 @@ function handleWS(data) {
     case 'whisper_sent':    onWhisperMessage(data.message, true); break;
     case 'whisper_received':onWhisperMessage(data.message, false); break;
     case 'invite_received': onInviteReceived(data.invitation); break;
+    case 'invite_sent':     onInviteSent(data.invitation); break;
+    case 'invite_accepted': onInviteAccepted(data); break;
+    case 'invite_declined': onInviteDeclined(data); break;
+    case 'invite_expired':  onInviteExpired(data); break;
     case 'invite_accepted': showToast('Приглашение принято: ' + (data.user?.username || '')); break;
     case 'invite_declined': showToast('Приглашение отклонено.'); break;
     case 'invite_expired':  showToast('Приглашение истекло.'); break;
@@ -956,6 +961,7 @@ function avatarMarkup(url, size = 42) {
 }
 
 function visibleRoleLabel(u) {
+  if (u && Number(u.id) === Number(CURRENT_USER.id) && CURRENT_USER.custom_status) return String(CURRENT_USER.custom_status);
   if (u.custom_status) return String(u.custom_status);
   if (u.room_role && !['member', 'banned'].includes(u.room_role)) return roomRoleLabel(u.room_role);
   if (u.global_role && u.global_role !== 'user') return roleLabel(u.global_role);
@@ -1148,8 +1154,10 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
   e.preventDefault();
   e.stopPropagation();
   const action = $(this).data('action');
-  const uid = Number($(this).data('id'));
-  const uname = $(this).data('name');
+  const $user = $(this).closest('.online-user');
+  const uid = Number($(this).data('id') || $user.data('id') || 0);
+  const uname = String($(this).data('name') || $user.data('username') || '');
+  if (!uid || !uname) return;
 
   switch (action) {
     case 'mention':
@@ -1161,6 +1169,7 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       } else {
         insertWhisperTarget(uname);
         activateWhisperMode(uid, uname);
+        showToast(`Режим шёпота: @${uname}`);
       }
       break;
     case 'invite':
@@ -1169,6 +1178,7 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
         break;
       }
       wsSend('invite_user', {to_user_id: uid});
+      showToast(`Приглашение в нумер отправлено: ${uname}`);
       break;
     case 'ignore':
       toggleIgnoreUser(uid, uname);
@@ -1310,6 +1320,35 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
 function onNumerJoined(data) {
   loadRooms();
   joinRoom(data.room_id, true);
+}
+
+function onInviteSent(invitation) {
+  if (!invitation) return;
+  pendingInviteRooms.set(Number(invitation.invitation_id), Number(invitation.room_id));
+  loadRooms();
+}
+
+function onInviteAccepted(data) {
+  const invitationId = Number(data.invitation_id || 0);
+  const roomId = Number(pendingInviteRooms.get(invitationId) || 0);
+  if (invitationId) pendingInviteRooms.delete(invitationId);
+  showToast('Приглашение принято: ' + (data.user?.username || ''));
+  loadRooms();
+  if (roomId) {
+    joinRoom(roomId, true);
+  }
+}
+
+function onInviteDeclined(data) {
+  const invitationId = Number(data?.invitation_id || 0);
+  if (invitationId) pendingInviteRooms.delete(invitationId);
+  showToast('Приглашение отклонено.');
+}
+
+function onInviteExpired(data) {
+  const invitationId = Number(data?.invitation_id || 0);
+  if (invitationId) pendingInviteRooms.delete(invitationId);
+  showToast('Приглашение истекло.');
 }
 
 function onNumerParticipantJoined(data) {
