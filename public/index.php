@@ -998,10 +998,6 @@ function insertDirectAddress(username) {
   appendInputToken(`${username}, `);
 }
 
-function insertWhisperTarget(username) {
-  appendInputToken(`@p+${username} `);
-}
-
 // Delete message
 $('#messages-list').on('click', '.msg-delete-btn', function() {
   const msgId = $(this).data('id');
@@ -1184,7 +1180,6 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      insertWhisperTarget(uname);
       activateWhisperMode(uid, uname);
       showToast(`Режим шёпота: @${uname}`);
       break;
@@ -1245,7 +1240,6 @@ $(document).on('click', '#ctx-menu a', function(e) {
       insertDirectAddress(uname);
       break;
     case 'whisper':
-      insertWhisperTarget(uname);
       activateWhisperMode(uid, uname);
       break;
     case 'invite':
