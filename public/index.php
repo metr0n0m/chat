@@ -209,12 +209,15 @@ body { overflow: hidden; height: 100vh; }
     </div>
 
     <div class="sidebar-bottom">
-      <img id="my-avatar" src="/assets/avatar-default.svg" alt="" class="rounded-circle" width="32" height="32" style="object-fit:cover">
-      <div class="flex-1 overflow-hidden">
-        <div id="my-username" class="fw-semibold text-truncate" style="font-size:.9rem"></div>
-        <div id="my-role-badge" class="badge bg-secondary" style="font-size:.68rem"></div>
+      <img id="my-avatar" src="/assets/avatar-default.svg" alt="" class="rounded-circle" style="width:36px;height:36px;object-fit:cover;flex-shrink:0;cursor:pointer" title="Настройки">
+      <div class="flex-1 overflow-hidden" style="cursor:pointer" id="my-username-wrap">
+        <div id="my-username" class="fw-semibold text-truncate" style="font-size:.88rem;line-height:1.2"></div>
+        <div id="my-status" class="text-truncate text-muted" style="font-size:.75rem;line-height:1.2"></div>
       </div>
-      <a href="/auth/logout" class="btn btn-sm btn-outline-danger" title="Выйти"><i class="fa fa-sign-out-alt"></i></a>
+      <div class="d-flex gap-1">
+        <button id="settings-btn" class="btn btn-sm btn-outline-secondary" title="Настройки"><i class="fa fa-gear"></i></button>
+        <a href="/auth/logout" class="btn btn-sm btn-outline-danger" title="Выйти"><i class="fa fa-sign-out-alt"></i></a>
+      </div>
     </div>
   </div>
 
@@ -291,8 +294,9 @@ body { overflow: hidden; height: 100vh; }
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">Имя пользователя</label>
-            <input type="text" class="form-control" name="username" minlength="3" maxlength="50">
+            <label class="form-label">Имя пользователя (ник)</label>
+            <input type="text" class="form-control" name="username" minlength="3" maxlength="50" id="usernameInput" autocomplete="off">
+            <div id="username-check" class="small mt-1"></div>
           </div>
           <div class="col-md-6">
             <label class="form-label">Подпись (до 300 символов)</label>
@@ -369,6 +373,39 @@ body { overflow: hidden; height: 100vh; }
   </div></div>
 </div>
 
+<!-- Create user modal (platform_owner only) -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Создать пользователя</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <form id="createUserForm">
+        <div class="mb-3">
+          <label class="form-label">Имя пользователя (ник) *</label>
+          <input type="text" class="form-control" name="username" minlength="3" maxlength="50" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email (необязательно)</label>
+          <input type="email" class="form-control" name="email">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Пароль *</label>
+          <input type="password" class="form-control" name="password" minlength="8" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Роль</label>
+          <select class="form-select" name="global_role">
+            <option value="user">Пользователь</option>
+            <option value="moderator">Модератор</option>
+            <option value="admin">Администратор</option>
+          </select>
+        </div>
+        <div id="create-user-error" class="alert alert-danger d-none"></div>
+        <button type="submit" class="btn btn-success w-100">Создать</button>
+      </form>
+    </div>
+  </div></div>
+</div>
+
 <!-- Create room modal -->
 <div class="modal fade" id="createRoomModal" tabindex="-1">
   <div class="modal-dialog"><div class="modal-content">
@@ -407,9 +444,12 @@ body { overflow: hidden; height: 100vh; }
           <div class="row g-3" id="admin-stats"></div>
         </div>
         <div class="tab-pane fade" id="adminUsers">
-          <div class="mb-2 d-flex gap-2">
-            <input type="text" class="form-control form-control-sm" id="admin-user-search" placeholder="Поиск...">
+          <div class="mb-2 d-flex gap-2 flex-wrap">
+            <input type="text" class="form-control form-control-sm" id="admin-user-search" placeholder="Поиск..." style="max-width:220px">
             <button class="btn btn-sm btn-outline-primary" id="admin-user-search-btn">Найти</button>
+            <?php if ($user['global_role'] === 'platform_owner'): ?>
+            <button class="btn btn-sm btn-outline-success ms-auto" id="admin-create-user-btn"><i class="fa fa-plus me-1"></i>Создать пользователя</button>
+            <?php endif; ?>
           </div>
           <div id="admin-users-table"></div>
         </div>
@@ -544,7 +584,7 @@ $(function() {
 function initUser() {
   if (!CURRENT_USER) return;
   $('#my-username').text(CURRENT_USER.username).css('color', CURRENT_USER.nick_color);
-  $('#my-role-badge').text(displayStatusLabel(CURRENT_USER));
+  $('#my-status').text(CURRENT_USER.custom_status || '');
   $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
   $('#my-avatar').off('error').on('error', function(){ this.onerror = null; this.src = DEFAULT_AVATAR_URL; });
 }
@@ -602,7 +642,10 @@ function handleWS(data) {
     case 'numer_participant_joined': onNumerParticipantJoined(data); break;
     case 'numer_participant_left':   onNumerParticipantLeft(data); break;
     case 'numer_owner_changed': onNumerOwnerChanged(data); break;
-    case 'numer_destroyed': onNumerDestroyed(data); break;
+    case 'numer_destroyed':
+      onNumerDestroyed(data);
+      if ($('#adminModal').hasClass('show') && $('#adminNumera').hasClass('active')) loadAdminNumera();
+      break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onKickedFromRoom(data); break;
     case 'muted_in_room':    onMutedInRoom(data); break;
@@ -1172,8 +1215,10 @@ function openUserInfo(uid, uname = '') {
     const canGlobal = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) && !isSelf;
 
     $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="mention">Обратиться</button>`);
-    $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="whisper">Шёпот</button>`);
-    $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="invite">В нумер</button>`);
+    if (!isSelf) {
+      $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="whisper">Шёпот</button>`);
+      $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="invite">В нумер</button>`);
+    }
 
     if (canModRoom) {
       $actions.append(`<button type="button" class="btn btn-sm btn-outline-warning user-info-action-btn" data-action="room-kick">Удалить из комнаты</button>`);
@@ -1523,6 +1568,21 @@ function initSettings() {
     localStorage.setItem('show_system_messages', $(this).is(':checked') ? '1' : '0');
   });
 
+  let usernameCheckTimer = null;
+  $('#usernameInput').on('input', function() {
+    const val = $(this).val().trim();
+    clearTimeout(usernameCheckTimer);
+    const $fb = $('#username-check').html('');
+    if (val === CURRENT_USER.username || val.length < 3) return;
+    usernameCheckTimer = setTimeout(function() {
+      $.get('/api/users/check', {username: val}, function(r) {
+        $fb.html(r.available
+          ? '<span class="text-success"><i class="fa fa-check"></i> Свободен</span>'
+          : '<span class="text-danger"><i class="fa fa-times"></i> Занят</span>');
+      });
+    }, 400);
+  });
+
   function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
     $(`[name="${pickerName}"]`).off('input.colorcheck').on('input.colorcheck', function() {
       const hex = $(this).val();
@@ -1597,8 +1657,7 @@ function initSettings() {
 // ════════════════════════════════════════════════
 
 function initSidebar() {
-  $('#my-username').css('cursor','pointer');
-  $('#my-username').on('click', openSettingsModal);
+  $('#settings-btn, #my-avatar, #my-username-wrap').on('click', openSettingsModal);
 
   $('#createRoomBtn').on('click', function() {
     $('#createRoomForm')[0].reset();
@@ -1700,6 +1759,37 @@ function initAdmin() {
 
   $('#admin-user-search-btn').on('click', loadAdminUsers);
   $('#whisper-search-btn').on('click', loadAdminWhispers);
+
+  $('#admin-create-user-btn').on('click', function() {
+    $('#createUserForm')[0].reset();
+    $('#create-user-error').addClass('d-none');
+    new bootstrap.Modal(document.getElementById('createUserModal')).show();
+  });
+
+  $('#createUserForm').on('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData(this);
+    fd.set('csrf_token', CSRF_TOKEN);
+    $.ajax({
+      url: '/api/admin/users',
+      method: 'POST',
+      data: fd,
+      processData: false,
+      contentType: false,
+      success: function(resp) {
+        if (resp.success) {
+          bootstrap.Modal.getInstance(document.getElementById('createUserModal'))?.hide();
+          showToast('Пользователь создан.', 'success');
+          loadAdminUsers();
+        } else {
+          $('#create-user-error').text(resp.error || 'Ошибка').removeClass('d-none');
+        }
+      },
+      error: function(xhr) {
+        $('#create-user-error').text(xhr.responseJSON?.error || 'Не удалось создать.').removeClass('d-none');
+      }
+    });
+  });
 }
 
 function loadAdminDash() {

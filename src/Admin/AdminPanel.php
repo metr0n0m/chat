@@ -109,6 +109,76 @@ class AdminPanel
      * @param array<string, mixed> $actor
      * @param array<string, mixed> $post
      */
+    public static function createUser(array $actor, array $post): never
+    {
+        if (($actor['global_role'] ?? '') !== 'platform_owner') {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Только владелец платформы может создавать пользователей.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (!\Chat\Security\CSRF::verifyRequest()) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $username = trim((string) ($post['username'] ?? ''));
+        $email    = trim((string) ($post['email'] ?? ''));
+        $password = (string) ($post['password'] ?? '');
+        $role     = (string) ($post['global_role'] ?? 'user');
+
+        if (mb_strlen($username) < 3 || mb_strlen($username) > 50 || !preg_match('/^[\w\p{Cyrillic}]+$/u', $username)) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Некорректное имя пользователя.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (strlen($password) < 8) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Пароль должен быть не менее 8 символов.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (!in_array($role, ['user', 'moderator', 'admin'], true)) {
+            $role = 'user';
+        }
+
+        $db = Connection::getInstance();
+
+        $exists = $db->fetchOne('SELECT id FROM users WHERE username = ?', [$username]);
+        if ($exists) {
+            http_response_code(409);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Имя уже занято.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($email !== '') {
+            $emailExists = $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email]);
+            if ($emailExists) {
+                http_response_code(409);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['success' => false, 'error' => 'Email уже используется.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        $hash = password_hash($password, PASSWORD_ARGON2ID);
+        $db->execute(
+            'INSERT INTO users (username, email, password_hash, global_role) VALUES (?, ?, ?, ?)',
+            [$username, $email !== '' ? $email : null, $hash, $role]
+        );
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'user_id' => (int) $db->lastInsertId()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     public static function updateStatusOverrideSettings(array $actor, array $post): void
     {
         if (($actor['global_role'] ?? 'user') !== 'platform_owner') {

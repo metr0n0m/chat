@@ -103,6 +103,7 @@ class Router
         if ($this->method === 'POST' && $this->path === '/api/friends') $this->handleAddFriend();
         if ($this->method === 'POST' && preg_match('~^/api/friends/(\d+)/respond$~', $this->path, $m)) $this->handleRespondFriend((int) $m[1]);
 
+        if ($this->method === 'GET'  && $this->path === '/api/users/check') $this->handleUsernameCheck();
         if ($this->method === 'POST' && $this->path === '/api/color-check') $this->handleColorCheck();
     }
 
@@ -117,6 +118,7 @@ class Router
 
         if ($this->method === 'GET'    && $this->path === '/api/admin/dashboard')                                AdminPanel::dashboard();
         if ($this->method === 'GET'    && $this->path === '/api/admin/users')                                   UserManager::list((int) ($_GET['page'] ?? 1), $_GET['search'] ?? '');
+        if ($this->method === 'POST'   && $this->path === '/api/admin/users')                                   AdminPanel::createUser($admin, $_POST);
         if ($this->method === 'POST'   && preg_match('~^/api/admin/users/(\d+)$~', $this->path, $m))            UserManager::update((int) $m[1], $_POST);
         if ($this->method === 'DELETE' && preg_match('~^/api/admin/users/(\d+)$~', $this->path, $m))            UserManager::delete((int) $m[1]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/rooms')                                   RoomManager::list((int) ($_GET['page'] ?? 1));
@@ -180,6 +182,22 @@ class Router
         );
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true]);
+        exit;
+    }
+
+    private function handleUsernameCheck(): never
+    {
+        $username = trim((string) ($_GET['username'] ?? ''));
+        $available = false;
+        if (mb_strlen($username) >= 3 && mb_strlen($username) <= 50) {
+            $row = Connection::getInstance()->fetchOne(
+                'SELECT id FROM users WHERE username = ? AND id != ?',
+                [$username, (int) $this->user['id']]
+            );
+            $available = $row === null;
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['available' => $available]);
         exit;
     }
 
