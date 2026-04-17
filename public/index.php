@@ -1172,8 +1172,8 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
   const action = $(this).data('action');
   const $user = $(this).closest('.online-user');
   const uid = Number($(this).data('id') || $user.data('id') || 0);
-  const uname = String($(this).data('name') || $user.data('username') || '');
-  if (!uid || !uname) return;
+  const uname = String($(this).data('name') || $user.data('username') || $user.find('.online-user-name').text() || '').trim();
+  if (!uid) return;
 
   switch (action) {
     case 'mention':
@@ -1188,10 +1188,15 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
       showToast(`Запрос в нумер: ${uname}`);
       break;
     case 'ignore':
+      if (!uname) return;
       toggleIgnoreUser(uid, uname);
       break;
     case 'info':
-      showUserCtxMenu(e, uid, uname);
+      if (uid === Number(CURRENT_USER.id)) {
+        new bootstrap.Modal(document.getElementById('settingsModal')).show();
+      } else {
+        showUserCtxMenu(e, uid, uname || (`ID ${uid}`));
+      }
       break;
   }
 });
@@ -1199,7 +1204,11 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
 function showUserCtxMenu(e, uid, uname) {
   e.preventDefault();
   const $menu = $('#ctx-menu').empty();
-  if (uid === Number(CURRENT_USER.id)) return;
+  if (uid === Number(CURRENT_USER.id)) {
+    $menu.append('<a class="dropdown-item" href="#" data-action="open-settings"><i class="fa fa-user-gear me-2"></i>Профиль и настройки</a>');
+    $menu.css({top: e.clientY, left: e.clientX}).show();
+    return;
+  }
 
   $menu.append(`<a class="dropdown-item" href="#" data-action="mention" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-at me-2"></i>Личное обращение</a>`);
   $menu.append(`<a class="dropdown-item" href="#" data-action="whisper" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-secret me-2"></i>Шёпот</a>`);
@@ -1270,6 +1279,9 @@ $(document).on('click', '#ctx-menu a', function(e) {
       if (confirm('Забанить пользователя глобально?')) {
         $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Пользователь заблокирован.'));
       }
+      break;
+    case 'open-settings':
+      new bootstrap.Modal(document.getElementById('settingsModal')).show();
       break;
   }
 });
