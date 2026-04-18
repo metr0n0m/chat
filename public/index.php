@@ -922,13 +922,20 @@ function buildWhisperMessage(m, isSent) {
   const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
   const from = m.from || {};
   const to   = m.to   || {};
-  const partner = isSent ? to : from;
-  const pid = Number(partner.id || 0);
-  const pname = esc(displayName(partner));
-  const dir = isSent ? 'для' : 'от';
+  const fromName  = esc(displayName(from));
+  const toName    = esc(displayName(to));
+  const reply     = isSent ? to : from;
+  const replyId   = Number(reply.id || 0);
+  const replyName = esc(displayName(reply));
+  const fromEl = isSent
+    ? `<span class="msg-username">${fromName}</span>`
+    : `<span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${replyId}" data-name="${replyName}">${fromName}</span>`;
+  const toEl = isSent
+    ? `<span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${replyId}" data-name="${replyName}">${toName}</span>`
+    : `<span class="msg-username">${toName}</span>`;
   return `<div class="msg msg-whisper-row" id="msg-${m.message_id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span><em><span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${pid}" data-name="${pname}">${pname}</span> <span class="msg-sep small">(шёпот ${dir})</span> <span class="msg-content">${m.content}</span></em>
+      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span>${fromEl} <span class="msg-sep">»»»</span> ${toEl}: <span class="msg-content">${m.content}</span>
     </div>
   </div>`;
 }
