@@ -2239,7 +2239,7 @@ function openRoomHistory(roomId, roomName) {
       rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
       resp.messages.forEach(m => {
-        rows += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${dayjs(m.created_at).format(CHAT_DATETIME_FORMAT)}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
     }
     $('#admin-rooms-table').html(`
