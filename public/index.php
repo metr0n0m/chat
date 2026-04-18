@@ -671,7 +671,7 @@ $(function() {
 // ════════════════════════════════════════════════
 function initUser() {
   if (!CURRENT_USER) return;
-  $('#my-username').text(CURRENT_USER.username).css('color', CURRENT_USER.nick_color);
+  $('#my-username').text(displayName(CURRENT_USER)).css('color', CURRENT_USER.nick_color);
   $('#my-status').text(CURRENT_USER.custom_status || '');
   $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
   $('#my-avatar').off('error').on('error', function(){ this.onerror = null; this.src = DEFAULT_AVATAR_URL; });
@@ -905,7 +905,7 @@ function buildMessage(m) {
 
   return `<div class="msg" id="msg-${m.id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><em><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}</em>
+      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><em><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(displayName(m))}</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}</em>
       ${embed}
     </div>
   </div>`;
@@ -917,7 +917,7 @@ function buildWhisperMessage(m, isSent) {
   const to   = m.to   || {};
   const partner = isSent ? to : from;
   const pid = Number(partner.id || 0);
-  const pname = esc(partner.username || '');
+  const pname = esc(displayName(partner));
   const dir = isSent ? 'для' : 'от';
   return `<div class="msg msg-whisper-row" id="msg-${m.message_id}">
     <div class="msg-body">
@@ -1180,7 +1180,7 @@ function buildOnlineUser(u) {
   return `<div class="online-user" id="online-user-${u.id}" data-id="${u.id}" data-username="${esc(u.username)}">
     <div class="online-user-avatar" data-action="mention">${avatarMarkup(u.avatar_url, 42)}</div>
     <div class="online-user-main" data-action="mention">
-      <div class="online-user-name" style="color:${esc(u.nick_color || 'inherit')}">${esc(u.username)}</div>
+      <div class="online-user-name" style="color:${esc(u.nick_color || 'inherit')}">${esc(displayName(u))}</div>
       <div class="online-user-role">${roleBadge}</div>
     </div>
     <div class="online-user-actions">
@@ -1300,7 +1300,7 @@ function openUserInfo(uid, uname = '') {
         <div>${avatarMarkup(u.avatar_url, 72)}</div>
         <div class="flex-1">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-            <strong style="color:${esc(u.nick_color || '#fff')}">${esc(u.username || infoUsername || ('ID ' + infoUserId))}</strong>
+            <strong style="color:${esc(u.nick_color || '#fff')}">${esc(displayName(u) || infoUsername || ('ID ' + infoUserId))}</strong>
             <span class="badge bg-secondary">${esc(roleText)}</span>
           </div>
           <div class="small text-muted mb-2">Последний вход: ${esc(lastSeenText)}</div>
@@ -1478,7 +1478,7 @@ function onInviteSent(invitation) {
 }
 
 function onInviteAccepted(data) {
-  showToast('Приглашение принято: ' + (data.user?.username || ''));
+  showToast('Приглашение принято: ' + displayName(data.user));
   loadRooms();
   if (data.room_id) openNumerWindow(data.room_id);
 }
@@ -1508,7 +1508,7 @@ function onInviteReceived(inv) {
   const from = inv.from || {};
   let countdown = 30;
   $('#invite-modal-body').html(`
-    <p><strong>${esc(from.username)}</strong> приглашает вас в нумер.</p>
+    <p><strong>${esc(displayName(from))}</strong> приглашает вас в нумер.</p>
     <p class="text-muted small">Приглашение истекает через <span id="invite-countdown">30</span> сек.</p>
     <div class="d-flex gap-2">
       <button class="btn btn-success flex-1" id="accept-invite" data-id="${inv.invitation_id}">Принять</button>
@@ -1597,7 +1597,7 @@ function renderFriends(friends) {
     const isOnline = !!f.current_room;
     const dot = `<span class="online-dot ${isOnline?'online':'offline'}"></span>`;
     const where = isOnline ? `<span class="text-muted small ms-1">${esc(f.current_room)}</span>` : `<span class="text-muted small ms-1">${f.last_seen_at ? dayjs(f.last_seen_at).fromNow() : ''}</span>`;
-    $list.append(`<div class="friend-item">${dot} <span>${esc(f.username)}</span>${where}</div>`);
+    $list.append(`<div class="friend-item">${dot} <span>${esc(displayName(f))}</span>${where}</div>`);
   });
 }
 
@@ -1785,7 +1785,7 @@ function initSidebar() {
     currentOnlineUsers.forEach(u => {
       if (Number(u.id) === Number(CURRENT_USER.id)) return;
       const role = visibleRoleLabel(u);
-      html += `<div class="list-group-item"><div class="d-flex align-items-center gap-2 mb-2">${avatarMarkup(u.avatar_url, 32)}<div class="flex-1"><div>${esc(u.username)}</div>${role ? `<div class="small text-muted">${role}</div>` : ''}</div></div><div class="d-flex flex-wrap gap-2"><button class="btn btn-sm btn-outline-secondary room-action-btn" data-action="kick" data-id="${u.id}">Удалить</button><button class="btn btn-sm btn-outline-danger room-action-btn" data-action="ban" data-id="${u.id}">Бан</button>${canAssignRoles ? `<button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="local_moderator" data-id="${u.id}">Модератор</button><button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="member" data-id="${u.id}">Участник</button>` : ''}${canAssignLocalAdmin() ? `<button class="btn btn-sm btn-outline-warning room-action-btn" data-action="set_role" data-role="local_admin" data-id="${u.id}">Локальный админ</button>` : ''}</div></div>`;
+      html += `<div class="list-group-item"><div class="d-flex align-items-center gap-2 mb-2">${avatarMarkup(u.avatar_url, 32)}<div class="flex-1"><div>${esc(displayName(u))}</div>${role ? `<div class="small text-muted">${role}</div>` : ''}</div></div><div class="d-flex flex-wrap gap-2"><button class="btn btn-sm btn-outline-secondary room-action-btn" data-action="kick" data-id="${u.id}">Удалить</button><button class="btn btn-sm btn-outline-danger room-action-btn" data-action="ban" data-id="${u.id}">Бан</button>${canAssignRoles ? `<button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="local_moderator" data-id="${u.id}">Модератор</button><button class="btn btn-sm btn-outline-primary room-action-btn" data-action="set_role" data-role="member" data-id="${u.id}">Участник</button>` : ''}${canAssignLocalAdmin() ? `<button class="btn btn-sm btn-outline-warning room-action-btn" data-action="set_role" data-role="local_admin" data-id="${u.id}">Локальный админ</button>` : ''}</div></div>`;
     });
     html += '</div>';
     $('#room-manage-body').html(html || '<div class="text-muted">Нет доступных действий.</div>');
@@ -2306,6 +2306,12 @@ function scrollToBottom() {
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function displayName(u) {
+  if (!u) return '';
+  const n = (u.nickname || '').trim();
+  return n ? n : (u.username || '');
 }
 
 function showToast(msg, type) {
