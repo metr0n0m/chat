@@ -19,7 +19,18 @@
       "Bash(docker exec chat_db *)",
       "Bash(docker restart *)",
       "Bash(php -l /c/inetpub/vhosts/chat/httpdocs/src/Admin/AdminPanel.php)",
-      "Bash(php -l /c/inetpub/vhosts/chat/httpdocs/src/Http/Router.php)"
+      "Bash(php -l /c/inetpub/vhosts/chat/httpdocs/src/Http/Router.php)",
+      "Bash(docker exec chat_php *)",
+      "Bash(php *)",
+      "Bash(docker exec *)",
+      "Bash(winpty docker *)",
+      "Bash(grep -v \"^\\\\s*//\")",
+      "Bash(docker-compose up *)",
+      "Bash(powershell -Command \"Start-Process cmd -ArgumentList '/c cd /d C:\\\\inetpub\\\\vhosts\\\\chat\\\\httpdocs && docker-compose up -d 2>&1' -Verb RunAs -Wait\")",
+      "Bash(powershell -Command \"Start-Process 'C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe' -ErrorAction SilentlyContinue\")",
+      "Bash(curl *)",
+      "Bash(git -C /c/inetpub/vhosts/chat/httpdocs diff --stat HEAD)",
+      "Bash(git *)"
     ]
   }
 }

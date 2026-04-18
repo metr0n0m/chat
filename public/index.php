@@ -306,17 +306,16 @@ body { height: 100vh; margin: 0; }
     <div class="modal-body p-0">
       <form id="settingsForm" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
-        <div class="d-flex" style="min-height:420px">
-          <!-- vertical tabs nav -->
-          <ul class="nav flex-column nav-pills p-3 border-end" style="min-width:140px">
-            <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#sTab1">Профиль</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sTab2">Внешний вид</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sTab3">Аватар</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sTab4">Приватность</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sTab5">Безопасность</a></li>
-          </ul>
+        <ul class="nav nav-tabs px-3 pt-3">
+          <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sTab1">Профиль</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab2">Внешний вид</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab3">Аватар</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab4">Приватность</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab5">Безопасность</a></li>
+        </ul>
+        <div>
           <!-- tab panes -->
-          <div class="tab-content flex-1 p-3">
+          <div class="tab-content p-3">
             <!-- Профиль -->
             <div class="tab-pane fade show active" id="sTab1">
               <div class="row g-3">
