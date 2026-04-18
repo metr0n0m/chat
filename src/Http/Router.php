@@ -93,6 +93,8 @@ class Router
 
         if ($this->method === 'GET' && preg_match('~^/numer/(\d+)$~', $this->path, $m)) NumerPage::render((int) $m[1], $this->user);
 
+        if ($this->method === 'GET' && preg_match('~^/api/rooms/(\d+)/members$~', $this->path, $m))  RoomController::members((int) $m[1], (int) $this->user['id']);
+
         if ($this->method === 'GET' && preg_match('~^/api/rooms/(\d+)/messages$~', $this->path, $m)) {
             $before = isset($_GET['before']) ? (int) $_GET['before'] : null;
             MessageController::history((int) $m[1], (int) $this->user['id'], $this->user['global_role'], $before);
