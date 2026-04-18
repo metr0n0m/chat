@@ -31,7 +31,6 @@ $userJson = $user ? json_encode([
     'nick_color'     => $user['nick_color'],
     'text_color'     => $user['text_color'],
     'avatar_url'     => $user['avatar_url'],
-    'signature'      => $user['signature'],
     'custom_status'  => $user['custom_status'] ?? null,
     'global_role'    => $user['global_role'],
     'can_create_room'=> (bool) $user['can_create_room'],
@@ -327,10 +326,6 @@ body { height: 100vh; margin: 0; }
                 <div class="col-12">
                   <label class="form-label">Отображаемый статус (до 80 символов)</label>
                   <input type="text" class="form-control" name="custom_status" maxlength="80" placeholder="Например: В отпуске">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Подпись (до 300 символов)</label>
-                  <textarea class="form-control" name="signature" maxlength="300" rows="2"></textarea>
                 </div>
                 <div class="col-12">
                   <label class="form-label">О себе (до 500 символов)</label>
@@ -1314,7 +1309,6 @@ function openUserInfo(uid, uname = '') {
           </div>
           <div class="small text-muted mb-2">Последний вход: ${esc(lastSeenText)}</div>
           <div class="mb-2"><strong>Статус:</strong> ${esc(u.custom_status || '—')}</div>
-          ${u.signature ? `<div class="mb-2"><strong>Подпись:</strong> ${esc(u.signature)}</div>` : ''}
           <div class="mb-2"><strong>О себе:</strong> ${esc(u.bio || '—')}</div>
           <div class="mb-2"><strong>Друзей:</strong> ${Number(u.friend_count || 0)}</div>
           <div><strong>Контакты:</strong> ${contacts.length ? contacts.join(' · ') : '—'}</div>
@@ -1646,7 +1640,6 @@ $('#friend-search').on('input', function() { loadFriends(); });
 function openSettingsModal() {
   const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
   $('[name="username"]').val(CURRENT_USER.username);
-  $('[name="signature"]').val(CURRENT_USER.signature || '');
   $('[name="bio"]').val(CURRENT_USER.bio || '');
   $('[name="social_telegram"]').val(CURRENT_USER.social_telegram || '');
   $('[name="social_whatsapp"]').val(CURRENT_USER.social_whatsapp || '');
@@ -1661,7 +1654,6 @@ function openSettingsModal() {
   $.get(`/api/users/${CURRENT_USER.id}`, function(resp) {
     if (!resp || !resp.success || !resp.user) return;
     Object.assign(CURRENT_USER, resp.user);
-    $('[name="signature"]').val(resp.user.signature || '');
     $('[name="bio"]').val(resp.user.bio || '');
     $('[name="social_telegram"]').val(resp.user.social_telegram || '');
     $('[name="social_whatsapp"]').val(resp.user.social_whatsapp || '');
