@@ -1491,6 +1491,9 @@ function onInviteExpired(data) {
 function onRoomCountChanged(data) {
   onlineCountsByRoom.set(Number(data.room_id), Number(data.count));
   updateRoomBadge(data.room_id);
+  if (numera.some(r => Number(r.id) === Number(data.room_id))) {
+    loadRooms();
+  }
 }
 
 function onInviteReceived(inv) {
