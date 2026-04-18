@@ -123,12 +123,21 @@ class Router
         if ($this->method === 'DELETE' && preg_match('~^/api/admin/users/(\d+)$~', $this->path, $m))            UserManager::delete((int) $m[1]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/rooms')                                   RoomManager::list((int) ($_GET['page'] ?? 1));
         if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/rename$~', $this->path, $m))     RoomManager::rename((int) $m[1], $_POST['name'] ?? '');
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/category$~', $this->path, $m))   RoomManager::setCategory((int) $m[1], $_POST['category'] ?? '');
         if ($this->method === 'DELETE' && preg_match('~^/api/admin/rooms/(\d+)$~', $this->path, $m))            RoomManager::delete((int) $m[1]);
         if ($this->method === 'GET'    && preg_match('~^/api/admin/rooms/(\d+)/members$~', $this->path, $m))    RoomManager::members((int) $m[1]);
+        if ($this->method === 'GET'    && preg_match('~^/api/admin/rooms/(\d+)/messages$~', $this->path, $m))   RoomManager::roomMessages((int) $m[1], (int) ($_GET['page'] ?? 1), $_GET['user'] ?? '');
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/clear$~', $this->path, $m))      RoomManager::clearMessages((int) $m[1]);
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/clear-user/(\d+)$~', $this->path, $m)) RoomManager::clearUserMessages((int) $m[1], (int) $m[2]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/numera')                                  RoomManager::numeraActive((int) ($_GET['page'] ?? 1));
         if ($this->method === 'GET'    && $this->path === '/api/admin/numera/archive')                          RoomManager::numeraArchive((int) ($_GET['page'] ?? 1), $_GET);
         if ($this->method === 'GET'    && preg_match('~^/api/admin/numera/(\d+)/messages$~', $this->path, $m))  RoomManager::numeraMessages((int) $m[1]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/whispers')                                WhisperController::archive((int) ($_GET['page'] ?? 1), $_GET);
+        if ($this->method === 'DELETE' && preg_match('~^/api/admin/whispers/(\d+)$~', $this->path, $m))         WhisperController::deleteWhisper((int) $m[1]);
+        if ($this->method === 'POST'   && $this->path === '/api/admin/whispers/clear')                          WhisperController::clearWhispers($_POST);
+        if ($this->method === 'GET'    && $this->path === '/api/admin/bans')                                    UserManager::listBanned();
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/unban/(\d+)$~', $this->path, $m))  UserManager::roomUnban((int) $m[1], (int) $m[2]);
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/unmute/(\d+)$~', $this->path, $m)) UserManager::roomUnmute((int) $m[1], (int) $m[2]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/moderators')                              AdminPanel::globalModerators();
         if ($this->method === 'GET'    && $this->path === '/api/admin/room-creators')                           AdminPanel::roomCreators();
         if ($this->method === 'GET'    && $this->path === '/api/admin/status-override-settings')                AdminPanel::statusOverrideSettings();
@@ -136,6 +145,8 @@ class Router
             if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
             AdminPanel::updateStatusOverrideSettings($admin, $_POST);
         }
+        if ($this->method === 'GET'    && $this->path === '/api/admin/system-settings')   AdminPanel::getSystemSettings();
+        if ($this->method === 'POST'   && $this->path === '/api/admin/system-settings')   AdminPanel::updateSystemSettings($admin, $_POST);
     }
 
     private function handleGetFriends(): never

@@ -48,10 +48,15 @@ class RoomController
             self::jsonError('Название должно быть от 2 до 100 символов.');
         }
 
+        $isPrivileged = in_array($actor['global_role'], ['platform_owner', 'admin'], true);
+        $categoryRaw  = trim((string) ($_POST['room_category'] ?? 'user'));
+        $category = ($isPrivileged && in_array($categoryRaw, ['permanent', 'user', 'commercial'], true))
+            ? $categoryRaw : 'user';
+
         $db = Connection::getInstance();
         $db->execute(
-            "INSERT INTO rooms (name, description, type, owner_id) VALUES (?, ?, 'public', ?)",
-            [$name, $description !== '' ? $description : null, $userId]
+            "INSERT INTO rooms (name, description, type, room_category, owner_id) VALUES (?, ?, 'public', ?, ?)",
+            [$name, $description !== '' ? $description : null, $category, $userId]
         );
         $roomId = (int) $db->lastInsertId();
 

@@ -206,10 +206,12 @@ class EventRouter
             'message' => $result,
         ]);
 
-        $this->cm->sendToUser($toId, [
-            'event'   => 'whisper_received',
-            'message' => $result,
-        ]);
+        if ($toId !== $fromId) {
+            $this->cm->sendToUser($toId, [
+                'event'   => 'whisper_received',
+                'message' => $result,
+            ]);
+        }
     }
 
     private function onInviteUser(ConnectionInterface $conn, array $session, array $data): void
@@ -220,19 +222,6 @@ class EventRouter
         $result = NumerController::invite($fromId, $session, $toId);
         if (isset($result['error'])) {
             $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => $result['error']]);
-            return;
-        }
-
-        if (!empty($result['self_created'])) {
-            $roomId = (int) ($result['room_id'] ?? 0);
-            if ($roomId > 0 && !$this->cm->isInRoom($fromId, $roomId)) {
-                $this->cm->joinRoom($conn, $roomId);
-            }
-            $this->cm->sendToConnection($conn, [
-                'event'   => 'numer_joined',
-                'room_id' => $roomId,
-                'members' => $result['members'] ?? [],
-            ]);
             return;
         }
 
@@ -310,6 +299,7 @@ class EventRouter
         $this->cm->sendToUser((int) $inv['from_user_id'], [
             'event'         => 'invite_accepted',
             'invitation_id' => $invId,
+            'room_id'       => $roomId,
             'user'          => $this->userPayload($session),
         ]);
     }

@@ -41,6 +41,22 @@ class RoomManager
         exit;
     }
 
+    public static function setCategory(int $roomId, string $category): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        if (!in_array($category, ['permanent', 'user', 'commercial'], true)) {
+            self::jsonError('Недопустимая категория.');
+        }
+        $db = Connection::getInstance();
+        if (!$db->fetchOne('SELECT id FROM rooms WHERE id = ?', [$roomId])) {
+            self::jsonError('Комната не найдена.', 404);
+        }
+        $db->execute('UPDATE rooms SET room_category = ? WHERE id = ?', [$category, $roomId]);
+        self::jsonSuccess(['updated' => true, 'room_category' => $category]);
+    }
+
     /**
      * Переименование комнаты.
      * Last updated: 2026-04-17.
@@ -262,6 +278,82 @@ class RoomManager
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    public static function roomMessages(int $roomId, int $page = 1, string $filterUser = ''): void
+    {
+        $db   = Connection::getInstance();
+        $room = $db->fetchOne('SELECT id, name FROM rooms WHERE id = ?', [$roomId]);
+        if (!$room) {
+            self::jsonError('Комната не найдена.', 404);
+        }
+
+        $offset = max(0, ($page - 1) * 50);
+        $where  = ["m.room_id = ?", "m.type != 'whisper'"];
+        $params = [$roomId];
+
+        if ($filterUser !== '') {
+            $where[] = 'u.username LIKE ?';
+            $params[] = '%' . $filterUser . '%';
+        }
+
+        $whereStr = implode(' AND ', $where);
+        $total = (int) $db->fetchOne(
+            "SELECT COUNT(*) AS c FROM messages m JOIN users u ON u.id = m.user_id WHERE $whereStr",
+            $params
+        )['c'];
+
+        $messages = $db->fetchAll(
+            "SELECT m.id, m.content, m.type, m.created_at, m.is_deleted,
+                    u.id AS user_id, u.username
+             FROM messages m
+             JOIN users u ON u.id = m.user_id
+             WHERE $whereStr
+             ORDER BY m.created_at DESC
+             LIMIT 50 OFFSET $offset",
+            $params
+        );
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'success'  => true,
+            'messages' => $messages,
+            'total'    => $total,
+            'page'     => $page,
+            'room'     => $room,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public static function clearMessages(int $roomId): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $actor = \Chat\Security\Session::current();
+        $db    = Connection::getInstance();
+        if (!$db->fetchOne('SELECT id FROM rooms WHERE id = ?', [$roomId])) {
+            self::jsonError('Комната не найдена.', 404);
+        }
+        $db->execute(
+            "UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE room_id = ? AND type != 'whisper' AND is_deleted = 0",
+            [(int) ($actor['id'] ?? 0), $roomId]
+        );
+        self::jsonSuccess(['cleared' => true]);
+    }
+
+    public static function clearUserMessages(int $roomId, int $userId): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $actor = \Chat\Security\Session::current();
+        $db    = Connection::getInstance();
+        $db->execute(
+            "UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE room_id = ? AND user_id = ? AND type != 'whisper' AND is_deleted = 0",
+            [(int) ($actor['id'] ?? 0), $roomId, $userId]
+        );
+        self::jsonSuccess(['cleared' => true]);
     }
 
     /**

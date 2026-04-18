@@ -17,6 +17,14 @@ $user = $router->getUser();
 $nonce = base64_encode(random_bytes(16));
 $csrfToken = CSRF::token();
 $isLoggedIn = (bool) $user;
+$_sysMsgColor = '#DEC8A4';
+if ($isLoggedIn) {
+    try {
+        $db = \Chat\DB\Connection::getInstance();
+        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color'");
+        if ($row && !empty($row['value'])) $_sysMsgColor = (string) $row['value'];
+    } catch (\Throwable $e) {}
+}
 $userJson = $user ? json_encode([
     'id'             => (int) $user['id'],
     'username'       => $user['username'],
@@ -41,9 +49,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style nonce="<?= $nonce ?>">
-:root { --sidebar-w: 260px; --right-panel-w: 220px; }
-body { overflow: hidden; height: 100vh; }
-.chat-layout { display: flex; height: 100vh; }
+:root { --sidebar-w: 260px; --right-panel-w: 220px; --sys-msg-color: <?= htmlspecialchars($_sysMsgColor, ENT_QUOTES) ?>; }
+body { height: 100vh; margin: 0; }
+.chat-layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* Left sidebar */
 #sidebar-left { width: var(--sidebar-w); min-width: var(--sidebar-w); display: flex; flex-direction: column; border-right: 1px solid var(--bs-border-color); background: var(--bs-body-bg); overflow: hidden; }
@@ -69,8 +77,11 @@ body { overflow: hidden; height: 100vh; }
 .msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
 .msg-inline-content { color: inherit; }
 .msg-inline-content * { color: inherit !important; }
-.msg-system { text-align: center; font-style: italic; color: var(--bs-secondary-color); font-size: .82rem; padding: 2px 0; }
-.msg-whisper { background: rgba(108,117,125,.08); border-left: 3px solid #6c757d; padding: 4px 10px; border-radius: 0 6px 6px 0; font-style: italic; color: var(--bs-secondary-color); }
+.msg-system { text-align: center; font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
+.msg-time { color: var(--sys-msg-color); font-size: .8rem; }
+.msg-sep { color: var(--sys-msg-color); }
+.msg-whisper-row { background: rgba(170,170,170,.13); border-radius: 4px; padding: 2px 6px; }
+.room-desc { font-size: .78rem; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
 .msg:hover .msg-delete-btn { opacity: 1; }
 .scroll-bottom-btn { position: absolute; bottom: 90px; right: 240px; z-index: 10; border-radius: 20px; display: none; }
@@ -225,7 +236,10 @@ body { overflow: hidden; height: 100vh; }
   <div id="chat-main">
     <div id="chat-header">
       <button class="btn btn-sm btn-outline-secondary d-md-none" id="toggleSidebar"><i class="fa fa-bars"></i></button>
-      <div id="room-title" class="fw-bold flex-1">Выберите комнату</div>
+      <div class="flex-1 overflow-hidden">
+        <div id="room-title" class="fw-bold">Выберите комнату</div>
+        <div id="room-description" class="room-desc d-none"></div>
+      </div>
       <div id="room-online-count" class="text-muted small"></div>
       <button id="room-manage-btn" class="btn btn-sm btn-outline-secondary d-none" title="Управление"><i class="fa fa-cog"></i></button>
       <?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
@@ -438,6 +452,10 @@ body { overflow: hidden; height: 100vh; }
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminRooms">Комнаты</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminNumera">Нумера</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminWhispers">Шёпот</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminBans">Баны</a></li>
+        <?php if ($user['global_role'] === 'platform_owner'): ?>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminSettings">Настройки</a></li>
+        <?php endif; ?>
       </ul>
       <div class="tab-content">
         <div class="tab-pane fade show active" id="adminDash">
@@ -459,6 +477,9 @@ body { overflow: hidden; height: 100vh; }
         <div class="tab-pane fade" id="adminNumera">
           <div id="admin-numera-table"></div>
         </div>
+        <div class="tab-pane fade" id="adminBans">
+          <div id="admin-bans-table"></div>
+        </div>
         <div class="tab-pane fade" id="adminWhispers">
           <div class="mb-2 d-flex gap-2">
             <input type="text" class="form-control form-control-sm" id="whisper-filter-from" placeholder="От пользователя">
@@ -467,6 +488,56 @@ body { overflow: hidden; height: 100vh; }
           </div>
           <div id="admin-whispers-table"></div>
         </div>
+        <?php if ($user['global_role'] === 'platform_owner'): ?>
+        <div class="tab-pane fade" id="adminSettings">
+          <form id="adminSettingsForm" class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Формат даты/времени</label>
+              <input type="text" class="form-control" name="datetime_format" placeholder="DD.MM.YY HH:mm">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Формат времени</label>
+              <input type="text" class="form-control" name="time_format" placeholder="HH:mm">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Цвет системных сообщений</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="color" class="form-control form-control-color" name="system_message_color" id="sysMsgColorPicker" style="width:46px;height:38px;padding:2px">
+                <div id="sys-msg-color-preview" class="color-preview-box">Системное</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Тема по умолчанию</label>
+              <select class="form-select" name="system_theme">
+                <option value="auto">Авто</option>
+                <option value="light">Светлая</option>
+                <option value="dark">Тёмная</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="registration_enabled" id="admin-reg-enabled" value="1">
+                <label class="form-check-label" for="admin-reg-enabled">Регистрация открыта</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="maintenance_mode" id="admin-maint-mode" value="1">
+                <label class="form-check-label" for="admin-maint-mode">Режим обслуживания</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Сообщение при обслуживании</label>
+              <input type="text" class="form-control" name="maintenance_message" placeholder="Текст для пользователей">
+            </div>
+            <div class="col-12">
+              <div id="admin-settings-error" class="alert alert-danger d-none"></div>
+              <div id="admin-settings-success" class="alert alert-success d-none">Настройки сохранены.</div>
+              <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+            </div>
+          </form>
+        </div>
+        <?php endif; ?>
       </div>
     </div>
   </div></div>
@@ -757,9 +828,11 @@ $('#load-more-btn').on('click', function() {
 });
 
 function onRoomJoined(data) {
-  const room = rooms.find(r => r.id === data.room_id) || numera.find(r => r.id === data.room_id) || {name: 'Комната'};
+  const room = rooms.find(r => Number(r.id) === Number(data.room_id)) || numera.find(r => Number(r.id) === Number(data.room_id)) || {name: 'Комната'};
   currentRoomRole = data.my_role || null;
   $('#room-title').text(room.name || 'Комната');
+  const desc = (room.description != null && room.description !== '') ? String(room.description) : '';
+  desc ? $('#room-description').text(desc).removeClass('d-none') : $('#room-description').addClass('d-none');
   renderOnlineList(data.online || []);
   onlineCountsByRoom.set(Number(data.room_id), (data.online || []).length);
   updateRoomBadge(data.room_id);
@@ -794,7 +867,7 @@ function buildMessage(m) {
 
   const time = dayjs(m.created_at).format('HH:mm:ss');
   const canDelete = canDeleteMessage(m);
-  const deleteBtn = canDelete ? `<span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
+  const deleteBtn = canDelete ? ` <span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
 
   let embed = '';
   if (m.embed_data) {
@@ -804,12 +877,7 @@ function buildMessage(m) {
 
   return `<div class="msg" id="msg-${m.id}">
     <div class="msg-body">
-      <div class="msg-meta">
-        <span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span>
-        <span>${time}</span>
-        <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>
-        ${deleteBtn}
-      </div>
+      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><em><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(m.username)}</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}</em>
       ${embed}
     </div>
   </div>`;
@@ -819,13 +887,13 @@ function buildWhisperMessage(m, isSent) {
   const time = dayjs(m.created_at).format('HH:mm:ss');
   const from = m.from || {};
   const to   = m.to   || {};
-  const label = isSent
-    ? `🤫 шёпот для <strong>@${esc(to.username || '')}</strong>`
-    : `🤫 шёпот от <strong>@${esc(from.username || '')}</strong>`;
-  return `<div class="msg" id="msg-${m.message_id}">
-    <div class="msg-whisper flex-1">
-      <div class="msg-meta small">${label} · ${time}</div>
-      <div class="msg-content">${m.content}</div>
+  const partner = isSent ? to : from;
+  const pid = Number(partner.id || 0);
+  const pname = esc(partner.username || '');
+  const dir = isSent ? 'для' : 'от';
+  return `<div class="msg msg-whisper-row" id="msg-${m.message_id}">
+    <div class="msg-body">
+      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span><em><span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${pid}" data-name="${pname}">${pname}</span> <span class="msg-sep small">(шёпот ${dir})</span> <span class="msg-content">${m.content}</span></em>
     </div>
   </div>`;
 }
@@ -934,6 +1002,13 @@ $('#messages-list').on('click', '.msg-delete-btn', function() {
   const msgId = $(this).data('id');
   if (!confirm('Удалить сообщение?')) return;
   wsSend('delete_message', {message_id: msgId});
+});
+
+// Whisper nick click → activate whisper mode
+$('#messages-list').on('click', '.whisper-nick-link', function() {
+  const uid = Number($(this).data('id'));
+  const uname = String($(this).data('name') || '');
+  if (uid && uname) activateWhisperMode(uid, uname);
 });
 
 // ════════════════════════════════════════════════
@@ -1371,18 +1446,14 @@ function onNumerJoined(data) {
 
 function onInviteSent(invitation) {
   if (!invitation) return;
-  pendingInviteRooms.set(Number(invitation.invitation_id), Number(invitation.room_id));
   loadRooms();
 }
 
 function onInviteAccepted(data) {
-  const invitationId = Number(data.invitation_id || 0);
-  const roomId = Number(pendingInviteRooms.get(invitationId) || 0);
-  if (invitationId) pendingInviteRooms.delete(invitationId);
   showToast('Приглашение принято: ' + (data.user?.username || ''));
   loadRooms();
-  if (roomId) {
-    joinRoom(roomId, true);
+  if (data.room_id) {
+    joinRoom(Number(data.room_id), true);
   }
 }
 
@@ -1441,9 +1512,10 @@ function onNumerDestroyed(data) {
 
 function onInviteReceived(inv) {
   const from = inv.from || {};
+  let countdown = 30;
   $('#invite-modal-body').html(`
     <p><strong>${esc(from.username)}</strong> приглашает вас в нумер.</p>
-    <p class="text-muted small">Приглашение истекает через 30 секунд.</p>
+    <p class="text-muted small">Приглашение истекает через <span id="invite-countdown">30</span> сек.</p>
     <div class="d-flex gap-2">
       <button class="btn btn-success flex-1" id="accept-invite" data-id="${inv.invitation_id}">Принять</button>
       <button class="btn btn-outline-secondary flex-1" id="decline-invite" data-id="${inv.invitation_id}">Отклонить</button>
@@ -1451,17 +1523,26 @@ function onInviteReceived(inv) {
   `);
   new bootstrap.Modal(document.getElementById('inviteModal')).show();
 
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    $('#invite-countdown').text(countdown);
+    if (countdown <= 0) clearInterval(countdownInterval);
+  }, 1000);
+
   const timer = setTimeout(() => {
-    $('#inviteModal').modal && bootstrap.Modal.getInstance(document.getElementById('inviteModal'))?.hide();
+    clearInterval(countdownInterval);
+    bootstrap.Modal.getInstance(document.getElementById('inviteModal'))?.hide();
   }, 30000);
 
+  function cleanup() { clearTimeout(timer); clearInterval(countdownInterval); }
+
   $('#accept-invite').one('click', function() {
-    clearTimeout(timer);
+    cleanup();
     wsSend('invite_respond', {invitation_id: inv.invitation_id, response: 'accept'});
     bootstrap.Modal.getInstance(document.getElementById('inviteModal'))?.hide();
   });
   $('#decline-invite').one('click', function() {
-    clearTimeout(timer);
+    cleanup();
     wsSend('invite_respond', {invitation_id: inv.invitation_id, response: 'decline'});
     bootstrap.Modal.getInstance(document.getElementById('inviteModal'))?.hide();
   });
@@ -1692,7 +1773,7 @@ function initSidebar() {
 
   $('#room-manage-btn').on('click', function() {
     if (!currentRoomId) return;
-    const room = rooms.find(r => r.id === currentRoomId) || numera.find(r => r.id === currentRoomId);
+    const room = rooms.find(r => Number(r.id) === Number(currentRoomId)) || numera.find(r => Number(r.id) === Number(currentRoomId));
     const canRenameDelete = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || currentRoomRole === 'owner';
     const canAssignRoles = canAssignLocalModerator() || canAssignLocalAdmin();
     let html = '';
@@ -1750,11 +1831,13 @@ function initAdmin() {
   // Tab switch
   $('#adminTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');
-    if (tab === '#adminDash')    loadAdminDash();
-    if (tab === '#adminUsers')   loadAdminUsers();
-    if (tab === '#adminRooms')   loadAdminRooms();
-    if (tab === '#adminNumera')  loadAdminNumera();
-    if (tab === '#adminWhispers')loadAdminWhispers();
+    if (tab === '#adminDash')     loadAdminDash();
+    if (tab === '#adminUsers')    loadAdminUsers();
+    if (tab === '#adminRooms')    loadAdminRooms();
+    if (tab === '#adminNumera')   loadAdminNumera();
+    if (tab === '#adminWhispers') loadAdminWhispers();
+    if (tab === '#adminBans')     loadAdminBans();
+    if (tab === '#adminSettings') loadAdminSettings();
   });
 
   $('#admin-user-search-btn').on('click', loadAdminUsers);
@@ -1994,7 +2077,10 @@ function loadAdminRooms() {
         <td>${r.message_count}</td>
         <td>${esc(r.owner_username||'—')}</td>
         <td>${r.days_running ?? 0}</td>
-        <td>${delBtn}</td></tr>`;
+        <td class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-info room-history-btn" data-id="${r.id}" data-name="${esc(r.name)}" title="История"><i class="fa fa-clock-rotate-left"></i></button>
+          ${delBtn}
+        </td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-rooms-table').html(html);
@@ -2024,7 +2110,7 @@ function loadAdminNumera() {
       const h = Math.floor(min / 60), m = min % 60;
       return `${h}ч ${m}м`;
     };
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th></tr></thead><tbody>';
+    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th><th></th></tr></thead><tbody>';
     resp.numera.forEach(r => {
       const started = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '—';
       const duration = fmtDuration(Number(r.minutes_running) || 0);
@@ -2037,7 +2123,8 @@ function loadAdminNumera() {
         <td>${esc(r.owner_username||'—')}</td>
         <td class="small">${esc(r.participants||'—')}</td>
         <td>${statusDot} ${r.member_count}</td>
-        <td>${duration}</td></tr>`;
+        <td>${duration}</td>
+        <td><button class="btn btn-sm btn-outline-info numer-history-btn" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button></td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-numera-table').html(html);
@@ -2057,6 +2144,137 @@ function loadAdminWhispers() {
     $('#admin-whispers-table').html(html);
   });
 }
+
+function loadAdminBans() {
+  $.get('/api/admin/bans', function(resp) {
+    if (!resp.success) { $('#admin-bans-table').html('<div class="text-muted">Нет данных.</div>'); return; }
+    if (!resp.bans || !resp.bans.length) {
+      $('#admin-bans-table').html('<div class="text-muted p-2">Заблокированных нет.</div>');
+      return;
+    }
+    let html = '<table class="table table-sm"><thead><tr><th>Пользователь</th><th>Комната</th><th>Роль</th><th>Кляп до</th><th></th></tr></thead><tbody>';
+    resp.bans.forEach(b => {
+      const mutedUntil = b.muted_until ? b.muted_until.slice(0,16) : '—';
+      const unbanBtn = b.room_role === 'banned'
+        ? `<button class="btn btn-xs btn-sm btn-outline-success admin-unban-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Разбанить"><i class="fa fa-unlock"></i></button>`
+        : '';
+      const unmuteBtn = b.muted_until
+        ? `<button class="btn btn-xs btn-sm btn-outline-warning admin-unmute-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Снять кляп"><i class="fa fa-comment"></i></button>`
+        : '';
+      html += `<tr><td>${esc(b.username)}</td><td>${esc(b.room_name||'—')}</td><td>${esc(b.room_role||'—')}</td><td>${mutedUntil}</td><td class="d-flex gap-1">${unbanBtn}${unmuteBtn}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    $('#admin-bans-table').html(html);
+  });
+}
+
+$('#admin-bans-table').on('click', '.admin-unban-btn', function() {
+  const roomId = $(this).data('room'), userId = $(this).data('user');
+  $.post(`/api/admin/rooms/${roomId}/unban/${userId}`, {csrf_token: CSRF_TOKEN}, function(resp) {
+    if (resp.success) { showToast('Разбанен.', 'success'); loadAdminBans(); }
+    else showToast(resp.error || 'Ошибка.', 'danger');
+  }, 'json');
+});
+
+$('#admin-bans-table').on('click', '.admin-unmute-btn', function() {
+  const roomId = $(this).data('room'), userId = $(this).data('user');
+  $.post(`/api/admin/rooms/${roomId}/unmute/${userId}`, {csrf_token: CSRF_TOKEN}, function(resp) {
+    if (resp.success) { showToast('Кляп снят.', 'success'); loadAdminBans(); }
+    else showToast(resp.error || 'Ошибка.', 'danger');
+  }, 'json');
+});
+
+$('#admin-rooms-table').on('click', '.room-history-btn', function() {
+  const id = $(this).data('id'), name = $(this).data('name');
+  openRoomHistory(id, name);
+});
+
+$('#admin-numera-table').on('click', '.numer-history-btn', function() {
+  const id = $(this).data('id');
+  openNumerHistory(id);
+});
+
+function openRoomHistory(roomId, roomName) {
+  $.get(`/api/admin/rooms/${roomId}/messages`, function(resp) {
+    if (!resp.success) { showToast('Не удалось загрузить историю.', 'danger'); return; }
+    let html = `<h6>${esc(roomName)} — история</h6>`;
+    if (!resp.messages || !resp.messages.length) {
+      html += '<div class="text-muted">Сообщений нет.</div>';
+    } else {
+      html += '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>';
+      resp.messages.forEach(m => {
+        html += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    $('#room-manage-body').html(html);
+    new bootstrap.Modal(document.getElementById('roomManageModal')).show();
+  });
+}
+
+function openNumerHistory(numerId) {
+  $.get(`/api/admin/numera/${numerId}/messages`, function(resp) {
+    if (!resp.success) { showToast('Не удалось загрузить историю.', 'danger'); return; }
+    let html = `<h6>Нумер #${numerId} — история</h6>`;
+    if (!resp.messages || !resp.messages.length) {
+      html += '<div class="text-muted">Сообщений нет.</div>';
+    } else {
+      html += '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>';
+      resp.messages.forEach(m => {
+        html += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    $('#room-manage-body').html(html);
+    new bootstrap.Modal(document.getElementById('roomManageModal')).show();
+  });
+}
+
+function loadAdminSettings() {
+  $.get('/api/admin/system-settings', function(resp) {
+    if (!resp.success) return;
+    const s = resp.settings;
+    $('[name="datetime_format"]').val(s.datetime_format || '');
+    $('[name="time_format"]').val(s.time_format || '');
+    $('[name="system_message_color"]').val(s.system_message_color || '#DEC8A4');
+    $('[name="system_theme"]').val(s.system_theme || 'auto');
+    $('#admin-reg-enabled').prop('checked', s.registration_enabled === '1');
+    $('#admin-maint-mode').prop('checked', s.maintenance_mode === '1');
+    $('[name="maintenance_message"]').val(s.maintenance_message || '');
+    const color = s.system_message_color || '#DEC8A4';
+    $('#sys-msg-color-preview').css('color', color).text('Системное');
+  });
+}
+
+$('#adminSettingsForm').on('submit', function(e) {
+  e.preventDefault();
+  const data = {
+    csrf_token: CSRF_TOKEN,
+    datetime_format: $('[name="datetime_format"]').val(),
+    time_format: $('[name="time_format"]').val(),
+    system_message_color: $('[name="system_message_color"]').val(),
+    system_theme: $('[name="system_theme"]').val(),
+    registration_enabled: $('#admin-reg-enabled').is(':checked') ? '1' : '0',
+    maintenance_mode: $('#admin-maint-mode').is(':checked') ? '1' : '0',
+    maintenance_message: $('[name="maintenance_message"]').val(),
+  };
+  $.post('/api/admin/system-settings', data, function(resp) {
+    if (resp.success) {
+      $('#admin-settings-success').removeClass('d-none');
+      $('#admin-settings-error').addClass('d-none');
+      document.documentElement.style.setProperty('--sys-msg-color', data.system_message_color);
+      setTimeout(() => $('#admin-settings-success').addClass('d-none'), 3000);
+    } else {
+      $('#admin-settings-error').text(resp.error || 'Ошибка').removeClass('d-none');
+    }
+  }, 'json').fail(function(xhr) {
+    $('#admin-settings-error').text(xhr.responseJSON?.error || 'Не удалось сохранить.').removeClass('d-none');
+  });
+});
+
+$('#sysMsgColorPicker').on('input', function() {
+  $('#sys-msg-color-preview').css('color', $(this).val());
+});
 
 // ════════════════════════════════════════════════
 //  HELPERS

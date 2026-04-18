@@ -22,6 +22,12 @@ class RegisterHandler
             self::jsonError('Неверный CSRF токен.', 403);
         }
 
+        $db = Connection::getInstance();
+        $regEnabled = $db->fetchOne('SELECT value FROM app_settings WHERE name = ?', ['registration_enabled']);
+        if (($regEnabled['value'] ?? '1') === '0') {
+            self::jsonError('Регистрация временно закрыта.', 403);
+        }
+
         $username = trim((string) ($_POST['username'] ?? ''));
         $email = trim((string) ($_POST['email'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');

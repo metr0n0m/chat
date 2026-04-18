@@ -39,8 +39,10 @@ class MessageController
         }
 
         $db = Connection::getInstance();
-        $params = [$roomId, 'whisper'];
-        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0 AND m.type != ?';
+        // Show own whispers (sent or received), hide others' whispers
+        $params = [$roomId, $actorId, $actorId];
+        $where = 'WHERE m.room_id = ? AND m.is_deleted = 0
+                  AND (m.type != \'whisper\' OR m.user_id = ? OR m.whisper_to = ?)';
 
         if ($beforeId !== null) {
             $where .= ' AND m.id < ?';
@@ -52,12 +54,14 @@ class MessageController
             : 'u.nick_color, u.text_color';
 
         $messages = $db->fetchAll(
-            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at,
+            'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.room_id,
+                    m.whisper_to, wt.username AS whisper_to_username,
                     u.username, u.custom_status, u.avatar_url, u.global_role,
                     ' . $colorSelect . ',
                     rm.room_role
              FROM messages m
              JOIN users u ON u.id = m.user_id
+             LEFT JOIN users wt ON wt.id = m.whisper_to
              LEFT JOIN room_members rm ON rm.room_id = m.room_id AND rm.user_id = m.user_id
              ' . $where . '
              ORDER BY m.created_at DESC
@@ -74,10 +78,10 @@ class MessageController
     {
         $db = Connection::getInstance();
         $memberState = $db->fetchOne(
-            'SELECT muted_until FROM room_members WHERE room_id = ? AND user_id = ?',
+            'SELECT muted_until FROM room_members WHERE room_id = ? AND user_id = ? AND muted_until > NOW()',
             [$roomId, $actorId]
         );
-        if (!empty($memberState['muted_until']) && strtotime((string)$memberState['muted_until']) > time()) {
+        if ($memberState) {
             return ['error' => 'У вас кляп до ' . date('H:i:s', strtotime((string)$memberState['muted_until'])) . '.'];
         }
 

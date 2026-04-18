@@ -19,15 +19,13 @@ class NumerController
     public static function invite(int $fromId, array $from, int $toId): array
     {
         $db = Connection::getInstance();
-        $numerId = self::findOrCreateOwnedNumer($db, $fromId);
 
-        // Self-create: пользователь создает/открывает нумер для ожидания приглашений.
-        if ($fromId === $toId) {
-            return [
-                'self_created' => true,
-                'room_id' => $numerId,
-                'members' => self::roomMembers($db, $numerId),
-            ];
+        $muted = $db->fetchOne(
+            'SELECT muted_until FROM room_members WHERE user_id = ? AND muted_until > NOW() LIMIT 1',
+            [$fromId]
+        );
+        if ($muted) {
+            return ['error' => 'У вас кляп до ' . date('H:i:s', strtotime((string) $muted['muted_until'])) . '.'];
         }
 
         $pendingCount = (int) $db->fetchOne(
@@ -47,15 +45,15 @@ class NumerController
         }
 
         $expiresAt = date('Y-m-d H:i:s', time() + 30);
+        // room_id остаётся NULL — нумер создаётся только при принятии приглашения
         $db->execute(
-            'INSERT INTO invitations (room_id, from_user_id, to_user_id, expires_at) VALUES (?, ?, ?, ?)',
-            [$numerId, $fromId, $toId, $expiresAt]
+            'INSERT INTO invitations (room_id, from_user_id, to_user_id, expires_at) VALUES (NULL, ?, ?, ?)',
+            [$fromId, $toId, $expiresAt]
         );
         $invId = (int) $db->lastInsertId();
 
         return [
             'invitation_id' => $invId,
-            'room_id' => $numerId,
             'from' => [
                 'id' => $fromId,
                 'username' => $from['username'],
@@ -93,7 +91,13 @@ class NumerController
             return ['declined' => true, 'invitation_id' => $invId];
         }
 
-        $roomId = (int) $inv['room_id'];
+        // Создаём (или находим существующий открытый) нумер для отправителя приглашения
+        $fromUserId = (int) $inv['from_user_id'];
+        $roomId = self::findOrCreateOwnedNumer($db, $fromUserId);
+
+        // Сохраняем room_id в приглашении для истории
+        $db->execute('UPDATE invitations SET room_id = ? WHERE id = ?', [$roomId, $invId]);
+
         $count = (int) $db->fetchOne(
             "SELECT COUNT(*) AS c FROM room_members WHERE room_id = ? AND room_role != 'banned'",
             [$roomId]

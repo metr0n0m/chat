@@ -102,6 +102,27 @@ class UserManager
 
             $set[] = "`$field` = ?";
             $params[] = $value;
+
+            // When banning: record metadata
+            if ($field === 'is_banned' && $value === 1) {
+                $actorId = $actor ? (int) $actor['id'] : null;
+                $reason  = trim((string) ($data['ban_reason'] ?? ''));
+                $hours   = (int) ($data['ban_hours'] ?? 0);
+                $set[]   = 'banned_at = NOW()';
+                $set[]   = 'banned_by = ?';
+                $params[] = $actorId;
+                $set[]   = 'ban_reason = ?';
+                $params[] = $reason !== '' ? $reason : null;
+                $set[]   = 'banned_until = ?';
+                $params[] = $hours > 0 ? date('Y-m-d H:i:s', time() + $hours * 3600) : null;
+            }
+            // When unbanning: clear metadata fields
+            if ($field === 'is_banned' && $value === 0) {
+                $set[] = 'banned_at = NULL';
+                $set[] = 'banned_by = NULL';
+                $set[] = 'banned_until = NULL';
+                $set[] = 'ban_reason = NULL';
+            }
         }
 
         if ($set === []) {
@@ -500,5 +521,90 @@ class UserManager
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    public static function listBanned(): void
+    {
+        $db = Connection::getInstance();
+
+        // Auto-expire time-limited global bans
+        $db->execute(
+            "UPDATE users SET is_banned = 0, banned_at = NULL, banned_by = NULL, banned_until = NULL, ban_reason = NULL
+             WHERE is_banned = 1 AND banned_until IS NOT NULL AND banned_until <= NOW()"
+        );
+        // Auto-clear expired mutes
+        $db->execute(
+            "UPDATE room_members SET muted_until = NULL, mute_reason = NULL
+             WHERE muted_until IS NOT NULL AND muted_until <= NOW()"
+        );
+
+        $global = $db->fetchAll(
+            "SELECT u.id, u.username, u.email, u.global_role,
+                    u.banned_at, u.banned_until, u.ban_reason,
+                    a.username AS banned_by_name,
+                    NULL AS room_id, NULL AS room_name,
+                    'global' AS ban_type
+             FROM users u
+             LEFT JOIN users a ON a.id = u.banned_by
+             WHERE u.is_banned = 1
+             ORDER BY u.banned_at DESC"
+        );
+
+        $room = $db->fetchAll(
+            "SELECT u.id, u.username, u.email, u.global_role,
+                    rm.banned_at, NULL AS banned_until, rm.ban_reason,
+                    a.username AS banned_by_name,
+                    r.id AS room_id, r.name AS room_name,
+                    'room' AS ban_type
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             JOIN rooms r ON r.id = rm.room_id
+             LEFT JOIN users a ON a.id = rm.banned_by
+             WHERE rm.room_role = 'banned'
+             ORDER BY rm.banned_at DESC"
+        );
+
+        $mutes = $db->fetchAll(
+            "SELECT u.id, u.username, u.email, u.global_role,
+                    rm.muted_until AS banned_until, rm.mute_reason AS ban_reason,
+                    NULL AS banned_at, NULL AS banned_by_name,
+                    r.id AS room_id, r.name AS room_name,
+                    'mute' AS ban_type
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             JOIN rooms r ON r.id = rm.room_id
+             WHERE rm.muted_until IS NOT NULL AND rm.muted_until > NOW()
+             ORDER BY rm.muted_until DESC"
+        );
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'global' => $global, 'room' => $room, 'mutes' => $mutes], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public static function roomUnban(int $roomId, int $userId): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $db = Connection::getInstance();
+        $db->execute(
+            "DELETE FROM room_members WHERE room_id = ? AND user_id = ? AND room_role = 'banned'",
+            [$roomId, $userId]
+        );
+        self::jsonSuccess();
+    }
+
+    public static function roomUnmute(int $roomId, int $userId): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $db = Connection::getInstance();
+        $db->execute(
+            'UPDATE room_members SET muted_until = NULL, mute_reason = NULL WHERE room_id = ? AND user_id = ?',
+            [$roomId, $userId]
+        );
+        self::jsonSuccess();
     }
 }

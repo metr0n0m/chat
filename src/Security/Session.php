@@ -57,7 +57,9 @@ class Session
             'SELECT s.id AS session_id, s.expires_at,
                     u.id, u.username, u.email, u.avatar_url, u.signature,
                     u.custom_status, u.nick_color, u.text_color, u.global_role,
-                    u.can_create_room, u.is_banned
+                    u.can_create_room, u.is_banned,
+                    u.hide_last_seen, u.bio,
+                    u.social_telegram, u.social_whatsapp, u.social_vk
              FROM sessions s
              JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = ? AND s.ip_ua_hash = ? AND s.expires_at > NOW()',

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Chat\Admin;
 
 use Chat\DB\Connection;
-use Chat\Security\Session;
+use Chat\Security\{Session, CSRF};
 
 /**
  * Методы админ-панели верхнего уровня.
@@ -176,6 +176,88 @@ class AdminPanel
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'user_id' => (int) $db->lastInsertId()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    private static function requireOwner(): array
+    {
+        $actor = Session::current();
+        if (!$actor || ($actor['global_role'] ?? '') !== 'platform_owner') {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Только владелец платформы.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        return $actor;
+    }
+
+    public static function getSystemSettings(): void
+    {
+        self::requireOwner();
+        $db = Connection::getInstance();
+        $rows = $db->fetchAll('SELECT name, value FROM app_settings');
+        $s = [];
+        foreach ($rows as $r) {
+            $s[$r['name']] = $r['value'];
+        }
+        $defaults = [
+            'datetime_format'      => 'DD.MM.YY HH:mm',
+            'time_format'          => 'HH:mm',
+            'registration_enabled' => '1',
+            'maintenance_mode'     => '0',
+            'maintenance_message'  => '',
+            'maintenance_until'    => '',
+            'site_description'     => '',
+            'site_keywords'        => '',
+            'system_theme'         => 'auto',
+            'system_message_color' => '#DEC8A4',
+        ];
+        foreach ($defaults as $k => $v) {
+            if (!array_key_exists($k, $s)) {
+                $s[$k] = $v;
+            }
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'settings' => $s], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public static function updateSystemSettings(array $actor, array $post): void
+    {
+        if (($actor['global_role'] ?? '') !== 'platform_owner') {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'Только владелец платформы.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!CSRF::verifyRequest()) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $allowed = [
+            'datetime_format', 'time_format', 'registration_enabled', 'maintenance_mode',
+            'maintenance_message', 'maintenance_until', 'site_description',
+            'site_keywords', 'system_theme', 'system_message_color',
+        ];
+        $db = Connection::getInstance();
+        foreach ($allowed as $key) {
+            if (!array_key_exists($key, $post)) {
+                continue;
+            }
+            $value = (string) $post[$key];
+            if ($key === 'system_message_color' && !preg_match('/^#[0-9a-fA-F]{6}$/', $value)) {
+                continue;
+            }
+            $db->execute(
+                'INSERT INTO app_settings (name, value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE value = VALUES(value)',
+                [$key, $value]
+            );
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
