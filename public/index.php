@@ -402,21 +402,30 @@ body { height: 100vh; margin: 0; }
   </div></div>
 </div>
 
-<!-- Numer floating panel -->
-<div id="numer-panel" style="display:none;position:fixed;bottom:0;right:20px;width:320px;max-height:480px;z-index:1060;border:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.35);background:var(--bs-body-bg);display:flex;flex-direction:column">
-  <div id="numer-panel-header" style="padding:7px 10px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:6px;cursor:pointer" id="numer-panel-toggle-area">
-    <i class="fa fa-lock text-warning" style="font-size:.8rem"></i>
-    <span id="numer-panel-title" class="fw-semibold flex-1 text-truncate" style="font-size:.88rem">Нумер</span>
-    <span id="numer-countdown-wrap" class="badge bg-warning text-dark d-none" style="font-size:.7rem"><i class="fa fa-clock me-1"></i><span id="numer-countdown-time">30:00</span></span>
-    <button id="numer-panel-leave-btn" class="btn btn-sm btn-outline-danger py-0 px-1" title="Покинуть нумер" style="font-size:.75rem"><i class="fa fa-door-open"></i></button>
-    <button id="numer-panel-minimize-btn" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Свернуть" style="font-size:.75rem"><i class="fa fa-minus"></i></button>
+<!-- Numer overlay panel -->
+<div id="numer-panel" style="display:none;position:fixed;top:0;bottom:0;left:var(--sidebar-w,240px);right:0;z-index:1055;background:var(--bs-body-bg);flex-direction:column;border-left:1px solid var(--bs-border-color)">
+  <!-- header -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);flex-shrink:0">
+    <i class="fa fa-lock text-warning"></i>
+    <span id="numer-panel-title" class="fw-bold flex-1 text-truncate">Нумер</span>
+    <span id="numer-countdown-wrap" class="badge bg-warning text-dark d-none"><i class="fa fa-hourglass-half me-1"></i><span id="numer-countdown-time">30:00</span></span>
+    <button id="numer-panel-leave-btn" class="btn btn-sm btn-outline-danger" title="Покинуть нумер"><i class="fa fa-door-open me-1"></i>Покинуть</button>
+    <button id="numer-panel-minimize-btn" class="btn btn-sm btn-outline-secondary" title="Свернуть"><i class="fa fa-minus"></i></button>
   </div>
-  <div id="numer-panel-body" style="display:flex;flex-direction:column;flex:1;min-height:0">
-    <div id="numer-participants-bar" style="padding:4px 8px;border-bottom:1px solid var(--bs-border-color);font-size:.75rem;min-height:28px;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
-    <div id="numer-messages" style="flex:1;overflow-y:auto;padding:8px;font-size:.88rem;max-height:280px"></div>
-    <div style="padding:6px 8px;border-top:1px solid var(--bs-border-color);display:flex;gap:6px">
-      <textarea id="numer-input" class="form-control form-control-sm" rows="1" placeholder="Сообщение..." style="resize:none"></textarea>
-      <button id="numer-send-btn" class="btn btn-sm btn-primary px-2">→</button>
+  <!-- body: messages + participants -->
+  <div id="numer-panel-body" style="display:flex;flex:1;min-height:0;overflow:hidden">
+    <!-- messages column -->
+    <div style="display:flex;flex-direction:column;flex:1;min-width:0">
+      <div id="numer-messages" style="flex:1;overflow-y:auto;padding:10px 14px"></div>
+      <div style="padding:8px 12px;border-top:1px solid var(--bs-border-color);display:flex;gap:8px;flex-shrink:0">
+        <textarea id="numer-input" class="form-control" rows="1" placeholder="Сообщение в нумере..." style="resize:none;min-height:38px;max-height:120px"></textarea>
+        <button id="numer-send-btn" class="btn btn-primary px-3">→</button>
+      </div>
+    </div>
+    <!-- participants column -->
+    <div style="width:180px;flex-shrink:0;border-left:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg,var(--bs-secondary-bg));padding:10px 8px;overflow-y:auto">
+      <div class="text-muted small mb-2 fw-semibold">Участники</div>
+      <div id="numer-participants-bar"></div>
     </div>
   </div>
 </div>
@@ -652,6 +661,7 @@ let isScrolledToBottom = true;
 let oldestMessageId = null;
 let rooms = [];
 let numera = [];
+let numerMembers = [];
 const ignoredUserIds = new Set();
 const pendingInviteRooms = new Map();
 const onlineCountsByRoom = new Map();
@@ -1510,19 +1520,20 @@ let numerCountdownInterval = null;
 
 function openNumerPanel(roomId, roomName, members) {
   currentNumerRoomId = roomId;
+  numerMembers = members || [];
   $('#numer-panel-title').text(roomName || 'Нумер');
   $('#numer-messages').empty();
-  renderNumerParticipants(members || []);
+  renderNumerParticipants(numerMembers);
   stopNumerCountdown();
   $('#numer-panel').css('display', 'flex');
   $('#numer-panel-body').show();
-  // load history into panel
   $.get(`/api/rooms/${roomId}/messages`, function(resp) {
     if (!resp.success) return;
     resp.messages.forEach(m => appendNumerMessage(m));
-    $('#numer-messages').scrollTop($('#numer-messages')[0].scrollHeight);
+    const $msgs = $('#numer-messages');
+    $msgs.scrollTop($msgs[0].scrollHeight);
   });
-  loadRooms(); // refresh sidebar link
+  loadRooms();
 }
 
 function closeNumerPanel() {
@@ -1535,19 +1546,24 @@ function closeNumerPanel() {
 }
 
 function appendNumerMessage(m) {
-  if (!m || !m.content) return;
-  const time = m.created_at ? dayjs(m.created_at).format('HH:mm') : '';
+  if (!m || !m.content || m.type === 'system') return;
+  const time = m.created_at ? dayjs(m.created_at).format('HH:mm:ss') : '';
   const nick = esc(m.username || '');
-  const color = m.nick_color || '#aaa';
-  const html = `<div style="margin-bottom:4px"><span class="text-muted" style="font-size:.7rem">${time}</span> <span style="color:${color};font-weight:600">${nick}</span>: ${esc(m.content)}</div>`;
+  const nickColor = m.nick_color || 'inherit';
+  const textColor = m.text_color || 'inherit';
+  const html = `<div class="msg">
+    <div class="msg-body">
+      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><em><span class="msg-username" style="color:${nickColor}">${nick}</span>: <span class="msg-content msg-inline-content" style="color:${textColor} !important">${esc(m.content)}</span></em>
+    </div>
+  </div>`;
   $('#numer-messages').append(html);
 }
 
 function renderNumerParticipants(members) {
   const $bar = $('#numer-participants-bar').empty();
-  members.forEach(u => {
-    const color = u.nick_color || '#aaa';
-    $bar.append(`<span style="color:${color};font-size:.78rem">${esc(u.username)}</span>`);
+  (members || []).forEach(u => {
+    const color = u.nick_color || 'inherit';
+    $bar.append(`<div class="mb-1" style="font-size:.85rem"><i class="fa fa-circle text-success me-1" style="font-size:.5rem;vertical-align:middle"></i><span style="color:${color}">${esc(u.username)}</span></div>`);
   });
 }
 
@@ -1600,15 +1616,18 @@ function onInviteExpired(data) {
 function onNumerParticipantJoined(data) {
   if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
   stopNumerCountdown();
-  const $bar = $('#numer-participants-bar');
-  const color = data.user?.nick_color || '#aaa';
-  $bar.append(`<span style="color:${color};font-size:.78rem">${esc(data.user?.username||'')}</span>`);
+  if (data.user) {
+    numerMembers = numerMembers.filter(u => Number(u.id) !== Number(data.user.id));
+    numerMembers.push(data.user);
+  }
+  renderNumerParticipants(numerMembers);
   showToast((data.user?.username || '') + ' присоединился к нумеру.');
 }
 
 function onNumerParticipantLeft(data) {
   if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
-  // rebuild participants bar on next numer_countdown or just reload
+  numerMembers = numerMembers.filter(u => Number(u.id) !== Number(data.user_id));
+  renderNumerParticipants(numerMembers);
 }
 
 function onNumerOwnerChanged(data) {
