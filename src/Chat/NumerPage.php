@@ -126,7 +126,7 @@ class NumerPage
   </div>
   <div id="right-col">
     <div class="r-section" style="text-align:center">
-      <a href="javascript:location.reload()" class="refresh-link"><i class="fa fa-rotate-right me-1"></i>Обновить</a>
+      <a href="javascript:refreshNumer()" class="refresh-link"><i class="fa fa-rotate-right me-1"></i>Обновить</a>
     </div>
     <div class="r-section">
       <div class="r-label">Хозяин номера</div>
@@ -135,6 +135,12 @@ class NumerPage
     <div class="r-section" style="flex:1">
       <div class="r-label">В номере</div>
       <div id="participant-list"></div>
+    </div>
+    <div id="invite-section" class="r-section" style="display:none">
+      <div class="r-label">Пригласить</div>
+      <input id="invite-input" type="text" placeholder="Имя пользователя" style="width:100%;background:#2a2c30;border:1px solid #3a3c42;color:#cdd0d4;border-radius:4px;padding:4px 6px;font-size:.8rem;margin-bottom:4px">
+      <button id="invite-btn" style="width:100%;background:transparent;border:1px solid #3a5a3a;color:#7ab07a;border-radius:4px;padding:4px 6px;font-size:.8rem;cursor:pointer">Пригласить</button>
+      <div id="invite-status" style="font-size:.75rem;margin-top:4px;color:#888"></div>
     </div>
     <div class="r-section">
       <button id="leave-btn"><i class="fa fa-door-open me-1"></i>Покинуть</button>
@@ -175,6 +181,17 @@ function renderParticipants() {
     d.innerHTML = `<span class="p-dot"></span><span style="color:\${esc(m.nick_color||'inherit')}">\${esc(m.username)}</span>`;
     list.appendChild(d);
   });
+  // Show invite section only for owner and if room not full
+  const isOwner = members.some(m => m.id == ME.id && m.room_role === 'owner');
+  const invSec = document.getElementById('invite-section');
+  if (invSec) invSec.style.display = (isOwner && members.length < 4) ? '' : 'none';
+}
+
+function refreshNumer() {
+  fetch('/api/rooms/' + ROOM_ID + '/members')
+    .then(r => r.json())
+    .then(d => { if (d.members) { members = d.members; renderParticipants(); } })
+    .catch(() => {});
 }
 
 // ── Messages ──────────────────────────────────────────────────
@@ -239,10 +256,7 @@ function connect() {
     try { d = JSON.parse(e.data); } catch { return; }
     switch (d.event) {
       case 'room_joined':
-        if (d.online) {
-          members = d.online;
-          renderParticipants();
-        }
+        // Keep PHP-loaded members (they have correct room_role); just check countdown
         if (members.length === 1) startCountdown(1800);
         break;
       case 'new_message':
@@ -319,11 +333,31 @@ function leaveNumer() {
   }
 }
 
-document.getElementById('leave-btn').addEventListener('click', () => {
-  leaveNumer();
-});
+document.getElementById('leave-btn').addEventListener('click', leaveNumer);
 
-window.addEventListener('beforeunload', leaveNumer);
+// ── Invite ────────────────────────────────────────────────────
+document.getElementById('invite-btn').addEventListener('click', function() {
+  const username = document.getElementById('invite-input').value.trim();
+  const status   = document.getElementById('invite-status');
+  if (!username) return;
+  status.textContent = 'Поиск...';
+  fetch('/api/users/find?username=' + encodeURIComponent(username))
+    .then(r => r.json())
+    .then(d => {
+      if (!d.user) { status.textContent = 'Пользователь не найден.'; return; }
+      if (members.some(m => m.id == d.user.id)) { status.textContent = 'Уже в номере.'; return; }
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({event: 'invite_user', to_user_id: d.user.id}));
+        status.textContent = 'Приглашение отправлено: ' + esc(d.user.username);
+        document.getElementById('invite-input').value = '';
+        setTimeout(() => { status.textContent = ''; }, 3000);
+      }
+    })
+    .catch(() => { status.textContent = 'Ошибка.'; });
+});
+document.getElementById('invite-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('invite-btn').click();
+});
 
 // ── Init ──────────────────────────────────────────────────────
 initMsgs.forEach(m => appendMsg(m));
