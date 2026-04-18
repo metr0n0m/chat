@@ -47,6 +47,7 @@ class EventRouter
             'leave_numer'     => $this->onLeaveNumer($conn, $session, $data),
             'room_action'     => $this->onRoomAction($conn, $session, $data),
             'get_online_users' => $this->onGetOnlineUsers($conn),
+            'get_room_counts'  => $this->onGetRoomCounts($conn),
             'ping'            => $conn->send(json_encode(['event' => 'pong'])),
             default           => $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.common.invalid_event')]),
         };
@@ -376,6 +377,19 @@ class EventRouter
                 $this->startNumerCountdown($roomId);
             }
         }
+    }
+
+    private function onGetRoomCounts(ConnectionInterface $conn): void
+    {
+        $rooms = Connection::getInstance()->fetchAll(
+            "SELECT id FROM rooms WHERE type = 'public' AND is_closed = 0"
+        );
+        $counts = [];
+        foreach ($rooms as $room) {
+            $roomId = (int) $room['id'];
+            $counts[$roomId] = count($this->cm->getRoomUserIds($roomId));
+        }
+        $this->cm->sendToConnection($conn, ['event' => 'room_counts', 'counts' => $counts]);
     }
 
     private function onGetOnlineUsers(ConnectionInterface $conn): void
