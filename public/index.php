@@ -761,7 +761,7 @@ function updateRoomBadge(roomId) {
   const count = onlineCountsByRoom.get(Number(roomId)) || 0;
   const $item = $(`.room-item[data-id="${roomId}"]`);
   $item.find('.room-count-badge').remove();
-  if (count > 1) {
+  if (count > 0) {
     $item.append(`<span class="badge bg-secondary ms-1 room-count-badge" style="font-size:.65rem">${count}</span>`);
   }
 }
