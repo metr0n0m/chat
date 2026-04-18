@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email`           VARCHAR(255) UNIQUE,
   `password_hash`   VARCHAR(255),
   `avatar_url`      VARCHAR(500),
-  `signature`       VARCHAR(300),
   `custom_status`   VARCHAR(80) DEFAULT NULL,
   `nick_color`      CHAR(7) DEFAULT '#ffffff',
   `text_color`      CHAR(7) DEFAULT '#dee2e6',
@@ -134,10 +133,10 @@ CREATE TABLE IF NOT EXISTS `avatar_uploads` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `users`
-  ADD COLUMN IF NOT EXISTS `custom_status` VARCHAR(80) DEFAULT NULL AFTER `signature`;
+  ADD COLUMN IF NOT EXISTS `custom_status` VARCHAR(80) DEFAULT NULL;
 
 ALTER TABLE `users`
-  ADD COLUMN IF NOT EXISTS `bio` VARCHAR(500) DEFAULT NULL AFTER `signature`,
+  ADD COLUMN IF NOT EXISTS `bio` VARCHAR(500) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `social_telegram` VARCHAR(255) DEFAULT NULL AFTER `bio`,
   ADD COLUMN IF NOT EXISTS `social_whatsapp` VARCHAR(255) DEFAULT NULL AFTER `social_telegram`,
   ADD COLUMN IF NOT EXISTS `social_vk` VARCHAR(255) DEFAULT NULL AFTER `social_whatsapp`,
