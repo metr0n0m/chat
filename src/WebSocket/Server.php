@@ -129,15 +129,10 @@ class Server implements MessageComponentInterface
             }
 
             foreach ($rooms as $roomId) {
-                if ($roomId <= 0 || !$this->cm->isInRoom($userId, $roomId)) {
+                if ($roomId <= 0) {
                     continue;
                 }
-                $this->cm->leaveRoom($userId, $roomId);
-                $this->cm->sendToRoom($roomId, [
-                    'event' => 'user_left',
-                    'room_id' => $roomId,
-                    'user_id' => $userId,
-                ]);
+                $this->router->handleRoomLeave($userId, $roomId);
             }
         });
     }
