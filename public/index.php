@@ -679,7 +679,7 @@ $(function() {
 // ════════════════════════════════════════════════
 function initUser() {
   if (!CURRENT_USER) return;
-  $('#my-username').text(displayName(CURRENT_USER)).css('color', CURRENT_USER.nick_color);
+  $('#my-username').text(displayName(CURRENT_USER)).css('color', effectiveColor(CURRENT_USER.nick_color));
   $('#my-status').text(CURRENT_USER.custom_status || '');
   $('#my-avatar').attr('src', CURRENT_USER.avatar_url || DEFAULT_AVATAR_URL);
   $('#my-avatar').off('error').on('error', function(){ this.onerror = null; this.src = DEFAULT_AVATAR_URL; });
@@ -929,7 +929,7 @@ function buildMessage(m) {
 
   return `<div class="msg" id="msg-${m.id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(displayName(m))}</span> <span class="msg-sep">»</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}
+      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><span class="msg-username" style="color:${esc(effectiveColor(m.nick_color))}">${esc(displayName(m))}</span> <span class="msg-sep">»</span> <span class="msg-content msg-inline-content" style="color:${esc(effectiveColor(m.text_color))} !important">${m.content}</span>${deleteBtn}
       ${embed}
     </div>
   </div>`;
@@ -1206,7 +1206,7 @@ function buildOnlineUser(u) {
   return `<div class="online-user" id="online-user-${u.id}" data-id="${u.id}" data-username="${esc(u.username)}">
     <div class="online-user-avatar" data-action="mention">${avatarMarkup(u.avatar_url, 42)}</div>
     <div class="online-user-main" data-action="mention">
-      <div class="online-user-name" style="color:${esc(u.nick_color || 'inherit')}">${esc(displayName(u))}</div>
+      <div class="online-user-name" style="color:${esc(effectiveColor(u.nick_color))}">${esc(displayName(u))}</div>
       <div class="online-user-role">${roleBadge}</div>
     </div>
     <div class="online-user-actions">
@@ -1326,7 +1326,7 @@ function openUserInfo(uid, uname = '') {
         <div>${avatarMarkup(u.avatar_url, 72)}</div>
         <div class="flex-1">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-            <strong style="color:${esc(u.nick_color || '#fff')}">${esc(displayName(u) || infoUsername || ('ID ' + infoUserId))}</strong>
+            <strong style="color:${esc(effectiveColor(u.nick_color, '#fff'))}">${esc(displayName(u) || infoUsername || ('ID ' + infoUserId))}</strong>
             <span class="badge bg-secondary">${esc(roleText)}</span>
           </div>
           <div class="small text-muted mb-2">Последний визит: ${esc(lastSeenText)}</div>
@@ -2338,6 +2338,62 @@ function displayName(u) {
   if (!u) return '';
   const n = (u.nickname || '').trim();
   return n ? n : (u.username || '');
+}
+
+function isDarkTheme() {
+  return document.documentElement.getAttribute('data-bs-theme') === 'dark';
+}
+
+const _effectiveColorCache = new Map();
+
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (d) {
+    s = d / (1 - Math.abs(2*l - 1));
+    h = max === r ? ((g-b)/d + (g<b?6:0))/6 : max === g ? ((b-r)/d + 2)/6 : ((r-g)/d + 4)/6;
+  }
+  return [h, s, l];
+}
+
+function hslToHex(h, s, l) {
+  const f = n => { const k=(n+h*12)%12, a=s*Math.min(l,1-l); return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1)))); };
+  return '#' + [f(0),f(8),f(4)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+function wcagLuminance(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]
+    .map(c => { c/=255; return c<=0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4; })
+    .reduce((sum,c,i) => sum + c * [0.2126,0.7152,0.0722][i], 0);
+}
+
+function wcagContrast(h1, h2) {
+  const l1 = wcagLuminance(h1), l2 = wcagLuminance(h2);
+  return (Math.max(l1,l2) + 0.05) / (Math.min(l1,l2) + 0.05);
+}
+
+function effectiveColor(hex, fallback = 'inherit') {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return fallback;
+  const theme = isDarkTheme() ? 'dark' : 'light';
+  const key = hex + '|' + theme;
+  if (_effectiveColorCache.has(key)) return _effectiveColorCache.get(key);
+  const bg = theme === 'dark' ? '#212529' : '#f8f9fa';
+  let result = hex;
+  if (wcagContrast(hex, bg) < 3.0) {
+    const [h, s, l] = hexToHsl(hex);
+    const dark = theme === 'dark';
+    let lo = dark ? l : 0, hi = dark ? 1 : l, best = dark ? 0.95 : 0.1;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      const candidate = hslToHex(h, s, mid);
+      if (wcagContrast(candidate, bg) >= 3.0) { best = mid; dark ? (hi = mid) : (lo = mid); }
+      else { dark ? (lo = mid) : (hi = mid); }
+    }
+    result = hslToHex(h, s, best);
+  }
+  _effectiveColorCache.set(key, result);
+  return result;
 }
 
 function showToast(msg, type) {
