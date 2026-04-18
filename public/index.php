@@ -17,8 +17,9 @@ $user = $router->getUser();
 $nonce = base64_encode(random_bytes(16));
 $csrfToken = CSRF::token();
 $isLoggedIn = (bool) $user;
-$_sysMsgColor = '#DEC8A4';
-$_timeFormat  = 'HH:mm:ss';
+$_sysMsgColor    = '#DEC8A4';
+$_timeFormat     = 'HH:mm:ss';
+$_datetimeFormat = 'DD.MM.YY HH:mm';
 if ($isLoggedIn) {
     try {
         $db = \Chat\DB\Connection::getInstance();
@@ -26,6 +27,8 @@ if ($isLoggedIn) {
         if ($row && !empty($row['value'])) $_sysMsgColor = (string) $row['value'];
         $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'time_format'");
         if ($row && !empty($row['value'])) $_timeFormat = (string) $row['value'];
+        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'datetime_format'");
+        if ($row && !empty($row['value'])) $_datetimeFormat = (string) $row['value'];
     } catch (\Throwable $e) {}
 }
 $userJson = $user ? json_encode([
@@ -601,7 +604,8 @@ dayjs.extend(dayjs_plugin_relativeTime);
 
 const CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
 const CURRENT_USER = <?= $userJson ?>;
-const CHAT_TIME_FORMAT = <?= json_encode($_timeFormat) ?>;
+const CHAT_TIME_FORMAT     = <?= json_encode($_timeFormat) ?>;
+const CHAT_DATETIME_FORMAT = <?= json_encode($_datetimeFormat) ?>;
 
 <?php if ($isLoggedIn): ?>
 // ════════════════════════════════════════════════
@@ -1309,7 +1313,7 @@ function openUserInfo(uid, uname = '') {
     const showLastSeen = !(Number(u.hide_last_seen || 0) === 1) || canModerateCurrentRoom() || ['platform_owner', 'admin'].includes(CURRENT_USER.global_role);
     const roleText = roleLabel(u.global_role) || roomRoleLabel(u.room_role || '') || 'Пользователь';
     const lastSeenText = showLastSeen
-      ? (u.last_seen_at ? dayjs(u.last_seen_at).format('YYYY-MM-DD HH:mm:ss') : 'нет данных')
+      ? (u.last_seen_at ? dayjs(u.last_seen_at).format(CHAT_DATETIME_FORMAT) : 'нет данных')
       : 'скрыт';
 
     const contacts = [];
@@ -2162,7 +2166,7 @@ function loadAdminWhispers() {
     if (!resp.success) return;
     let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Комната</th><th>От</th><th>Кому</th><th>Время</th><th>Текст</th></tr></thead><tbody>';
     resp.whispers.forEach(w => {
-      html += `<tr><td>${w.id}</td><td>${esc(w.room_name)}</td><td>${esc(w.from_username)}</td><td>${esc(w.to_username)}</td><td>${w.created_at}</td><td>${w.content}</td></tr>`;
+      html += `<tr><td>${w.id}</td><td>${esc(w.room_name)}</td><td>${esc(w.from_username)}</td><td>${esc(w.to_username)}</td><td>${dayjs(w.created_at).format(CHAT_DATETIME_FORMAT)}</td><td>${w.content}</td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-whispers-table').html(html);
