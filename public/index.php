@@ -1694,12 +1694,6 @@ function initSettings() {
 
   $('#settingsForm').off('submit').on('submit', function(e) {
     e.preventDefault();
-    syncSettingsSaveState();
-    if ($('#settings-save-btn').prop('disabled')) {
-      $('#settings-error').text('Выбранный цвет плохо читается на теме. Исправьте цвета и сохраните снова.').removeClass('d-none');
-      return;
-    }
-
     const fd = new FormData(this);
     fd.set('csrf_token', CSRF_TOKEN);
     fd.set('hide_last_seen', $('#hideLastSeenSetting').is(':checked') ? '1' : '0');
