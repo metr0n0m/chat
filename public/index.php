@@ -1662,13 +1662,6 @@ function openSettingsModal() {
 }
 
 function initSettings() {
-  const colorValidity = { nick_color: true, text_color: true };
-
-  function syncSettingsSaveState() {
-    const ok = colorValidity.nick_color && colorValidity.text_color;
-    $('#settings-save-btn').prop('disabled', !ok);
-  }
-
   $('#showSystemMessagesSetting').on('change', function() {
     localStorage.setItem('show_system_messages', $(this).is(':checked') ? '1' : '0');
   });
@@ -1688,32 +1681,16 @@ function initSettings() {
     }, 400);
   });
 
-  function updateColorPreview(pickerName, previewLightId, previewDarkId, feedbackId) {
+  function updateColorPreview(pickerName, previewLightId, previewDarkId) {
     $(`[name="${pickerName}"]`).off('input.colorcheck').on('input.colorcheck', function() {
       const hex = $(this).val();
-      const $fb = $(`#${feedbackId}`);
       $(`#${previewLightId}`).css('color', hex);
       $(`#${previewDarkId}`).css('color', hex);
-      $fb.html('<span class="text-muted">Проверка...</span>');
-
-      $.post('/api/color-check', {color: hex}, function(resp) {
-        colorValidity[pickerName] = !!resp.valid;
-        if (resp.valid) {
-          $fb.html(`<span class="text-success"><i class="fa fa-check"></i></span> Свет: ${resp.ratios.light}:1 / Тёмная: ${resp.ratios.dark}:1`);
-        } else {
-          $fb.html(`<span class="text-danger"><i class="fa fa-times"></i> ${esc(resp.error)}</span>`);
-        }
-        syncSettingsSaveState();
-      }, 'json').fail(function() {
-        colorValidity[pickerName] = false;
-        $fb.html('<span class="text-danger"><i class="fa fa-times"></i> Не удалось проверить цвет.</span>');
-        syncSettingsSaveState();
-      });
     });
   }
 
-  updateColorPreview('nick_color', 'nick-preview-light', 'nick-preview-dark', 'nick-color-feedback');
-  updateColorPreview('text_color', 'text-preview-light', 'text-preview-dark', 'text-color-feedback');
+  updateColorPreview('nick_color', 'nick-preview-light', 'nick-preview-dark');
+  updateColorPreview('text_color', 'text-preview-light', 'text-preview-dark');
 
   $('#settingsForm').off('submit').on('submit', function(e) {
     e.preventDefault();
