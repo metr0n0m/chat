@@ -241,8 +241,7 @@ body { height: 100vh; margin: 0; }
       </div>
       <div id="room-online-count" class="text-muted small"></div>
       <button id="room-manage-btn" class="btn btn-sm btn-outline-secondary d-none" title="Управление"><i class="fa fa-cog"></i></button>
-      <button id="leave-numer-btn" class="btn btn-sm btn-outline-danger d-none" title="Покинуть нумер"><i class="fa fa-door-open me-1"></i>Выйти</button>
-      <?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
+<?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
       <a href="#" id="admin-btn" class="btn btn-sm btn-outline-warning" title="Администрирование"><i class="fa fa-shield-alt"></i></a>
       <?php endif; ?>
     </div>
@@ -401,6 +400,25 @@ body { height: 100vh; margin: 0; }
       </form>
     </div>
   </div></div>
+</div>
+
+<!-- Numer floating panel -->
+<div id="numer-panel" style="display:none;position:fixed;bottom:0;right:20px;width:320px;max-height:480px;z-index:1060;border:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.35);background:var(--bs-body-bg);display:flex;flex-direction:column">
+  <div id="numer-panel-header" style="padding:7px 10px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:6px;cursor:pointer" id="numer-panel-toggle-area">
+    <i class="fa fa-lock text-warning" style="font-size:.8rem"></i>
+    <span id="numer-panel-title" class="fw-semibold flex-1 text-truncate" style="font-size:.88rem">Нумер</span>
+    <span id="numer-countdown-wrap" class="badge bg-warning text-dark d-none" style="font-size:.7rem"><i class="fa fa-clock me-1"></i><span id="numer-countdown-time">30:00</span></span>
+    <button id="numer-panel-leave-btn" class="btn btn-sm btn-outline-danger py-0 px-1" title="Покинуть нумер" style="font-size:.75rem"><i class="fa fa-door-open"></i></button>
+    <button id="numer-panel-minimize-btn" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Свернуть" style="font-size:.75rem"><i class="fa fa-minus"></i></button>
+  </div>
+  <div id="numer-panel-body" style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div id="numer-participants-bar" style="padding:4px 8px;border-bottom:1px solid var(--bs-border-color);font-size:.75rem;min-height:28px;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
+    <div id="numer-messages" style="flex:1;overflow-y:auto;padding:8px;font-size:.88rem;max-height:280px"></div>
+    <div style="padding:6px 8px;border-top:1px solid var(--bs-border-color);display:flex;gap:6px">
+      <textarea id="numer-input" class="form-control form-control-sm" rows="1" placeholder="Сообщение..." style="resize:none"></textarea>
+      <button id="numer-send-btn" class="btn btn-sm btn-primary px-2">→</button>
+    </div>
+  </div>
 </div>
 
 <!-- Create user modal (platform_owner only) -->
@@ -731,8 +749,10 @@ function handleWS(data) {
     case 'numer_participant_joined': onNumerParticipantJoined(data); break;
     case 'numer_participant_left':   onNumerParticipantLeft(data); break;
     case 'numer_owner_changed': onNumerOwnerChanged(data); break;
-    case 'numer_left':       onNumerLeft(data); break;
-    case 'room_count_changed': onRoomCountChanged(data); break;
+    case 'numer_left':               onNumerLeft(data); break;
+    case 'numer_countdown':          startNumerCountdown(data.seconds); break;
+    case 'numer_countdown_cancelled': stopNumerCountdown(); break;
+    case 'room_count_changed':       onRoomCountChanged(data); break;
     case 'numer_destroyed':
       onNumerDestroyed(data);
       if ($('#adminModal').hasClass('show') && $('#adminNumera').hasClass('active')) loadAdminNumera();
@@ -791,7 +811,7 @@ function loadRooms() {
     numera.forEach(r => {
       const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span></div>`);
       if (Number(r.id) === Number(currentRoomId)) $item.addClass('active');
-      $item.on('click', () => switchToNumerView(r.id));
+      $item.on('click', () => { $('#numer-panel').css('display', 'flex'); $('#numer-panel-body').show(); });
       $list.append($item);
     });
     onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
@@ -813,7 +833,6 @@ function joinPublicRoom(roomId) {
   $('#load-more-btn-wrap').addClass('d-none');
   $('.room-item').removeClass('active');
   $(`.room-item[data-id="${roomId}"]`).addClass('active');
-  $('#leave-numer-btn').addClass('d-none');
   loadHistory(roomId);
   wsSend('join_room', {room_id: roomId});
 }
@@ -829,7 +848,6 @@ function switchToNumerView(numerRoomId) {
   $('#load-more-btn-wrap').addClass('d-none');
   $('.room-item').removeClass('active');
   $(`.room-item[data-id="${numerRoomId}"]`).addClass('active');
-  $('#leave-numer-btn').removeClass('d-none');
   $('#room-manage-btn').addClass('d-none');
   const numer = numera.find(r => Number(r.id) === Number(numerRoomId));
   $('#room-title').text(numer ? numer.name : 'Нумер');
@@ -957,6 +975,12 @@ function appendMessage(m) {
 }
 
 function onNewMessage(m) {
+  if (Number(m.room_id) === Number(currentNumerRoomId)) {
+    appendNumerMessage(m);
+    const $msgs = $('#numer-messages');
+    $msgs.scrollTop($msgs[0].scrollHeight);
+    return;
+  }
   if (m.room_id !== currentRoomId) return;
   appendMessage(m);
 }
@@ -1480,28 +1504,73 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
 
 
 // ════════════════════════════════════════════════
-//  НУМЕРА
+//  НУМЕРА — плавающая панель
 // ════════════════════════════════════════════════
-function onNumerJoined(data) {
-  currentNumerRoomId = data.room_id;
+let numerCountdownInterval = null;
+
+function openNumerPanel(roomId, roomName, members) {
+  currentNumerRoomId = roomId;
+  $('#numer-panel-title').text(roomName || 'Нумер');
+  $('#numer-messages').empty();
+  renderNumerParticipants(members || []);
+  stopNumerCountdown();
+  $('#numer-panel').css('display', 'flex');
+  $('#numer-panel-body').show();
+  // load history into panel
+  $.get(`/api/rooms/${roomId}/messages`, function(resp) {
+    if (!resp.success) return;
+    resp.messages.forEach(m => appendNumerMessage(m));
+    $('#numer-messages').scrollTop($('#numer-messages')[0].scrollHeight);
+  });
+  loadRooms(); // refresh sidebar link
+}
+
+function closeNumerPanel() {
+  currentNumerRoomId = null;
+  stopNumerCountdown();
+  $('#numer-panel').hide();
+  $('#numer-messages').empty();
+  $('#numer-participants-bar').empty();
   loadRooms();
-  // Set view directly (WS subscription already done via invite_respond)
-  currentRoomId = data.room_id;
-  currentRoomRole = 'member';
-  oldestMessageId = null;
-  clearWhisperMode();
-  $('#messages-list').empty();
-  $('#load-more-btn-wrap').addClass('d-none');
-  $('.room-item').removeClass('active');
-  $(`.room-item[data-id="${data.room_id}"]`).addClass('active');
-  $('#leave-numer-btn').removeClass('d-none');
-  $('#room-manage-btn').addClass('d-none');
-  $('#room-description').addClass('d-none');
-  $('#room-title').text(data.room_name || 'Нумер');
-  const members = data.members || [];
-  renderOnlineList(members);
-  onlineCountsByRoom.set(Number(data.room_id), members.length);
-  loadHistory(data.room_id);
+}
+
+function appendNumerMessage(m) {
+  if (!m || !m.content) return;
+  const time = m.created_at ? dayjs(m.created_at).format('HH:mm') : '';
+  const nick = esc(m.username || '');
+  const color = m.nick_color || '#aaa';
+  const html = `<div style="margin-bottom:4px"><span class="text-muted" style="font-size:.7rem">${time}</span> <span style="color:${color};font-weight:600">${nick}</span>: ${esc(m.content)}</div>`;
+  $('#numer-messages').append(html);
+}
+
+function renderNumerParticipants(members) {
+  const $bar = $('#numer-participants-bar').empty();
+  members.forEach(u => {
+    const color = u.nick_color || '#aaa';
+    $bar.append(`<span style="color:${color};font-size:.78rem">${esc(u.username)}</span>`);
+  });
+}
+
+function startNumerCountdown(seconds) {
+  stopNumerCountdown();
+  let remaining = seconds;
+  const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  $('#numer-countdown-time').text(fmt(remaining));
+  $('#numer-countdown-wrap').removeClass('d-none');
+  numerCountdownInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) { stopNumerCountdown(); return; }
+    $('#numer-countdown-time').text(fmt(remaining));
+  }, 1000);
+}
+
+function stopNumerCountdown() {
+  if (numerCountdownInterval) { clearInterval(numerCountdownInterval); numerCountdownInterval = null; }
+  $('#numer-countdown-wrap').addClass('d-none');
+}
+
+function onNumerJoined(data) {
+  openNumerPanel(data.room_id, data.room_name, data.members);
 }
 
 function onInviteSent(invitation) {
@@ -1511,10 +1580,8 @@ function onInviteSent(invitation) {
 
 function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + (data.user?.username || ''));
-  loadRooms();
   if (data.room_id) {
-    currentNumerRoomId = Number(data.room_id);
-    switchToNumerView(Number(data.room_id));
+    openNumerPanel(Number(data.room_id), null, null);
   }
 }
 
@@ -1531,70 +1598,34 @@ function onInviteExpired(data) {
 }
 
 function onNumerParticipantJoined(data) {
-  if (data.room_id === currentRoomId) {
-    addToOnlineList(data.user);
-    showToast(data.user.username + ' присоединился к нумеру.');
-  }
+  if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
+  stopNumerCountdown();
+  const $bar = $('#numer-participants-bar');
+  const color = data.user?.nick_color || '#aaa';
+  $bar.append(`<span style="color:${color};font-size:.78rem">${esc(data.user?.username||'')}</span>`);
+  showToast((data.user?.username || '') + ' присоединился к нумеру.');
 }
 
 function onNumerParticipantLeft(data) {
-  if (data.room_id === currentRoomId) {
-    removeFromOnlineList(data.user_id);
-  }
+  if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
+  // rebuild participants bar on next numer_countdown or just reload
 }
 
 function onNumerOwnerChanged(data) {
-  if (data.room_id !== currentRoomId) return;
-  const owner = data.owner || {};
-  if (owner.id) {
-    currentOnlineUsers = currentOnlineUsers.map(u => {
-      if (Number(u.id) === Number(owner.id)) return {...u, room_role: 'owner'};
-      if (u.room_role === 'owner') return {...u, room_role: 'member'};
-      return u;
-    });
-    renderOnlineList(currentOnlineUsers);
-  }
-  loadRooms();
-  if (owner.username) {
-    showToast('Новый владелец нумера: ' + owner.username);
-  }
+  if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
+  if (data.owner?.username) showToast('Владелец нумера: ' + data.owner.username);
 }
 
 function onNumerDestroyed(data) {
-  if (Number(data.room_id) === Number(currentNumerRoomId)) {
-    currentNumerRoomId = null;
-    showToast('Нумер завершён.');
-    loadRooms();
-    if (Number(currentRoomId) === Number(data.room_id)) {
-      if (currentPublicRoomId) {
-        joinPublicRoom(currentPublicRoomId);
-      } else {
-        currentRoomId = null;
-        $('#room-title').text('Выберите комнату');
-        $('#messages-list').empty();
-        $('#online-users-list').empty();
-        $('#leave-numer-btn').addClass('d-none');
-      }
-    }
-  }
+  if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
+  showToast('Нумер завершён.');
+  closeNumerPanel();
 }
 
 function onNumerLeft(data) {
   if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
-  currentNumerRoomId = null;
   showToast(data.destroyed ? 'Нумер завершён.' : 'Вы покинули нумер.');
-  loadRooms();
-  if (Number(currentRoomId) === Number(data.room_id)) {
-    if (currentPublicRoomId) {
-      joinPublicRoom(currentPublicRoomId);
-    } else {
-      currentRoomId = null;
-      $('#room-title').text('Выберите комнату');
-      $('#messages-list').empty();
-      $('#online-users-list').empty();
-      $('#leave-numer-btn').addClass('d-none');
-    }
-  }
+  closeNumerPanel();
 }
 
 function onRoomCountChanged(data) {
@@ -1867,11 +1898,31 @@ function initSidebar() {
     });
   });
 
-  $('#leave-numer-btn').on('click', function() {
+  // Numer panel controls
+  $('#numer-panel-leave-btn').on('click', function(e) {
+    e.stopPropagation();
     if (!currentNumerRoomId) return;
     if (!confirm('Покинуть нумер?')) return;
     wsSend('leave_numer', {room_id: currentNumerRoomId});
   });
+  $('#numer-panel-minimize-btn').on('click', function(e) {
+    e.stopPropagation();
+    const $body = $('#numer-panel-body');
+    const minimized = $body.is(':hidden');
+    $body.toggle(!minimized);
+    $(this).find('i').toggleClass('fa-minus', minimized).toggleClass('fa-expand', !minimized);
+  });
+  $('#numer-send-btn').on('click', sendNumerMessage);
+  $('#numer-input').on('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNumerMessage(); }
+  });
+
+  function sendNumerMessage() {
+    const content = $('#numer-input').val().trim();
+    if (!content || !currentNumerRoomId) return;
+    wsSend('send_message', {room_id: currentNumerRoomId, content});
+    $('#numer-input').val('');
+  }
 
   $('#room-manage-btn').on('click', function() {
     if (!currentRoomId) return;
