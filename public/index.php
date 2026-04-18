@@ -241,6 +241,7 @@ body { height: 100vh; margin: 0; }
       </div>
       <div id="room-online-count" class="text-muted small"></div>
       <button id="room-manage-btn" class="btn btn-sm btn-outline-secondary d-none" title="Управление"><i class="fa fa-cog"></i></button>
+      <button id="leave-numer-btn" class="btn btn-sm btn-outline-danger d-none" title="Покинуть нумер"><i class="fa fa-door-open me-1"></i>Выйти</button>
       <?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
       <a href="#" id="admin-btn" class="btn btn-sm btn-outline-warning" title="Администрирование"><i class="fa fa-shield-alt"></i></a>
       <?php endif; ?>
@@ -620,7 +621,9 @@ $('#themeToggle').on('click', function() {
 //  STATE
 // ════════════════════════════════════════════════
 let ws = null;
-let currentRoomId = null;
+let currentRoomId = null;       // currently VIEWED room (public or numer)
+let currentPublicRoomId = null; // public room you're WS-subscribed to
+let currentNumerRoomId = null;  // numer you're WS-subscribed to
 let currentRoomRole = null;
 let currentOnlineUsers = [];
 let whisperToId   = null;
@@ -745,9 +748,8 @@ function handleWS(data) {
 }
 
 function onWSConnected(data) {
-  if (currentRoomId) {
-    wsSend('join_room', {room_id: currentRoomId});
-  }
+  if (currentPublicRoomId) wsSend('join_room', {room_id: currentPublicRoomId});
+  if (currentNumerRoomId)  wsSend('join_room', {room_id: currentNumerRoomId});
 }
 
 // ════════════════════════════════════════════════
@@ -769,13 +771,15 @@ function loadRooms() {
     const $list = $('#rooms-list').empty();
     rooms.forEach(r => {
       const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name">${esc(r.name)}</span></div>`);
-      if (r.id === currentRoomId) $item.addClass('active');
-      $item.on('click', () => joinRoom(r.id));
+      if (Number(r.id) === Number(currentRoomId)) $item.addClass('active');
+      $item.on('click', () => joinPublicRoom(r.id));
       $list.append($item);
     });
     onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
-    if (!currentRoomId && rooms.length > 0) {
-      joinRoom(rooms[0].id);
+    if (!currentPublicRoomId && rooms.length > 0) {
+      const saved = localStorage.getItem('lastRoomId');
+      const target = saved ? rooms.find(r => Number(r.id) === Number(saved)) : null;
+      joinPublicRoom(target ? Number(target.id) : rooms[0].id);
     }
   });
   $.get('/api/numera', function(resp) {
@@ -784,29 +788,52 @@ function loadRooms() {
     const $list = $('#numera-list').empty();
     numera.forEach(r => {
       const $item = $(`<div class="room-item" data-id="${r.id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(r.name)}</span></div>`);
-      if (r.id === currentRoomId) $item.addClass('active');
-      $item.on('click', () => joinRoom(r.id, true));
+      if (Number(r.id) === Number(currentRoomId)) $item.addClass('active');
+      $item.on('click', () => switchToNumerView(r.id));
       $list.append($item);
     });
     onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
   });
 }
 
-function joinRoom(roomId, isNumer) {
-  if (currentRoomId === roomId) return;
-  if (currentRoomId) wsSend('leave_room', {room_id: currentRoomId});
+// Join a public room (switches WS subscription, leaves old public room)
+function joinPublicRoom(roomId) {
+  if (currentPublicRoomId && Number(currentPublicRoomId) !== Number(roomId)) {
+    wsSend('leave_room', {room_id: currentPublicRoomId});
+  }
+  currentPublicRoomId = roomId;
   currentRoomId = roomId;
+  currentRoomRole = null;
+  oldestMessageId = null;
+  clearWhisperMode();
+  localStorage.setItem('lastRoomId', roomId);
+  $('#messages-list').empty();
+  $('#load-more-btn-wrap').addClass('d-none');
+  $('.room-item').removeClass('active');
+  $(`.room-item[data-id="${roomId}"]`).addClass('active');
+  $('#leave-numer-btn').addClass('d-none');
+  loadHistory(roomId);
+  wsSend('join_room', {room_id: roomId});
+}
+
+// Switch view to a numer (you're already WS-subscribed, no WS leave for public room)
+function switchToNumerView(numerRoomId) {
+  if (Number(currentRoomId) === Number(numerRoomId)) return;
+  currentRoomId = numerRoomId;
   currentRoomRole = null;
   oldestMessageId = null;
   clearWhisperMode();
   $('#messages-list').empty();
   $('#load-more-btn-wrap').addClass('d-none');
-
   $('.room-item').removeClass('active');
-  $(`.room-item[data-id="${roomId}"]`).addClass('active');
-
-  loadHistory(roomId);
-  wsSend('join_room', {room_id: roomId});
+  $(`.room-item[data-id="${numerRoomId}"]`).addClass('active');
+  $('#leave-numer-btn').removeClass('d-none');
+  $('#room-manage-btn').addClass('d-none');
+  const numer = numera.find(r => Number(r.id) === Number(numerRoomId));
+  $('#room-title').text(numer ? numer.name : 'Нумер');
+  $('#room-description').addClass('d-none');
+  loadHistory(numerRoomId);
+  wsSend('join_room', {room_id: numerRoomId}); // get fresh online list
 }
 
 function loadHistory(roomId, before) {
@@ -1454,8 +1481,25 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
 //  НУМЕРА
 // ════════════════════════════════════════════════
 function onNumerJoined(data) {
+  currentNumerRoomId = data.room_id;
   loadRooms();
-  joinRoom(data.room_id, true);
+  // Set view directly (WS subscription already done via invite_respond)
+  currentRoomId = data.room_id;
+  currentRoomRole = 'member';
+  oldestMessageId = null;
+  clearWhisperMode();
+  $('#messages-list').empty();
+  $('#load-more-btn-wrap').addClass('d-none');
+  $('.room-item').removeClass('active');
+  $(`.room-item[data-id="${data.room_id}"]`).addClass('active');
+  $('#leave-numer-btn').removeClass('d-none');
+  $('#room-manage-btn').addClass('d-none');
+  $('#room-description').addClass('d-none');
+  $('#room-title').text(data.room_name || 'Нумер');
+  const members = data.members || [];
+  renderOnlineList(members);
+  onlineCountsByRoom.set(Number(data.room_id), members.length);
+  loadHistory(data.room_id);
 }
 
 function onInviteSent(invitation) {
