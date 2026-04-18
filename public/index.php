@@ -731,6 +731,8 @@ function handleWS(data) {
     case 'numer_participant_joined': onNumerParticipantJoined(data); break;
     case 'numer_participant_left':   onNumerParticipantLeft(data); break;
     case 'numer_owner_changed': onNumerOwnerChanged(data); break;
+    case 'numer_left':       onNumerLeft(data); break;
+    case 'room_count_changed': onRoomCountChanged(data); break;
     case 'numer_destroyed':
       onNumerDestroyed(data);
       if ($('#adminModal').hasClass('show') && $('#adminNumera').hasClass('active')) loadAdminNumera();
@@ -1511,7 +1513,8 @@ function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + (data.user?.username || ''));
   loadRooms();
   if (data.room_id) {
-    joinRoom(Number(data.room_id), true);
+    currentNumerRoomId = Number(data.room_id);
+    switchToNumerView(Number(data.room_id));
   }
 }
 
@@ -1558,14 +1561,45 @@ function onNumerOwnerChanged(data) {
 }
 
 function onNumerDestroyed(data) {
-  if (data.room_id === currentRoomId) {
+  if (Number(data.room_id) === Number(currentNumerRoomId)) {
+    currentNumerRoomId = null;
     showToast('Нумер завершён.');
-    currentRoomId = null;
-    $('#room-title').text('Выберите комнату');
-    $('#messages-list').empty();
-    $('#online-users-list').empty();
     loadRooms();
+    if (Number(currentRoomId) === Number(data.room_id)) {
+      if (currentPublicRoomId) {
+        joinPublicRoom(currentPublicRoomId);
+      } else {
+        currentRoomId = null;
+        $('#room-title').text('Выберите комнату');
+        $('#messages-list').empty();
+        $('#online-users-list').empty();
+        $('#leave-numer-btn').addClass('d-none');
+      }
+    }
   }
+}
+
+function onNumerLeft(data) {
+  if (Number(data.room_id) !== Number(currentNumerRoomId)) return;
+  currentNumerRoomId = null;
+  showToast(data.destroyed ? 'Нумер завершён.' : 'Вы покинули нумер.');
+  loadRooms();
+  if (Number(currentRoomId) === Number(data.room_id)) {
+    if (currentPublicRoomId) {
+      joinPublicRoom(currentPublicRoomId);
+    } else {
+      currentRoomId = null;
+      $('#room-title').text('Выберите комнату');
+      $('#messages-list').empty();
+      $('#online-users-list').empty();
+      $('#leave-numer-btn').addClass('d-none');
+    }
+  }
+}
+
+function onRoomCountChanged(data) {
+  onlineCountsByRoom.set(Number(data.room_id), Number(data.count));
+  updateRoomBadge(data.room_id);
 }
 
 function onInviteReceived(inv) {
@@ -1610,12 +1644,15 @@ function onInviteReceived(inv) {
 //  KICK / BAN / DELETE
 // ════════════════════════════════════════════════
 function onKickedFromRoom(data) {
-  if (data.room_id === currentRoomId) {
+  if (Number(data.room_id) === Number(currentPublicRoomId)) {
     showToast('Вы были удалены из комнаты.', 'warning');
-    currentRoomId = null;
-    $('#room-title').text('Выберите комнату');
-    $('#messages-list').empty();
-    $('#online-users-list').empty();
+    currentPublicRoomId = null;
+    if (Number(currentRoomId) === Number(data.room_id)) {
+      currentRoomId = null;
+      $('#room-title').text('Выберите комнату');
+      $('#messages-list').empty();
+      $('#online-users-list').empty();
+    }
     loadRooms();
   }
 }
@@ -1628,11 +1665,14 @@ function onMutedInRoom(data) {
 }
 
 function onRoomDeleted(data) {
-  if (data.room_id === currentRoomId) {
-    showToast('Комната была удалена.', 'warning');
-    currentRoomId = null;
-    $('#room-title').text('Выберите комнату');
-    $('#messages-list').empty();
+  if (Number(data.room_id) === Number(currentPublicRoomId)) {
+    currentPublicRoomId = null;
+    if (Number(currentRoomId) === Number(data.room_id)) {
+      showToast('Комната была удалена.', 'warning');
+      currentRoomId = null;
+      $('#room-title').text('Выберите комнату');
+      $('#messages-list').empty();
+    }
   }
   loadRooms();
 }
@@ -1816,7 +1856,7 @@ function initSidebar() {
         if (resp.success) {
           bootstrap.Modal.getInstance(document.getElementById('createRoomModal'))?.hide();
           loadRooms();
-          if (resp.room_id) setTimeout(() => joinRoom(resp.room_id), 300);
+          if (resp.room_id) setTimeout(() => joinPublicRoom(resp.room_id), 300);
         } else {
           $('#create-room-error').text(resp.error || 'Ошибка').removeClass('d-none');
         }
@@ -1825,6 +1865,12 @@ function initSidebar() {
         $('#create-room-error').text(xhr.responseJSON?.error || 'Не удалось создать комнату.').removeClass('d-none');
       }
     });
+  });
+
+  $('#leave-numer-btn').on('click', function() {
+    if (!currentNumerRoomId) return;
+    if (!confirm('Покинуть нумер?')) return;
+    wsSend('leave_numer', {room_id: currentNumerRoomId});
   });
 
   $('#room-manage-btn').on('click', function() {
