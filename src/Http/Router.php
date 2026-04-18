@@ -106,6 +106,7 @@ class Router
         if ($this->method === 'POST' && preg_match('~^/api/friends/(\d+)/respond$~', $this->path, $m)) $this->handleRespondFriend((int) $m[1]);
 
         if ($this->method === 'GET'  && $this->path === '/api/users/check') $this->handleUsernameCheck();
+        if ($this->method === 'GET'  && $this->path === '/api/users/find')  $this->handleFindUser();
         if ($this->method === 'POST' && $this->path === '/api/color-check') $this->handleColorCheck();
     }
 
@@ -196,6 +197,21 @@ class Router
         );
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true]);
+        exit;
+    }
+
+    private function handleFindUser(): never
+    {
+        $username = trim((string) ($_GET['username'] ?? ''));
+        $found = null;
+        if (mb_strlen($username) >= 3) {
+            $found = Connection::getInstance()->fetchOne(
+                'SELECT id, username, nick_color FROM users WHERE username = ? AND is_banned = 0 LIMIT 1',
+                [$username]
+            );
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['user' => $found ?: null]);
         exit;
     }
 
