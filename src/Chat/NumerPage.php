@@ -164,6 +164,12 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function displayName(u) {
+  if (!u) return '';
+  const n = (u.nickname || '').trim();
+  return n ? n : (u.username || '');
+}
+
 function setStatus(txt) { document.getElementById('status-bar').textContent = txt; }
 
 // ── Participants ──────────────────────────────────────────────
@@ -171,7 +177,7 @@ function renderParticipants() {
   const owner = members.find(m => m.room_role === 'owner');
   const ownerEl = document.getElementById('owner-name');
   if (owner) {
-    ownerEl.innerHTML = `<span style="color:\${esc(owner.nick_color||'inherit')}">\u25cf \${esc(owner.username)}</span>`;
+    ownerEl.innerHTML = `<span style="color:\${esc(owner.nick_color||'inherit')}">\u25cf \${esc(displayName(owner))}</span>`;
   } else {
     ownerEl.textContent = '—';
   }
@@ -180,7 +186,7 @@ function renderParticipants() {
   members.forEach(m => {
     const d = document.createElement('div');
     d.className = 'p-item';
-    d.innerHTML = `<span class="p-dot"></span><span style="color:\${esc(m.nick_color||'inherit')}">\${esc(m.username)}</span>`;
+    d.innerHTML = `<span class="p-dot"></span><span style="color:\${esc(m.nick_color||'inherit')}">\${esc(displayName(m))}</span>`;
     list.appendChild(d);
   });
   // Show invite section only for owner and if room not full
@@ -202,7 +208,7 @@ function appendMsg(m) {
   const el = document.createElement('div');
   el.className = 'msg';
   const t = m.created_at ? new Date(m.created_at.replace(' ','T')).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
-  el.innerHTML = `<span class="msg-time">\${esc(t)}</span><span class="msg-sep"> \u00bb </span><em><span style="color:\${esc(m.nick_color||'inherit')};font-weight:600">\${esc(m.username||'')}</span>: \${esc(m.content)}</em>`;
+  el.innerHTML = `<span class="msg-time">\${esc(t)}</span><span class="msg-sep"> \u00bb </span><em><span style="color:\${esc(m.nick_color||'inherit')};font-weight:600">\${esc(displayName(m))}</span>: \${esc(m.content)}</em>`;
   const box = document.getElementById('messages');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   box.appendChild(el);
@@ -271,7 +277,7 @@ function connect() {
           members = members.filter(m => m.id != d.user.id);
           members.push(d.user);
           renderParticipants();
-          appendSys(d.user.username + ' вошёл(а) в нумер');
+          appendSys(displayName(d.user) + ' вошёл(а) в нумер');
         }
         break;
       case 'numer_participant_left':
@@ -372,13 +378,13 @@ function renderInviteDropdown(users) {
   candidates.forEach(u => {
     const d = document.createElement('div');
     d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:6px;border-bottom:1px solid #2e3035';
-    d.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#28a745;display:inline-block;flex-shrink:0"></span><span style="color:\${esc(u.nick_color||'inherit')}">\${esc(u.username)}</span>`;
+    d.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#28a745;display:inline-block;flex-shrink:0"></span><span style="color:\${esc(u.nick_color||'inherit')}">\${esc(displayName(u))}</span>`;
     d.addEventListener('mouseenter', () => d.style.background = '#2e3440');
     d.addEventListener('mouseleave', () => d.style.background = '');
     d.addEventListener('click', () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({event: 'invite_user', to_user_id: Number(u.id)}));
-        inviteStatus.textContent = 'Приглашение → ' + esc(u.username);
+        inviteStatus.textContent = 'Приглашение → ' + esc(displayName(u));
         setTimeout(() => { inviteStatus.textContent = ''; }, 3000);
       }
       inviteDropdown.style.display = 'none';
