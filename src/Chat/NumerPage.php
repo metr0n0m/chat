@@ -136,10 +136,12 @@ class NumerPage
       <div class="r-label">В номере</div>
       <div id="participant-list"></div>
     </div>
-    <div id="invite-section" class="r-section" style="display:none">
+    <div id="invite-section" class="r-section" style="display:none;position:relative">
       <div class="r-label">Пригласить</div>
-      <input id="invite-input" type="text" placeholder="Имя пользователя" style="width:100%;background:#2a2c30;border:1px solid #3a3c42;color:#cdd0d4;border-radius:4px;padding:4px 6px;font-size:.8rem;margin-bottom:4px">
-      <button id="invite-btn" style="width:100%;background:transparent;border:1px solid #3a5a3a;color:#7ab07a;border-radius:4px;padding:4px 6px;font-size:.8rem;cursor:pointer">Пригласить</button>
+      <button id="invite-btn" style="width:100%;background:transparent;border:1px solid #3a5a3a;color:#7ab07a;border-radius:4px;padding:4px 6px;font-size:.8rem;cursor:pointer"><i class="fa fa-user-plus me-1"></i>Онлайн</button>
+      <div id="invite-dropdown" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:#22262a;border:1px solid #3a3c42;border-radius:6px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,.4)">
+        <div id="invite-list"></div>
+      </div>
       <div id="invite-status" style="font-size:.75rem;margin-top:4px;color:#888"></div>
     </div>
     <div class="r-section">
@@ -288,6 +290,9 @@ function connect() {
       case 'numer_countdown_cancelled':
         if (d.room_id == ROOM_ID) stopCountdown();
         break;
+      case 'online_users':
+        renderInviteDropdown(d.users || []);
+        break;
       case 'numer_destroyed':
         if (d.room_id != ROOM_ID) break;
         stopCountdown();
@@ -335,29 +340,52 @@ function leaveNumer() {
 
 document.getElementById('leave-btn').addEventListener('click', leaveNumer);
 
-// ── Invite ────────────────────────────────────────────────────
+// ── Invite dropdown ───────────────────────────────────────────
+const inviteDropdown = document.getElementById('invite-dropdown');
+const inviteList     = document.getElementById('invite-list');
+const inviteStatus   = document.getElementById('invite-status');
+
 document.getElementById('invite-btn').addEventListener('click', function() {
-  const username = document.getElementById('invite-input').value.trim();
-  const status   = document.getElementById('invite-status');
-  if (!username) return;
-  status.textContent = 'Поиск...';
-  fetch('/api/users/find?username=' + encodeURIComponent(username))
-    .then(r => r.json())
-    .then(d => {
-      if (!d.user) { status.textContent = 'Пользователь не найден.'; return; }
-      if (members.some(m => m.id == d.user.id)) { status.textContent = 'Уже в номере.'; return; }
+  const open = inviteDropdown.style.display !== 'none';
+  if (open) { inviteDropdown.style.display = 'none'; return; }
+  inviteList.innerHTML = '<div style="padding:8px;color:#666;font-size:.8rem">Загрузка...</div>';
+  inviteDropdown.style.display = 'block';
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({event: 'get_online_users'}));
+  }
+});
+
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('invite-section').contains(e.target)) {
+    inviteDropdown.style.display = 'none';
+  }
+});
+
+function renderInviteDropdown(users) {
+  const alreadyIn = new Set(members.map(m => Number(m.id)));
+  const candidates = users.filter(u => !alreadyIn.has(Number(u.id)) && Number(u.id) !== ME.id);
+  if (!candidates.length) {
+    inviteList.innerHTML = '<div style="padding:8px;color:#666;font-size:.8rem">Нет доступных пользователей</div>';
+    return;
+  }
+  inviteList.innerHTML = '';
+  candidates.forEach(u => {
+    const d = document.createElement('div');
+    d.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:6px;border-bottom:1px solid #2e3035';
+    d.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#28a745;display:inline-block;flex-shrink:0"></span><span style="color:\${esc(u.nick_color||'inherit')}">\${esc(u.username)}</span>`;
+    d.addEventListener('mouseenter', () => d.style.background = '#2e3440');
+    d.addEventListener('mouseleave', () => d.style.background = '');
+    d.addEventListener('click', () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({event: 'invite_user', to_user_id: d.user.id}));
-        status.textContent = 'Приглашение отправлено: ' + esc(d.user.username);
-        document.getElementById('invite-input').value = '';
-        setTimeout(() => { status.textContent = ''; }, 3000);
+        ws.send(JSON.stringify({event: 'invite_user', to_user_id: Number(u.id)}));
+        inviteStatus.textContent = 'Приглашение → ' + esc(u.username);
+        setTimeout(() => { inviteStatus.textContent = ''; }, 3000);
       }
-    })
-    .catch(() => { status.textContent = 'Ошибка.'; });
-});
-document.getElementById('invite-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('invite-btn').click();
-});
+      inviteDropdown.style.display = 'none';
+    });
+    inviteList.appendChild(d);
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────
 initMsgs.forEach(m => appendMsg(m));
