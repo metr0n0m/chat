@@ -309,7 +309,7 @@ body { height: 100vh; margin: 0; }
           <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sTab1">Профиль</a></li>
           <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab2">Внешний вид</a></li>
           <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab3">Аватар</a></li>
-          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab4">Прочее</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab4">Безопасность</a></li>
         </ul>
         <div class="tab-content">
           <div class="tab-pane fade show active" id="sTab1">
