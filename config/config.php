@@ -44,3 +44,4 @@ define('OAUTH_ENCRYPT_KEY', 'REPLACE_WITH_BASE64_OF_32_RANDOM_BYTES');
 define('MSG_RATE_LIMIT_SEC', 1);
 define('WHISPER_RATE_LIMIT_MIN', 5);
 define('INVITE_PENDING_MAX', 3);
+define('NUMER_IDLE_TIMEOUT', 1800); // seconds before auto-close when 1 participant remains

@@ -18,6 +18,9 @@ class EventRouter
      * Инициализирует роутер WS-событий.
      * Last updated: 2026-04-17.
      */
+    /** @var array<int, \React\EventLoop\TimerInterface> */
+    private array $numerTimers = [];
+
     public function __construct(private ConnectionManager $cm) {}
 
     /**
@@ -287,6 +290,7 @@ class EventRouter
         }
 
         $roomId = $result['room_id'];
+        $this->cancelNumerCountdown($roomId); // cancel auto-close if someone just joined
         $db2    = Connection::getInstance();
         $roomName = (string) ($db2->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId])['name'] ?? 'Нумер');
         $this->cm->joinRoom($conn, $roomId);
@@ -332,6 +336,7 @@ class EventRouter
         $this->cm->leaveRoom($userId, $roomId);
 
         if ($destroyed) {
+            $this->cancelNumerCountdown($roomId);
             $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
         } else {
             $this->cm->sendToRoom($roomId, [
@@ -352,6 +357,12 @@ class EventRouter
                         'owner'   => $newOwner,
                     ]);
                 }
+            }
+
+            // Start 30-min auto-close if only 1 participant remains
+            $remaining = (int) ($result['remaining'] ?? 0);
+            if ($remaining === 1) {
+                $this->startNumerCountdown($roomId);
             }
         }
     }
@@ -443,6 +454,46 @@ class EventRouter
             'avatar_url'  => $session['avatar_url'],
             'global_role' => $session['global_role'],
         ];
+    }
+
+    private function startNumerCountdown(int $roomId): void
+    {
+        $this->cancelNumerCountdown($roomId);
+        $seconds = NUMER_IDLE_TIMEOUT ?? 1800;
+        $this->cm->sendToRoom($roomId, [
+            'event'   => 'numer_countdown',
+            'room_id' => $roomId,
+            'seconds' => $seconds,
+        ]);
+        $cm   = $this->cm;
+        $self = $this;
+        $this->numerTimers[$roomId] = \React\EventLoop\Loop::get()->addTimer(
+            $seconds,
+            function () use ($roomId, $cm, $self) {
+                unset($self->numerTimers[$roomId]);
+                $db = Connection::getInstance();
+                if (!$db->fetchOne("SELECT id FROM rooms WHERE id = ? AND is_closed = 0", [$roomId])) {
+                    return;
+                }
+                $db->execute('UPDATE rooms SET is_closed = 1, closed_at = NOW() WHERE id = ?', [$roomId]);
+                $cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                $cm->clearRoom($roomId);
+                $self->broadcastRoomCount($roomId);
+            }
+        );
+    }
+
+    private function cancelNumerCountdown(int $roomId): void
+    {
+        if (!isset($this->numerTimers[$roomId])) {
+            return;
+        }
+        \React\EventLoop\Loop::get()->cancelTimer($this->numerTimers[$roomId]);
+        unset($this->numerTimers[$roomId]);
+        $this->cm->sendToRoom($roomId, [
+            'event'   => 'numer_countdown_cancelled',
+            'room_id' => $roomId,
+        ]);
     }
 
     private function broadcastRoomCount(int $roomId): void

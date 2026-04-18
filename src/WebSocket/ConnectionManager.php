@@ -167,6 +167,13 @@ class ConnectionManager
         return true;
     }
 
+    public function clearRoom(int $roomId): void
+    {
+        foreach (array_keys($this->roomMembers[$roomId] ?? []) as $userId) {
+            $this->leaveRoom($userId, $roomId);
+        }
+    }
+
     public function sendToAll(array $event): void
     {
         $payload = json_encode($event);
