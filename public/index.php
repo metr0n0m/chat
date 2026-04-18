@@ -302,118 +302,101 @@ body { height: 100vh; margin: 0; }
 <div class="modal fade" id="settingsModal" tabindex="-1">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <div class="modal-header"><h5 class="modal-title">Настройки профиля</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body p-0">
+    <div class="modal-body">
       <form id="settingsForm" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
-        <ul class="nav nav-tabs px-3 pt-3">
+        <ul class="nav nav-tabs mb-3">
           <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sTab1">Профиль</a></li>
           <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab2">Внешний вид</a></li>
           <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab3">Аватар</a></li>
-          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab4">Приватность</a></li>
-          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab5">Безопасность</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sTab4">Прочее</a></li>
         </ul>
-        <div>
-          <!-- tab panes -->
-          <div class="tab-content p-3">
-            <!-- Профиль -->
-            <div class="tab-pane fade show active" id="sTab1">
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label">Имя пользователя (ник)</label>
-                  <input type="text" class="form-control" name="username" minlength="3" maxlength="50" id="usernameInput" autocomplete="off">
-                  <div id="username-check" class="small mt-1"></div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Отображаемый статус (до 80 символов)</label>
-                  <input type="text" class="form-control" name="custom_status" maxlength="80" placeholder="Например: В отпуске">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">О себе (до 500 символов)</label>
-                  <textarea class="form-control" name="bio" maxlength="500" rows="2"></textarea>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Telegram</label>
-                  <input type="url" class="form-control" name="social_telegram" placeholder="https://t.me/...">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">WhatsApp</label>
-                  <input type="url" class="form-control" name="social_whatsapp" placeholder="https://wa.me/...">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">VK</label>
-                  <input type="url" class="form-control" name="social_vk" placeholder="https://vk.com/...">
-                </div>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="sTab1">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">Имя пользователя (ник)</label>
+                <input type="text" class="form-control" name="username" minlength="3" maxlength="50" id="usernameInput" autocomplete="off">
+                <div id="username-check" class="small mt-1"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Статус (до 80 символов)</label>
+                <input type="text" class="form-control" name="custom_status" maxlength="80" placeholder="Например: В отпуске">
+              </div>
+              <div class="col-12">
+                <label class="form-label">О себе (до 500 символов)</label>
+                <textarea class="form-control" name="bio" maxlength="500" rows="2"></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Telegram</label>
+                <input type="url" class="form-control form-control-sm" name="social_telegram" placeholder="https://t.me/...">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">WhatsApp</label>
+                <input type="url" class="form-control form-control-sm" name="social_whatsapp" placeholder="https://wa.me/...">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">VK</label>
+                <input type="url" class="form-control form-control-sm" name="social_vk" placeholder="https://vk.com/...">
               </div>
             </div>
-            <!-- Внешний вид -->
-            <div class="tab-pane fade" id="sTab2">
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label">Цвет ника</label>
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <input type="color" class="form-control form-control-color" name="nick_color" id="nickColorPicker" style="width:46px;height:38px;padding:2px">
-                    <div class="color-preview-box" id="nick-preview-light" style="background:#f8f9fa">Ник</div>
-                    <div class="color-preview-box" id="nick-preview-dark" style="background:#212529">Ник</div>
-                  </div>
-                  <div id="nick-color-feedback" class="small"></div>
+          </div>
+          <div class="tab-pane fade" id="sTab2">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Цвет ника</label>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <input type="color" class="form-control form-control-color" name="nick_color" id="nickColorPicker" style="width:46px;height:38px;padding:2px">
+                  <div class="color-preview-box" id="nick-preview-light" style="background:#f8f9fa">Ник</div>
+                  <div class="color-preview-box" id="nick-preview-dark" style="background:#212529">Ник</div>
                 </div>
-                <div class="col-12">
-                  <label class="form-label">Цвет текста</label>
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <input type="color" class="form-control form-control-color" name="text_color" id="textColorPicker" style="width:46px;height:38px;padding:2px">
-                    <div class="color-preview-box" id="text-preview-light" style="background:#f8f9fa">Текст</div>
-                    <div class="color-preview-box" id="text-preview-dark" style="background:#212529">Текст</div>
-                  </div>
-                  <div id="text-color-feedback" class="small"></div>
+                <div id="nick-color-feedback" class="small"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Цвет текста</label>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <input type="color" class="form-control form-control-color" name="text_color" id="textColorPicker" style="width:46px;height:38px;padding:2px">
+                  <div class="color-preview-box" id="text-preview-light" style="background:#f8f9fa">Текст</div>
+                  <div class="color-preview-box" id="text-preview-dark" style="background:#212529">Текст</div>
                 </div>
+                <div id="text-color-feedback" class="small"></div>
               </div>
             </div>
-            <!-- Аватар -->
-            <div class="tab-pane fade" id="sTab3">
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label">Загрузить файл (JPEG/PNG/GIF/WEBP ≤2MB)</label>
-                  <input type="file" class="form-control" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">или URL аватара</label>
-                  <input type="url" class="form-control" name="avatar_url" placeholder="https://...">
-                </div>
+          </div>
+          <div class="tab-pane fade" id="sTab3">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Загрузить файл (JPEG/PNG/GIF/WEBP ≤2MB)</label>
+                <input type="file" class="form-control" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp">
+              </div>
+              <div class="col-12">
+                <label class="form-label">или URL аватара</label>
+                <input type="url" class="form-control" name="avatar_url" placeholder="https://...">
               </div>
             </div>
-            <!-- Приватность -->
-            <div class="tab-pane fade" id="sTab4">
-              <div class="row g-3">
-                <div class="col-12">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="showSystemMessagesSetting">
-                    <label class="form-check-label" for="showSystemMessagesSetting">Показывать сервисные сообщения в чате</label>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="hideLastSeenSetting" name="hide_last_seen" value="1">
-                    <label class="form-check-label" for="hideLastSeenSetting">Скрывать последний вход от обычных пользователей</label>
-                  </div>
-                </div>
+          </div>
+          <div class="tab-pane fade" id="sTab4">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Новый пароль (оставьте пустым чтобы не менять)</label>
+                <input type="password" class="form-control" name="password" minlength="8">
               </div>
-            </div>
-            <!-- Безопасность -->
-            <div class="tab-pane fade" id="sTab5">
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label">Новый пароль (оставьте пустым чтобы не менять)</label>
-                  <input type="password" class="form-control" name="password" minlength="8">
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="showSystemMessagesSetting">
+                  <label class="form-check-label" for="showSystemMessagesSetting">Показывать сервисные сообщения в чате</label>
+                </div>
+                <div class="form-check mt-1">
+                  <input class="form-check-input" type="checkbox" id="hideLastSeenSetting" name="hide_last_seen" value="1">
+                  <label class="form-check-label" for="hideLastSeenSetting">Скрывать последний вход от других пользователей</label>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="border-top p-3">
-          <div id="settings-error" class="alert alert-danger mb-2 d-none"></div>
-          <div id="settings-success" class="alert alert-success mb-2 d-none">Настройки сохранены.</div>
-          <button type="submit" class="btn btn-primary" id="settings-save-btn">Сохранить</button>
-        </div>
+        <div id="settings-error" class="alert alert-danger mt-3 d-none"></div>
+        <div id="settings-success" class="alert alert-success mt-3 d-none">Настройки сохранены.</div>
+        <button type="submit" class="btn btn-primary mt-3" id="settings-save-btn">Сохранить</button>
       </form>
     </div>
   </div></div>
