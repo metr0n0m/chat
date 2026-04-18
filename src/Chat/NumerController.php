@@ -243,7 +243,7 @@ class NumerController
     private static function roomMembers(Connection $db, int $roomId): array
     {
         return $db->fetchAll(
-            'SELECT u.id, u.username, u.nick_color, u.avatar_url
+            'SELECT u.id, u.username, u.nickname, u.nick_color, u.avatar_url
              FROM room_members rm
              JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id = ?',
