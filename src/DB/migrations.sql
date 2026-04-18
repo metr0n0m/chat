@@ -4,6 +4,7 @@ SET foreign_key_checks = 0;
 CREATE TABLE IF NOT EXISTS `users` (
   `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `username`        VARCHAR(50) NOT NULL,
+  `nickname`        VARCHAR(50) DEFAULT NULL,
   `email`           VARCHAR(255) UNIQUE,
   `password_hash`   VARCHAR(255),
   `avatar_url`      VARCHAR(500),
