@@ -289,11 +289,16 @@ class EventRouter
             return;
         }
 
-        $roomId = $result['room_id'];
-        $this->cancelNumerCountdown($roomId); // cancel auto-close if someone just joined
-        $db2    = Connection::getInstance();
+        $roomId   = $result['room_id'];
+        $fromId   = (int) $inv['from_user_id'];
+        $this->cancelNumerCountdown($roomId);
+        $db2      = Connection::getInstance();
         $roomName = (string) ($db2->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId])['name'] ?? 'Нумер');
+
+        // Join both the responder and the inviter to the WS room
         $this->cm->joinRoom($conn, $roomId);
+        $this->cm->joinRoomByUserId($fromId, $roomId);
+
         $this->cm->sendToConnection($conn, [
             'event'      => 'numer_joined',
             'room_id'    => $roomId,
@@ -305,12 +310,16 @@ class EventRouter
             'room_id' => $roomId,
             'user'    => $this->userPayload($session),
         ], $userId);
-        $this->cm->sendToUser((int) $inv['from_user_id'], [
+        $this->cm->sendToUser($fromId, [
             'event'         => 'invite_accepted',
             'invitation_id' => $invId,
             'room_id'       => $roomId,
+            'room_name'     => $roomName,
+            'members'       => $result['members'],
             'user'          => $this->userPayload($session),
         ]);
+
+        $this->broadcastRoomCount($roomId);
     }
 
     private function onLeaveNumer(ConnectionInterface $conn, array $session, array $data): void
@@ -334,6 +343,7 @@ class EventRouter
         ]);
 
         $this->cm->leaveRoom($userId, $roomId);
+        $this->broadcastRoomCount($roomId);
 
         if ($destroyed) {
             $this->cancelNumerCountdown($roomId);
