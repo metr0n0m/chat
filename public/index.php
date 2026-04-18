@@ -1479,6 +1479,7 @@ function onInviteSent(invitation) {
 
 function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + (data.user?.username || ''));
+  loadRooms();
   if (data.room_id) openNumerWindow(data.room_id);
 }
 
