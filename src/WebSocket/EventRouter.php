@@ -98,15 +98,23 @@ class EventRouter
             'online'    => $online,
         ]);
 
-        if ($room['type'] === 'public' && !$alreadyInRoom) {
-            $this->cm->sendToRoom($roomId, [
-                'event'    => 'user_joined',
-                'room_id'  => $roomId,
-                'user'     => $this->userPayload($session),
-            ], $userId);
-
-            $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату', $userId);
-            $this->broadcastRoomCount($roomId);
+        if (!$alreadyInRoom) {
+            if ($room['type'] === 'public') {
+                $this->cm->sendToRoom($roomId, [
+                    'event'   => 'user_joined',
+                    'room_id' => $roomId,
+                    'user'    => $this->userPayload($session),
+                ], $userId);
+                $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату', $userId);
+                $this->broadcastRoomCount($roomId);
+            } elseif ($room['type'] === 'numer') {
+                $this->cm->sendToRoom($roomId, [
+                    'event'   => 'numer_participant_joined',
+                    'room_id' => $roomId,
+                    'user'    => $this->userPayload($session),
+                ], $userId);
+                $this->broadcastRoomCount($roomId);
+            }
         }
     }
 
@@ -292,24 +300,17 @@ class EventRouter
         $roomId   = $result['room_id'];
         $fromId   = (int) $inv['from_user_id'];
         $this->cancelNumerCountdown($roomId);
-        $db2      = Connection::getInstance();
-        $roomName = (string) ($db2->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId])['name'] ?? 'Нумер');
+        $roomName = (string) (Connection::getInstance()->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId])['name'] ?? 'Нумер');
 
-        // Join both the responder and the inviter to the WS room
-        $this->cm->joinRoom($conn, $roomId);
-        $this->cm->joinRoomByUserId($fromId, $roomId);
-
+        // Notify responder to open numer popup
         $this->cm->sendToConnection($conn, [
-            'event'      => 'numer_joined',
-            'room_id'    => $roomId,
-            'room_name'  => $roomName,
-            'members'    => $result['members'],
+            'event'     => 'numer_joined',
+            'room_id'   => $roomId,
+            'room_name' => $roomName,
+            'members'   => $result['members'],
         ]);
-        $this->cm->sendToRoom($roomId, [
-            'event'   => 'numer_participant_joined',
-            'room_id' => $roomId,
-            'user'    => $this->userPayload($session),
-        ], $userId);
+
+        // Notify inviter to open numer popup
         $this->cm->sendToUser($fromId, [
             'event'         => 'invite_accepted',
             'invitation_id' => $invId,
@@ -318,8 +319,7 @@ class EventRouter
             'members'       => $result['members'],
             'user'          => $this->userPayload($session),
         ]);
-
-        $this->broadcastRoomCount($roomId);
+        // Both users will open /numer/{id} in a popup window and join via their own WS connection.
     }
 
     private function onLeaveNumer(ConnectionInterface $conn, array $session, array $data): void
@@ -373,6 +373,58 @@ class EventRouter
             $remaining = (int) ($result['remaining'] ?? 0);
             if ($remaining === 1) {
                 $this->startNumerCountdown($roomId);
+            }
+        }
+    }
+
+    public function handleRoomLeave(int $userId, int $roomId): void
+    {
+        if (!$this->cm->isInRoom($userId, $roomId)) {
+            return;
+        }
+
+        $db   = Connection::getInstance();
+        $room = $db->fetchOne('SELECT type FROM rooms WHERE id = ?', [$roomId]);
+        if (!$room) {
+            return;
+        }
+
+        if ($room['type'] === 'public') {
+            $this->cm->leaveRoom($userId, $roomId);
+            $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $userId]);
+            $this->broadcastRoomCount($roomId);
+            return;
+        }
+
+        if ($room['type'] === 'numer') {
+            $result = NumerController::leave($roomId, $userId);
+            if (isset($result['error'])) {
+                return;
+            }
+
+            $destroyed = (bool) ($result['destroyed'] ?? false);
+            $this->cm->leaveRoom($userId, $roomId);
+            $this->broadcastRoomCount($roomId);
+
+            if ($destroyed) {
+                $this->cancelNumerCountdown($roomId);
+                $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+            } else {
+                $this->cm->sendToRoom($roomId, ['event' => 'numer_participant_left', 'room_id' => $roomId, 'user_id' => $userId]);
+
+                if (!empty($result['owner_transferred']) && !empty($result['new_owner_id'])) {
+                    $newOwner = $db->fetchOne(
+                        'SELECT id, username, nick_color, avatar_url, global_role FROM users WHERE id = ?',
+                        [(int) $result['new_owner_id']]
+                    );
+                    if ($newOwner) {
+                        $this->cm->sendToRoom($roomId, ['event' => 'numer_owner_changed', 'room_id' => $roomId, 'owner' => $newOwner]);
+                    }
+                }
+
+                if ((int) ($result['remaining'] ?? 0) === 1) {
+                    $this->startNumerCountdown($roomId);
+                }
             }
         }
     }
