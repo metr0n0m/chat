@@ -2137,7 +2137,7 @@ function loadAdminNumera() {
     };
     let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th><th></th></tr></thead><tbody>';
     resp.numera.forEach(r => {
-      const started = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '—';
+      const started = r.created_at && dayjs(r.created_at).isValid() ? dayjs(r.created_at).format(CHAT_DATETIME_FORMAT) : '—';
       const duration = fmtDuration(Number(r.minutes_running) || 0);
       const statusDot = Number(r.member_count) > 0
         ? '<span class="badge bg-success">Активен</span>'
@@ -2182,7 +2182,7 @@ function loadAdminBans() {
     }
     let html = '<table class="table table-sm"><thead><tr><th>Пользователь</th><th>Комната</th><th>Роль</th><th>Кляп до</th><th></th></tr></thead><tbody>';
     resp.bans.forEach(b => {
-      const mutedUntil = b.muted_until ? b.muted_until.slice(0,16) : '—';
+      const mutedUntil = b.muted_until && dayjs(b.muted_until).isValid() ? dayjs(b.muted_until).format(CHAT_DATETIME_FORMAT) : '—';
       const unbanBtn = b.room_role === 'banned'
         ? `<button class="btn btn-xs btn-sm btn-outline-success admin-unban-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Разбанить"><i class="fa fa-unlock"></i></button>`
         : '';
@@ -2259,7 +2259,7 @@ function openNumerHistory(numerId) {
       rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
       resp.messages.forEach(m => {
-        rows += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${m.created_at && dayjs(m.created_at).isValid() ? dayjs(m.created_at).format(CHAT_DATETIME_FORMAT) : '—'}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
     }
     $('#admin-numera-table').html(`
