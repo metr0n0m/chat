@@ -394,7 +394,7 @@ body { height: 100vh; margin: 0; }
                 </div>
                 <div class="form-check mt-1">
                   <input class="form-check-input" type="checkbox" id="hideLastSeenSetting" name="hide_last_seen" value="1">
-                  <label class="form-check-label" for="hideLastSeenSetting">Скрывать последний вход от других пользователей</label>
+                  <label class="form-check-label" for="hideLastSeenSetting">Скрывать последний визит от других пользователей</label>
                 </div>
               </div>
             </div>
@@ -1329,7 +1329,7 @@ function openUserInfo(uid, uname = '') {
             <strong style="color:${esc(u.nick_color || '#fff')}">${esc(displayName(u) || infoUsername || ('ID ' + infoUserId))}</strong>
             <span class="badge bg-secondary">${esc(roleText)}</span>
           </div>
-          <div class="small text-muted mb-2">Последний вход: ${esc(lastSeenText)}</div>
+          <div class="small text-muted mb-2">Последний визит: ${esc(lastSeenText)}</div>
           <div class="mb-2"><strong>Статус:</strong> ${esc(u.custom_status || '—')}</div>
           <div class="mb-2"><strong>О себе:</strong> ${esc(u.bio || '—')}</div>
           <div class="mb-2"><strong>Друзей:</strong> ${Number(u.friend_count || 0)}</div>
