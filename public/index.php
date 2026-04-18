@@ -82,7 +82,7 @@ body { height: 100vh; margin: 0; }
 .msg-system { font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
 .msg-time { color: var(--sys-msg-color); font-size: .8rem; }
 .msg-sep { color: var(--sys-msg-color); }
-.msg-whisper-row { background: rgba(170,170,170,.13); border-radius: 4px; padding: 2px 6px; margin: 2px 0; }
+.msg-whisper-row { background: rgba(170,170,170,.13); border-radius: 4px; padding: 2px 6px; margin: 2px 0; cursor: pointer; }
 .room-desc { font-size: .78rem; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
 .msg:hover .msg-delete-btn { opacity: 1; }
@@ -940,15 +940,9 @@ function buildWhisperMessage(m, isSent) {
   const reply     = isSent ? to : from;
   const replyId   = Number(reply.id || 0);
   const replyName = esc(displayName(reply));
-  const fromEl = isSent
-    ? `<span class="msg-username">${fromName}</span>`
-    : `<span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${replyId}" data-name="${replyName}">${fromName}</span>`;
-  const toEl = isSent
-    ? `<span class="msg-username whisper-nick-link" style="cursor:pointer" data-id="${replyId}" data-name="${replyName}">${toName}</span>`
-    : `<span class="msg-username">${toName}</span>`;
-  return `<div class="msg msg-whisper-row" id="msg-${m.message_id}">
+  return `<div class="msg msg-whisper-row" data-id="${replyId}" data-name="${replyName}" id="msg-${m.message_id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span>${fromEl} <span class="msg-sep">»»»</span> ${toEl}: <span class="msg-content">${m.content}</span>
+      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span><span class="msg-username">${fromName}</span> <span class="msg-sep">»»»</span> <span class="msg-username">${toName}</span>: <span class="msg-content">${m.content}</span>
     </div>
   </div>`;
 }
@@ -1061,7 +1055,7 @@ $('#messages-list').on('click', '.msg-delete-btn', function() {
 });
 
 // Whisper nick click → activate whisper mode
-$('#messages-list').on('click', '.whisper-nick-link', function() {
+$('#messages-list').on('click', '.msg-whisper-row', function() {
   const uid = Number($(this).data('id'));
   const uname = String($(this).data('name') || '');
   if (uid && uname) activateWhisperMode(uid, uname);
