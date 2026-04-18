@@ -909,7 +909,7 @@ function buildMessage(m) {
 
   return `<div class="msg" id="msg-${m.id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><em><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(displayName(m))}</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}</em>
+      <span class="msg-time">${time}</span><span class="msg-sep"> » </span><span class="msg-username" style="color:${esc(m.nick_color || 'inherit')}">${esc(displayName(m))}</span> <span class="msg-sep">»</span> <span class="msg-content msg-inline-content" style="color:${esc(m.text_color || 'inherit')} !important">${m.content}</span>${deleteBtn}
       ${embed}
     </div>
   </div>`;
