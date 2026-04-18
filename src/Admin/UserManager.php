@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Chat\Admin;
 
 use Chat\DB\Connection;
-use Chat\Security\ColorContrast;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 
@@ -269,11 +268,8 @@ class UserManager
 
         if (isset($post['nick_color'])) {
             $nickColor = strtolower(trim((string) $post['nick_color']));
-            if ($nickColor !== strtolower((string) $currentUser['nick_color'])) {
-                $error = ColorContrast::validate($nickColor);
-                if ($error) {
-                    self::jsonError($error);
-                }
+            if (!preg_match('/^#[0-9a-fA-F]{6}$/', $nickColor)) {
+                self::jsonError('Недопустимый формат цвета.');
             }
             $set[] = 'nick_color = ?';
             $params[] = $nickColor;
@@ -281,11 +277,8 @@ class UserManager
 
         if (isset($post['text_color'])) {
             $textColor = strtolower(trim((string) $post['text_color']));
-            if ($textColor !== strtolower((string) $currentUser['text_color'])) {
-                $error = ColorContrast::validate($textColor);
-                if ($error) {
-                    self::jsonError($error);
-                }
+            if (!preg_match('/^#[0-9a-fA-F]{6}$/', $textColor)) {
+                self::jsonError('Недопустимый формат цвета.');
             }
             $set[] = 'text_color = ?';
             $params[] = $textColor;
