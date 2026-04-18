@@ -5,7 +5,7 @@ namespace Chat\Http;
 
 use Chat\Security\{Session, CSRF};
 use Chat\Auth\{LoginHandler, RegisterHandler, VKOAuth, GoogleOAuth};
-use Chat\Chat\{RoomController, MessageController, WhisperController};
+use Chat\Chat\{RoomController, MessageController, WhisperController, NumerPage};
 use Chat\Admin\{AdminPanel, UserManager, RoomManager};
 use Chat\DB\Connection;
 
@@ -90,6 +90,8 @@ class Router
         if ($this->method === 'GET'  && $this->path === '/api/rooms')  RoomController::list((int) $this->user['id'], $this->user['global_role']);
         if ($this->method === 'GET'  && $this->path === '/api/numera') RoomController::numera((int) $this->user['id']);
         if ($this->method === 'POST' && $this->path === '/api/rooms')  RoomController::create((int) $this->user['id'], $this->user);
+
+        if ($this->method === 'GET' && preg_match('~^/numer/(\d+)$~', $this->path, $m)) NumerPage::render((int) $m[1], $this->user);
 
         if ($this->method === 'GET' && preg_match('~^/api/rooms/(\d+)/messages$~', $this->path, $m)) {
             $before = isset($_GET['before']) ? (int) $_GET['before'] : null;
