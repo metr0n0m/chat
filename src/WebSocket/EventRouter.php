@@ -46,6 +46,7 @@ class EventRouter
             'invite_respond'  => $this->onInviteRespond($conn, $session, $data),
             'leave_numer'     => $this->onLeaveNumer($conn, $session, $data),
             'room_action'     => $this->onRoomAction($conn, $session, $data),
+            'get_online_users' => $this->onGetOnlineUsers($conn),
             'ping'            => $conn->send(json_encode(['event' => 'pong'])),
             default           => $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.common.invalid_event')]),
         };
@@ -375,6 +376,20 @@ class EventRouter
                 $this->startNumerCountdown($roomId);
             }
         }
+    }
+
+    private function onGetOnlineUsers(ConnectionInterface $conn): void
+    {
+        $userIds = $this->cm->getOnlineUserIds();
+        $users   = [];
+        if ($userIds) {
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $users = Connection::getInstance()->fetchAll(
+                "SELECT id, username, nick_color FROM users WHERE id IN ($placeholders) AND is_banned = 0 ORDER BY username",
+                $userIds
+            );
+        }
+        $this->cm->sendToConnection($conn, ['event' => 'online_users', 'users' => $users]);
     }
 
     public function handleRoomLeave(int $userId, int $roomId): void
