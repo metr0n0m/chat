@@ -84,6 +84,12 @@ class ConnectionManager
         $this->userRooms[$userId][$roomId]   = true;
     }
 
+    public function joinRoomByUserId(int $userId, int $roomId): void
+    {
+        $this->roomMembers[$roomId][$userId] = true;
+        $this->userRooms[$userId][$roomId]   = true;
+    }
+
     public function leaveRoom(int $userId, int $roomId): void
     {
         unset($this->roomMembers[$roomId][$userId], $this->userRooms[$userId][$roomId]);
