@@ -402,8 +402,8 @@ body { height: 100vh; margin: 0; }
   </div></div>
 </div>
 
-<!-- Numer floating popup (like messenger chat window) -->
-<div id="numer-panel" style="display:none;position:fixed;bottom:0;right:24px;width:440px;height:520px;z-index:1055;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25);flex-direction:column">
+<!-- Numer floating popup (draggable + resizable) -->
+<div id="numer-panel" style="display:none;position:fixed;bottom:0;right:24px;width:440px;height:520px;z-index:1055;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25);flex-direction:column;min-width:280px;min-height:200px">
   <!-- header — click to minimize/restore -->
   <div id="numer-panel-header" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;cursor:pointer;flex-shrink:0">
     <i class="fa fa-lock text-warning fa-sm"></i>
@@ -427,6 +427,10 @@ body { height: 100vh; margin: 0; }
       <div class="text-muted fw-semibold mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Участники</div>
       <div id="numer-participants-bar"></div>
     </div>
+  </div>
+  <!-- resize handle bottom-left -->
+  <div id="numer-resize-handle" style="position:absolute;bottom:0;left:0;width:18px;height:18px;cursor:sw-resize;opacity:.4" title="Изменить размер">
+    <svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 16 L16 2" stroke="currentColor" stroke-width="1.5"/><path d="M2 10 L10 2" stroke="currentColor" stroke-width="1.5"/></svg>
   </div>
 </div>
 
@@ -1943,6 +1947,56 @@ function initSidebar() {
     wsSend('send_message', {room_id: currentNumerRoomId, content});
     $('#numer-input').val('');
   }
+
+  // ── Numer panel: drag & resize ──────────────────
+  (function() {
+    const $panel = $('#numer-panel');
+    let dragging = false, resizing = false;
+    let startX, startY, startLeft, startTop, startW, startH;
+
+    function toTopLeft() {
+      const el = $panel[0];
+      const r = el.getBoundingClientRect();
+      $panel.css({top: r.top, left: r.left, bottom: 'auto', right: 'auto'});
+    }
+
+    // Drag via header
+    $('#numer-panel-header').on('mousedown', function(e) {
+      if ($(e.target).closest('button').length) return;
+      toTopLeft();
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = parseInt($panel.css('left')); startTop = parseInt($panel.css('top'));
+      e.preventDefault();
+    });
+
+    // Resize via bottom-left handle
+    $('#numer-resize-handle').on('mousedown', function(e) {
+      toTopLeft();
+      resizing = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = parseInt($panel.css('left')); startTop = parseInt($panel.css('top'));
+      startW = $panel.outerWidth(); startH = $panel.outerHeight();
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    $(document).on('mousemove', function(e) {
+      if (dragging) {
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        $panel.css({left: startLeft + dx, top: startTop + dy});
+      }
+      if (resizing) {
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        const newW = Math.max(280, startW - dx);
+        const newH = Math.max(200, startH + dy);
+        $panel.css({width: newW, height: newH, left: startLeft + (startW - newW)});
+      }
+    }).on('mouseup', function() {
+      dragging = false; resizing = false;
+    });
+  })();
+  // ────────────────────────────────────────────────
 
   $('#room-manage-btn').on('click', function() {
     if (!currentRoomId) return;
