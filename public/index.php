@@ -402,29 +402,29 @@ body { height: 100vh; margin: 0; }
   </div></div>
 </div>
 
-<!-- Numer overlay panel -->
-<div id="numer-panel" style="display:none;position:fixed;top:0;bottom:0;left:var(--sidebar-w,240px);right:0;z-index:1055;background:var(--bs-body-bg);flex-direction:column;border-left:1px solid var(--bs-border-color)">
-  <!-- header -->
-  <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);flex-shrink:0">
-    <i class="fa fa-lock text-warning"></i>
-    <span id="numer-panel-title" class="fw-bold flex-1 text-truncate">Нумер</span>
-    <span id="numer-countdown-wrap" class="badge bg-warning text-dark d-none"><i class="fa fa-hourglass-half me-1"></i><span id="numer-countdown-time">30:00</span></span>
-    <button id="numer-panel-leave-btn" class="btn btn-sm btn-outline-danger" title="Покинуть нумер"><i class="fa fa-door-open me-1"></i>Покинуть</button>
-    <button id="numer-panel-minimize-btn" class="btn btn-sm btn-outline-secondary" title="Свернуть"><i class="fa fa-minus"></i></button>
+<!-- Numer floating popup (like messenger chat window) -->
+<div id="numer-panel" style="display:none;position:fixed;bottom:0;right:24px;width:440px;height:520px;z-index:1055;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.25);flex-direction:column">
+  <!-- header — click to minimize/restore -->
+  <div id="numer-panel-header" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bs-secondary-bg);border-bottom:1px solid var(--bs-border-color);border-radius:8px 8px 0 0;cursor:pointer;flex-shrink:0">
+    <i class="fa fa-lock text-warning fa-sm"></i>
+    <span id="numer-panel-title" class="fw-semibold flex-1 text-truncate" style="font-size:.9rem">Нумер</span>
+    <span id="numer-countdown-wrap" class="badge bg-warning text-dark d-none" style="font-size:.72rem"><i class="fa fa-hourglass-half me-1"></i><span id="numer-countdown-time">30:00</span></span>
+    <button id="numer-panel-leave-btn" class="btn btn-sm btn-outline-danger py-0 px-2" title="Покинуть нумер" style="font-size:.8rem"><i class="fa fa-door-open me-1"></i>Покинуть</button>
+    <button id="numer-panel-minimize-btn" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Свернуть/развернуть" style="font-size:.8rem"><i class="fa fa-minus"></i></button>
   </div>
-  <!-- body: messages + participants -->
+  <!-- body -->
   <div id="numer-panel-body" style="display:flex;flex:1;min-height:0;overflow:hidden">
-    <!-- messages column -->
+    <!-- messages -->
     <div style="display:flex;flex-direction:column;flex:1;min-width:0">
-      <div id="numer-messages" style="flex:1;overflow-y:auto;padding:10px 14px"></div>
-      <div style="padding:8px 12px;border-top:1px solid var(--bs-border-color);display:flex;gap:8px;flex-shrink:0">
-        <textarea id="numer-input" class="form-control" rows="1" placeholder="Сообщение в нумере..." style="resize:none;min-height:38px;max-height:120px"></textarea>
-        <button id="numer-send-btn" class="btn btn-primary px-3">→</button>
+      <div id="numer-messages" style="flex:1;overflow-y:auto;padding:8px 12px"></div>
+      <div style="padding:6px 10px;border-top:1px solid var(--bs-border-color);display:flex;gap:6px;flex-shrink:0">
+        <textarea id="numer-input" class="form-control form-control-sm" rows="1" placeholder="Сообщение..." style="resize:none;min-height:34px;max-height:100px"></textarea>
+        <button id="numer-send-btn" class="btn btn-sm btn-primary px-3">→</button>
       </div>
     </div>
-    <!-- participants column -->
-    <div style="width:180px;flex-shrink:0;border-left:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg,var(--bs-secondary-bg));padding:10px 8px;overflow-y:auto">
-      <div class="text-muted small mb-2 fw-semibold">Участники</div>
+    <!-- participants -->
+    <div style="width:140px;flex-shrink:0;border-left:1px solid var(--bs-border-color);background:var(--bs-secondary-bg);padding:8px 6px;overflow-y:auto">
+      <div class="text-muted fw-semibold mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Участники</div>
       <div id="numer-participants-bar"></div>
     </div>
   </div>
@@ -1924,12 +1924,13 @@ function initSidebar() {
     if (!confirm('Покинуть нумер?')) return;
     wsSend('leave_numer', {room_id: currentNumerRoomId});
   });
-  $('#numer-panel-minimize-btn').on('click', function(e) {
-    e.stopPropagation();
+  $('#numer-panel-minimize-btn, #numer-panel-header').on('click', function(e) {
+    if ($(e.target).closest('#numer-panel-leave-btn').length) return;
     const $body = $('#numer-panel-body');
     const minimized = $body.is(':hidden');
-    $body.toggle(!minimized);
-    $(this).find('i').toggleClass('fa-minus', minimized).toggleClass('fa-expand', !minimized);
+    $body.toggle(minimized);
+    $('#numer-panel').css('height', minimized ? '520px' : 'auto');
+    $('#numer-panel-minimize-btn i').toggleClass('fa-minus', minimized).toggleClass('fa-chevron-up', !minimized);
   });
   $('#numer-send-btn').on('click', sendNumerMessage);
   $('#numer-input').on('keydown', function(e) {
