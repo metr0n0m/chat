@@ -2136,7 +2136,10 @@ function loadAdminNumera() {
         <td class="small">${esc(r.participants||'—')}</td>
         <td>${statusDot} ${r.member_count}</td>
         <td>${duration}</td>
-        <td><button class="btn btn-sm btn-outline-info numer-history-btn" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button></td></tr>`;
+        <td>
+          <button class="btn btn-sm btn-outline-info numer-history-btn me-1" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>
+          <button class="btn btn-sm btn-outline-danger numer-close-btn" data-id="${r.id}" title="Закрыть нумер"><i class="fa fa-xmark"></i></button>
+        </td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-numera-table').html(html);
@@ -2204,6 +2207,15 @@ $('#admin-rooms-table').on('click', '.room-history-btn', function() {
 $('#admin-numera-table').on('click', '.numer-history-btn', function() {
   const id = $(this).data('id');
   openNumerHistory(id);
+});
+
+$('#admin-numera-table').on('click', '.numer-close-btn', function() {
+  const id = $(this).data('id');
+  if (!confirm('Принудительно закрыть нумер #' + id + '?')) return;
+  $.post(`/api/admin/numera/${id}/close`, {csrf_token: csrfToken}, function(resp) {
+    if (resp.success) { showToast('Нумер #' + id + ' закрыт.'); loadAdminNumera(); }
+    else showToast(resp.error || 'Ошибка', 'danger');
+  });
 });
 
 function openRoomHistory(roomId, roomName) {
