@@ -349,7 +349,7 @@ class RoomController
             exit;
         }
         $members = $db->fetchAll(
-            "SELECT u.id, u.username, u.nick_color, u.avatar_url, rm.room_role
+            "SELECT u.id, u.username, u.nickname, u.nick_color, u.avatar_url, rm.room_role
              FROM room_members rm
              JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id = ? AND rm.room_role != 'banned'
