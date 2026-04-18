@@ -727,6 +727,12 @@ function handleWS(data) {
     case 'invite_declined': onInviteDeclined(data); break;
     case 'invite_expired':  onInviteExpired(data); break;
     case 'numer_joined':    onNumerJoined(data); break;
+    case 'room_counts':
+      Object.entries(data.counts || {}).forEach(([id, count]) => {
+        onlineCountsByRoom.set(Number(id), Number(count));
+        updateRoomBadge(id);
+      });
+      break;
     case 'room_count_changed':       onRoomCountChanged(data); break;
     case 'numer_destroyed':
       loadRooms();
@@ -746,6 +752,7 @@ function handleWS(data) {
 
 function onWSConnected(data) {
   if (currentPublicRoomId) wsSend('join_room', {room_id: currentPublicRoomId});
+  wsSend('get_room_counts', {});
 }
 
 // ════════════════════════════════════════════════
