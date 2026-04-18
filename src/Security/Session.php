@@ -55,7 +55,7 @@ class Session
 
         $session = $db->fetchOne(
             'SELECT s.id AS session_id, s.expires_at,
-                    u.id, u.username, u.email, u.avatar_url,
+                    u.id, u.username, u.nickname, u.email, u.avatar_url,
                     u.custom_status, u.nick_color, u.text_color, u.global_role,
                     u.can_create_room, u.is_banned,
                     u.hide_last_seen, u.bio,
