@@ -900,6 +900,19 @@ function buildMessage(m) {
       : '';
   }
 
+  if (m.type === 'whisper') {
+    const isSent = Number(m.user_id) === Number(CURRENT_USER.id);
+    const normalized = {
+      message_id: m.id,
+      room_id:    m.room_id,
+      created_at: m.created_at,
+      content:    m.content,
+      from: { id: m.user_id,    username: m.username,            nickname: m.nickname,  nick_color: m.nick_color },
+      to:   { id: m.whisper_to, username: m.whisper_to_username, nickname: null },
+    };
+    return buildWhisperMessage(normalized, isSent);
+  }
+
   const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
   const canDelete = canDeleteMessage(m);
   const deleteBtn = canDelete ? ` <span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
