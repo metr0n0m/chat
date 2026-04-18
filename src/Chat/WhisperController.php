@@ -55,7 +55,7 @@ class WhisperController
         $msgId = (int) $db->lastInsertId();
 
         $toUser = $db->fetchOne(
-            'SELECT id, username, custom_status, nick_color, avatar_url FROM users WHERE id = ?',
+            'SELECT id, username, nickname, custom_status, nick_color, avatar_url FROM users WHERE id = ?',
             [$toId]
         );
 
@@ -65,6 +65,7 @@ class WhisperController
             'from' => [
                 'id' => $fromId,
                 'username' => $from['username'],
+                'nickname' => $from['nickname'] ?? null,
                 'custom_status' => $from['custom_status'] ?? null,
                 'nick_color' => $from['nick_color'],
                 'avatar_url' => $from['avatar_url'],
