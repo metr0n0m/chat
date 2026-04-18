@@ -79,7 +79,7 @@ body { height: 100vh; margin: 0; }
 .msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
 .msg-inline-content { color: inherit; }
 .msg-inline-content * { color: inherit !important; }
-.msg-system { text-align: center; font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
+.msg-system { font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
 .msg-time { color: var(--sys-msg-color); font-size: .8rem; }
 .msg-sep { color: var(--sys-msg-color); }
 .msg-whisper-row { background: rgba(170,170,170,.13); border-radius: 4px; padding: 2px 6px; }
@@ -894,7 +894,10 @@ function onUserLeft(data) {
 // ════════════════════════════════════════════════
 function buildMessage(m) {
   if (m.type === 'system') {
-    return shouldShowSystemMessages() ? `<div class="msg-system">${esc(m.content)}</div>` : '';
+    const sysTime = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+    return shouldShowSystemMessages()
+      ? `<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`
+      : '';
   }
 
   const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
@@ -961,7 +964,8 @@ function onSystemMessage(m) {
     return;
   }
   if (!shouldShowSystemMessages()) return;
-  $('#messages-list').append(`<div class="msg-system">${esc(m.content)}</div>`);
+  const sysTime = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+  $('#messages-list').append(`<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`);
   if (isScrolledToBottom) scrollToBottom();
 }
 
