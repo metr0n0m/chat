@@ -163,7 +163,7 @@ function renderParticipants() {
   const owner = members.find(m => m.room_role === 'owner');
   const ownerEl = document.getElementById('owner-name');
   if (owner) {
-    ownerEl.innerHTML = `<span style="color:${esc(owner.nick_color||'inherit')}">\u25cf ${esc(owner.username)}</span>`;
+    ownerEl.innerHTML = `<span style="color:\${esc(owner.nick_color||'inherit')}">\u25cf \${esc(owner.username)}</span>`;
   } else {
     ownerEl.textContent = '—';
   }
@@ -172,7 +172,7 @@ function renderParticipants() {
   members.forEach(m => {
     const d = document.createElement('div');
     d.className = 'p-item';
-    d.innerHTML = `<span class="p-dot"></span><span style="color:${esc(m.nick_color||'inherit')}">${esc(m.username)}</span>`;
+    d.innerHTML = `<span class="p-dot"></span><span style="color:\${esc(m.nick_color||'inherit')}">\${esc(m.username)}</span>`;
     list.appendChild(d);
   });
 }
@@ -183,7 +183,7 @@ function appendMsg(m) {
   const el = document.createElement('div');
   el.className = 'msg';
   const t = m.created_at ? new Date(m.created_at.replace(' ','T')).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
-  el.innerHTML = `<span class="msg-time">${esc(t)}</span><span class="msg-sep"> \xbb </span><em><span style="color:${esc(m.nick_color||'inherit')};font-weight:600">${esc(m.username||'')}</span>: ${esc(m.content)}</em>`;
+  el.innerHTML = `<span class="msg-time">\${esc(t)}</span><span class="msg-sep"> \xbb </span><em><span style="color:\${esc(m.nick_color||'inherit')};font-weight:600">\${esc(m.username||'')}</span>: \${esc(m.content)}</em>`;
   const box = document.getElementById('messages');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   box.appendChild(el);
