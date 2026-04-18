@@ -167,6 +167,14 @@ class ConnectionManager
         return true;
     }
 
+    public function sendToAll(array $event): void
+    {
+        $payload = json_encode($event);
+        foreach ($this->connections as $conn) {
+            $conn->send($payload);
+        }
+    }
+
     public function getOnlineUserIds(): array
     {
         return array_keys($this->userConnections);

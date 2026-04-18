@@ -103,6 +103,7 @@ class EventRouter
             ], $userId);
 
             $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату', $userId);
+            $this->broadcastRoomCount($roomId);
         }
     }
 
@@ -123,6 +124,7 @@ class EventRouter
             'user_id' => $userId,
         ]);
         $this->broadcastSystemMessage($roomId, $session['username'] . ' покинул(а) комнату', $userId);
+        $this->broadcastRoomCount($roomId);
     }
 
     private function onSendMessage(ConnectionInterface $conn, array $session, array $data): void
@@ -285,11 +287,14 @@ class EventRouter
         }
 
         $roomId = $result['room_id'];
+        $db2    = Connection::getInstance();
+        $roomName = (string) ($db2->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId])['name'] ?? 'Нумер');
         $this->cm->joinRoom($conn, $roomId);
         $this->cm->sendToConnection($conn, [
-            'event'   => 'numer_joined',
-            'room_id' => $roomId,
-            'members' => $result['members'],
+            'event'      => 'numer_joined',
+            'room_id'    => $roomId,
+            'room_name'  => $roomName,
+            'members'    => $result['members'],
         ]);
         $this->cm->sendToRoom($roomId, [
             'event'   => 'numer_participant_joined',
@@ -315,9 +320,18 @@ class EventRouter
             return;
         }
 
+        $destroyed = (bool) ($result['destroyed'] ?? false);
+
+        // Notify the leaver directly before removing from room
+        $this->cm->sendToConnection($conn, [
+            'event'     => 'numer_left',
+            'room_id'   => $roomId,
+            'destroyed' => $destroyed,
+        ]);
+
         $this->cm->leaveRoom($userId, $roomId);
 
-        if ($result['destroyed'] ?? false) {
+        if ($destroyed) {
             $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
         } else {
             $this->cm->sendToRoom($roomId, [
@@ -333,9 +347,9 @@ class EventRouter
                 );
                 if ($newOwner) {
                     $this->cm->sendToRoom($roomId, [
-                        'event' => 'numer_owner_changed',
+                        'event'   => 'numer_owner_changed',
                         'room_id' => $roomId,
-                        'owner' => $newOwner,
+                        'owner'   => $newOwner,
                     ]);
                 }
             }
@@ -429,6 +443,16 @@ class EventRouter
             'avatar_url'  => $session['avatar_url'],
             'global_role' => $session['global_role'],
         ];
+    }
+
+    private function broadcastRoomCount(int $roomId): void
+    {
+        $count = count($this->cm->getRoomUserIds($roomId));
+        $this->cm->sendToAll([
+            'event'   => 'room_count_changed',
+            'room_id' => $roomId,
+            'count'   => $count,
+        ]);
     }
 
     private function notifyGlobalStaffCall(int $roomId, array $session): void
