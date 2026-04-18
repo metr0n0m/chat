@@ -336,6 +336,31 @@ class RoomController
         exit;
     }
 
+    public static function members(int $roomId, int $userId): never
+    {
+        $db = Connection::getInstance();
+        $member = $db->fetchOne(
+            "SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ? AND room_role != 'banned'",
+            [$roomId, $userId]
+        );
+        if (!$member) {
+            http_response_code(403);
+            echo json_encode(['success' => false]);
+            exit;
+        }
+        $members = $db->fetchAll(
+            "SELECT u.id, u.username, u.nick_color, u.avatar_url, rm.room_role
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ? AND rm.room_role != 'banned'
+             ORDER BY rm.joined_at ASC",
+            [$roomId]
+        );
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'members' => $members], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     private static function jsonError(string $message, int $code = 400): never
     {
         http_response_code($code);
