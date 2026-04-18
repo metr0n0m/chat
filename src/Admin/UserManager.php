@@ -160,7 +160,7 @@ class UserManager
         $db = Connection::getInstance();
 
         $select = [
-            'id', 'username', 'email', 'avatar_url', 'signature', 'custom_status', 'nick_color', 'text_color',
+            'id', 'username', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
         foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
@@ -204,7 +204,7 @@ class UserManager
 
         $db = Connection::getInstance();
         $currentUser = $db->fetchOne(
-            'SELECT username, nick_color, text_color, avatar_url, signature, custom_status
+            'SELECT username, nick_color, text_color, avatar_url, custom_status
              FROM users
              WHERE id = ?',
             [$userId]
@@ -230,11 +230,6 @@ class UserManager
             $params[] = $username;
         }
 
-        if (isset($post['signature'])) {
-            $signature = mb_substr(trim((string) $post['signature']), 0, 300);
-            $set[] = 'signature = ?';
-            $params[] = $signature;
-        }
 
         if (self::hasUsersColumn($db, 'bio') && array_key_exists('bio', $post)) {
             $bio = mb_substr(trim((string)$post['bio']), 0, 500);
@@ -340,7 +335,7 @@ class UserManager
         $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
 
         $select = [
-            'id', 'username', 'email', 'avatar_url', 'signature', 'custom_status', 'nick_color', 'text_color',
+            'id', 'username', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
         foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
