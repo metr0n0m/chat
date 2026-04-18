@@ -109,7 +109,6 @@ class Router
 
         if ($this->method === 'GET'  && $this->path === '/api/users/check') $this->handleUsernameCheck();
         if ($this->method === 'GET'  && $this->path === '/api/users/find')  $this->handleFindUser();
-        if ($this->method === 'POST' && $this->path === '/api/color-check') $this->handleColorCheck();
     }
 
     private function dispatchAdmin(): void
@@ -233,12 +232,4 @@ class Router
         exit;
     }
 
-    private function handleColorCheck(): never
-    {
-        $error  = \Chat\Security\ColorContrast::validate($_POST['color'] ?? '');
-        $ratios = \Chat\Security\ColorContrast::ratios($_POST['color'] ?? '#ffffff');
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['valid' => !$error, 'error' => $error, 'ratios' => $ratios]);
-        exit;
-    }
 }
