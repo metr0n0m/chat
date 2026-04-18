@@ -2226,38 +2226,45 @@ $('#admin-numera-table').on('click', '.numer-history-btn', function() {
 function openRoomHistory(roomId, roomName) {
   $.get(`/api/admin/rooms/${roomId}/messages`, function(resp) {
     if (!resp.success) { showToast('Не удалось загрузить историю.', 'danger'); return; }
-    let html = `<h6>${esc(roomName)} — история</h6>`;
+    let rows = '';
     if (!resp.messages || !resp.messages.length) {
-      html += '<div class="text-muted">Сообщений нет.</div>';
+      rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
-      html += '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>';
       resp.messages.forEach(m => {
-        html += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
-      html += '</tbody></table></div>';
     }
-    $('#room-manage-body').html(html);
-    new bootstrap.Modal(document.getElementById('roomManageModal')).show();
+    $('#admin-rooms-table').html(`
+      <button class="btn btn-sm btn-outline-secondary mb-2" id="admin-rooms-back-btn"><i class="fa fa-arrow-left me-1"></i>Назад</button>
+      <div class="fw-semibold mb-2">${esc(roomName)} — история</div>
+      <div style="max-height:400px;overflow-y:auto">
+        <table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`);
   });
 }
 
 function openNumerHistory(numerId) {
   $.get(`/api/admin/numera/${numerId}/messages`, function(resp) {
     if (!resp.success) { showToast('Не удалось загрузить историю.', 'danger'); return; }
-    let html = `<h6>Нумер #${numerId} — история</h6>`;
+    let rows = '';
     if (!resp.messages || !resp.messages.length) {
-      html += '<div class="text-muted">Сообщений нет.</div>';
+      rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
-      html += '<div style="max-height:400px;overflow-y:auto"><table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>';
       resp.messages.forEach(m => {
-        html += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${esc(String(m.created_at||'').slice(0,16))}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
-      html += '</tbody></table></div>';
     }
-    $('#room-manage-body').html(html);
-    new bootstrap.Modal(document.getElementById('roomManageModal')).show();
+    $('#admin-numera-table').html(`
+      <button class="btn btn-sm btn-outline-secondary mb-2" id="admin-numera-back-btn"><i class="fa fa-arrow-left me-1"></i>Назад</button>
+      <div class="fw-semibold mb-2">Нумер #${numerId} — история</div>
+      <div style="max-height:400px;overflow-y:auto">
+        <table class="table table-sm table-striped"><thead><tr><th>Время</th><th>От</th><th>Сообщение</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`);
   });
 }
+
+$(document).on('click', '#admin-rooms-back-btn', loadAdminRooms);
+$(document).on('click', '#admin-numera-back-btn', loadAdminNumera);
 
 function loadAdminSettings() {
   $.get('/api/admin/system-settings', function(resp) {
