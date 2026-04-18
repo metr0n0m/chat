@@ -18,11 +18,14 @@ $nonce = base64_encode(random_bytes(16));
 $csrfToken = CSRF::token();
 $isLoggedIn = (bool) $user;
 $_sysMsgColor = '#DEC8A4';
+$_timeFormat  = 'HH:mm:ss';
 if ($isLoggedIn) {
     try {
         $db = \Chat\DB\Connection::getInstance();
         $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color'");
         if ($row && !empty($row['value'])) $_sysMsgColor = (string) $row['value'];
+        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'time_format'");
+        if ($row && !empty($row['value'])) $_timeFormat = (string) $row['value'];
     } catch (\Throwable $e) {}
 }
 $userJson = $user ? json_encode([
@@ -598,6 +601,7 @@ dayjs.extend(dayjs_plugin_relativeTime);
 
 const CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
 const CURRENT_USER = <?= $userJson ?>;
+const CHAT_TIME_FORMAT = <?= json_encode($_timeFormat) ?>;
 
 <?php if ($isLoggedIn): ?>
 // ════════════════════════════════════════════════
@@ -893,7 +897,7 @@ function buildMessage(m) {
     return shouldShowSystemMessages() ? `<div class="msg-system">${esc(m.content)}</div>` : '';
   }
 
-  const time = dayjs(m.created_at).format('HH:mm:ss');
+  const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
   const canDelete = canDeleteMessage(m);
   const deleteBtn = canDelete ? ` <span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
 
@@ -912,7 +916,7 @@ function buildMessage(m) {
 }
 
 function buildWhisperMessage(m, isSent) {
-  const time = dayjs(m.created_at).format('HH:mm:ss');
+  const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
   const from = m.from || {};
   const to   = m.to   || {};
   const partner = isSent ? to : from;
