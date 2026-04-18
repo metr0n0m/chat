@@ -1529,6 +1529,7 @@ function openNumerPanel(roomId, roomName, members) {
   $('#numer-messages').empty();
   renderNumerParticipants(numerMembers);
   stopNumerCountdown();
+  if (numerMembers.length === 1) startNumerCountdown(1800);
   $('#numer-panel').css('display', 'flex');
   $('#numer-panel-body').show();
   $.get(`/api/rooms/${roomId}/messages`, function(resp) {
@@ -1601,7 +1602,7 @@ function onInviteSent(invitation) {
 function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + (data.user?.username || ''));
   if (data.room_id) {
-    openNumerPanel(Number(data.room_id), null, null);
+    openNumerPanel(Number(data.room_id), data.room_name || null, data.members || null);
   }
 }
 
