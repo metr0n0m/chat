@@ -56,7 +56,7 @@ class MessageController
         $messages = $db->fetchAll(
             'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.room_id,
                     m.whisper_to, wt.username AS whisper_to_username,
-                    u.username, u.custom_status, u.avatar_url, u.global_role,
+                    u.username, u.nickname, u.custom_status, u.avatar_url, u.global_role,
                     ' . $colorSelect . ',
                     rm.room_role
              FROM messages m
@@ -115,6 +115,7 @@ class MessageController
             'room_id' => $roomId,
             'user_id' => $actorId,
             'username' => $actor['username'],
+            'nickname' => $actor['nickname'] ?? null,
             'custom_status' => $actor['custom_status'] ?? null,
             'nick_color' => $actor['nick_color'],
             'text_color' => $actor['text_color'],
