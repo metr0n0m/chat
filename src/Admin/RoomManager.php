@@ -209,6 +209,23 @@ class RoomManager
     }
 
     /**
+     * Принудительно закрывает нумер (только если is_closed = 0).
+     */
+    public static function closeNumer(int $roomId): void
+    {
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $db   = Connection::getInstance();
+        $room = $db->fetchOne("SELECT id FROM rooms WHERE id = ? AND type = 'numer' AND is_closed = 0", [$roomId]);
+        if (!$room) {
+            self::jsonError('Нумер не найден или уже закрыт.', 404);
+        }
+        $db->execute('UPDATE rooms SET is_closed = 1, closed_at = NOW() WHERE id = ?', [$roomId]);
+        self::jsonSuccess(['closed' => true, 'room_id' => $roomId]);
+    }
+
+    /**
      * Архив закрытых нумеров.
      * Last updated: 2026-04-17.
      *

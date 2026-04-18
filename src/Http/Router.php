@@ -131,6 +131,7 @@ class Router
         if ($this->method === 'POST'   && preg_match('~^/api/admin/rooms/(\d+)/clear-user/(\d+)$~', $this->path, $m)) RoomManager::clearUserMessages((int) $m[1], (int) $m[2]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/numera')                                  RoomManager::numeraActive((int) ($_GET['page'] ?? 1));
         if ($this->method === 'GET'    && $this->path === '/api/admin/numera/archive')                          RoomManager::numeraArchive((int) ($_GET['page'] ?? 1), $_GET);
+        if ($this->method === 'POST'   && preg_match('~^/api/admin/numera/(\d+)/close$~', $this->path, $m))    RoomManager::closeNumer((int) $m[1]);
         if ($this->method === 'GET'    && preg_match('~^/api/admin/numera/(\d+)/messages$~', $this->path, $m))  RoomManager::numeraMessages((int) $m[1]);
         if ($this->method === 'GET'    && $this->path === '/api/admin/whispers')                                WhisperController::archive((int) ($_GET['page'] ?? 1), $_GET);
         if ($this->method === 'DELETE' && preg_match('~^/api/admin/whispers/(\d+)$~', $this->path, $m))         WhisperController::deleteWhisper((int) $m[1]);
