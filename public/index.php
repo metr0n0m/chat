@@ -2302,10 +2302,6 @@ $('#adminSettingsForm').on('submit', function(e) {
   });
 });
 
-$('#sysMsgColorPicker').on('input', function() {
-  $('#sys-msg-color-preview').css('color', $(this).val());
-});
-
 // ════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════
