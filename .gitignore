@@ -1,9 +1,32 @@
 # Docker volumes
 chat_db_data/
 
+# Docker / infrastructure
+Dockerfile-php
+docker-compose.yml
+nginx/
+supervisord.docker.conf
+
+# Local dev
+index.php
+tools/
+
 # Environment files
 .env
 .env.local
+
+# Config with secrets
+config/config.php
+
+# Dependencies (restore via composer install)
+vendor/
+
+# Storage / uploads
+storage/
+
+# Claude Code / AI tools
+.claude/
+.codex/
 
 # OS
 .DS_Store

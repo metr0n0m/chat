@@ -1,14 +1,14 @@
 <?php
 // Database
-define('DB_HOST', 'db');
+define('DB_HOST', 'localhost');
 define('DB_PORT', 3306);
 define('DB_NAME', 'chat');
 define('DB_USER', 'chat_user');
-define('DB_PASS', 'chat_pass');
+define('DB_PASS', 'REPLACE_WITH_DB_PASSWORD');
 
 // Application
 define('APP_NAME', 'Chat');
-define('APP_URL', 'http://localhost:8080');
+define('APP_URL', 'https://yourdomain.com');
 define('APP_LOCALE', 'ru');
 // Generate: php -r "echo bin2hex(random_bytes(32));"
 define('APP_SECRET', 'REPLACE_WITH_64_HEX_CHARS_GENERATED_ABOVE');
