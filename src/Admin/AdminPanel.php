@@ -209,8 +209,10 @@ class AdminPanel
             'maintenance_until'    => '',
             'site_description'     => '',
             'site_keywords'        => '',
-            'system_theme'         => 'auto',
-            'system_message_color' => '#DEC8A4',
+            'system_theme'               => 'auto',
+            'system_message_color'       => '#DEC8A4',
+            'system_message_color_light' => '#7a6a4a',
+            'system_message_color_dark'  => '#DEC8A4',
         ];
         foreach ($defaults as $k => $v) {
             if (!array_key_exists($k, $s)) {
@@ -240,6 +242,7 @@ class AdminPanel
             'datetime_format', 'time_format', 'registration_enabled', 'maintenance_mode',
             'maintenance_message', 'maintenance_until', 'site_description',
             'site_keywords', 'system_theme', 'system_message_color',
+            'system_message_color_light', 'system_message_color_dark',
         ];
         $db = Connection::getInstance();
         foreach ($allowed as $key) {
@@ -247,7 +250,8 @@ class AdminPanel
                 continue;
             }
             $value = (string) $post[$key];
-            if ($key === 'system_message_color' && !preg_match('/^#[0-9a-fA-F]{6}$/', $value)) {
+            if (in_array($key, ['system_message_color', 'system_message_color_light', 'system_message_color_dark'], true)
+                && !preg_match('/^#[0-9a-fA-F]{6}$/', $value)) {
                 continue;
             }
             $db->execute(
