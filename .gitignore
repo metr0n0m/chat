@@ -21,9 +21,6 @@ config/config.php
 # Dependencies (restore via composer install)
 vendor/
 
-# Storage / uploads
-storage/
-
 # Claude Code / AI tools
 .claude/
 .codex/
