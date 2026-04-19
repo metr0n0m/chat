@@ -527,10 +527,17 @@ body { height: 100vh; margin: 0; }
               <input type="text" class="form-control" name="time_format" placeholder="HH:mm">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Цвет системных сообщений</label>
+              <label class="form-label">Цвет системных сообщений (светлая тема)</label>
               <div class="d-flex align-items-center gap-2">
-                <input type="color" class="form-control form-control-color" name="system_message_color" id="sysMsgColorPicker" style="width:46px;height:38px;padding:2px">
-                <div id="sys-msg-color-preview" class="color-preview-box">Системное</div>
+                <input type="color" class="form-control form-control-color" name="system_message_color_light" style="width:46px;height:38px;padding:2px">
+                <div id="sys-msg-color-preview-light" style="background:#f8f9fa;padding:2px 8px;border-radius:4px;font-style:italic;font-size:.82rem">Системное</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Цвет системных сообщений (тёмная тема)</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="color" class="form-control form-control-color" name="system_message_color_dark" style="width:46px;height:38px;padding:2px">
+                <div id="sys-msg-color-preview-dark" style="background:#212529;padding:2px 8px;border-radius:4px;font-style:italic;font-size:.82rem">Системное</div>
               </div>
             </div>
             <div class="col-md-6">
@@ -2256,13 +2263,14 @@ function loadAdminSettings() {
     const s = resp.settings;
     $('[name="datetime_format"]').val(s.datetime_format || '');
     $('[name="time_format"]').val(s.time_format || '');
-    $('[name="system_message_color"]').val(s.system_message_color || '#DEC8A4');
+    $('[name="system_message_color_light"]').val(s.system_message_color_light || '#7a6a4a');
+    $('[name="system_message_color_dark"]').val(s.system_message_color_dark || '#DEC8A4');
+    $('#sys-msg-color-preview-light').css('color', s.system_message_color_light || '#7a6a4a');
+    $('#sys-msg-color-preview-dark').css('color', s.system_message_color_dark || '#DEC8A4');
     $('[name="system_theme"]').val(s.system_theme || 'auto');
     $('#admin-reg-enabled').prop('checked', s.registration_enabled === '1');
     $('#admin-maint-mode').prop('checked', s.maintenance_mode === '1');
     $('[name="maintenance_message"]').val(s.maintenance_message || '');
-    const color = s.system_message_color || '#DEC8A4';
-    $('#sys-msg-color-preview').css('color', color).text('Системное');
   });
 }
 
@@ -2272,7 +2280,8 @@ $('#adminSettingsForm').on('submit', function(e) {
     csrf_token: CSRF_TOKEN,
     datetime_format: $('[name="datetime_format"]').val(),
     time_format: $('[name="time_format"]').val(),
-    system_message_color: $('[name="system_message_color"]').val(),
+    system_message_color_light: $('[name="system_message_color_light"]').val(),
+    system_message_color_dark:  $('[name="system_message_color_dark"]').val(),
     system_theme: $('[name="system_theme"]').val(),
     registration_enabled: $('#admin-reg-enabled').is(':checked') ? '1' : '0',
     maintenance_mode: $('#admin-maint-mode').is(':checked') ? '1' : '0',
@@ -2282,7 +2291,8 @@ $('#adminSettingsForm').on('submit', function(e) {
     if (resp.success) {
       $('#admin-settings-success').removeClass('d-none');
       $('#admin-settings-error').addClass('d-none');
-      document.documentElement.style.setProperty('--sys-msg-color', data.system_message_color);
+      document.documentElement.style.setProperty('--sys-msg-color-light', data.system_message_color_light);
+      document.documentElement.style.setProperty('--sys-msg-color-dark',  data.system_message_color_dark);
       setTimeout(() => $('#admin-settings-success').addClass('d-none'), 3000);
     } else {
       $('#admin-settings-error').text(resp.error || 'Ошибка').removeClass('d-none');
