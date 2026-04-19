@@ -1033,12 +1033,6 @@ function visibleRoleLabel(u) {
   return '';
 }
 
-function displayStatusLabel(u) {
-  if (u && u.custom_status) return String(u.custom_status);
-  if (u && u.global_role) return roleLabel(u.global_role);
-  return '';
-}
-
 function visibleRoleClass(u) {
   if (u.room_role && !['member', 'banned'].includes(u.room_role)) return 'bg-info';
   if (u.global_role === 'platform_owner') return 'bg-dark';
