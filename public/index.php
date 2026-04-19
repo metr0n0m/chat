@@ -86,9 +86,12 @@ body { height: 100vh; margin: 0; }
 .msg-content { font-size: .93rem; word-break: break-word; padding-left: 0; display: inline; }
 .msg-inline-content { color: inherit; }
 .msg-inline-content * { color: inherit !important; }
-.msg-system { font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
-.msg-time { color: var(--sys-msg-color); font-size: .8rem; }
-.msg-sep { color: var(--sys-msg-color); }
+.msg-system { font-style: italic; color: var(--sys-msg-color-light); font-size: .82rem; padding: 2px 0; }
+.msg-time { color: var(--sys-msg-color-light); font-size: .8rem; }
+.msg-sep { color: var(--sys-msg-color-light); }
+[data-bs-theme="dark"] .msg-system { color: var(--sys-msg-color-dark); }
+[data-bs-theme="dark"] .msg-time   { color: var(--sys-msg-color-dark); }
+[data-bs-theme="dark"] .msg-sep    { color: var(--sys-msg-color-dark); }
 .msg-whisper-row { background: rgba(180,180,190,.35); border-radius: 4px; padding: 2px 6px; margin: 2px 0; cursor: pointer; }
 [data-bs-theme="dark"] .msg-whisper-row { background: rgba(170,170,170,.13); }
 .room-desc { font-size: .78rem; color: var(--bs-secondary-color); }
