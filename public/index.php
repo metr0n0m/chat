@@ -361,7 +361,6 @@ body { height: 100vh; margin: 0; }
                   <div class="color-preview-box" id="nick-preview-light" style="background:#f8f9fa">Ник</div>
                   <div class="color-preview-box" id="nick-preview-dark" style="background:#212529">Ник</div>
                 </div>
-                <div id="nick-color-feedback" class="small"></div>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Цвет текста</label>
@@ -370,7 +369,6 @@ body { height: 100vh; margin: 0; }
                   <div class="color-preview-box" id="text-preview-light" style="background:#f8f9fa">Текст</div>
                   <div class="color-preview-box" id="text-preview-dark" style="background:#212529">Текст</div>
                 </div>
-                <div id="text-color-feedback" class="small"></div>
               </div>
             </div>
           </div>
