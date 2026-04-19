@@ -89,7 +89,7 @@ body { height: 100vh; margin: 0; }
 .msg-system { font-style: italic; color: var(--sys-msg-color); font-size: .82rem; padding: 2px 0; }
 .msg-time { color: var(--sys-msg-color); font-size: .8rem; }
 .msg-sep { color: var(--sys-msg-color); }
-.msg-whisper-row { background: rgba(0,0,0,.07); border-radius: 4px; padding: 2px 6px; margin: 2px 0; cursor: pointer; }
+.msg-whisper-row { background: rgba(0,0,0,.18); border-radius: 4px; padding: 2px 6px; margin: 2px 0; cursor: pointer; }
 [data-bs-theme="dark"] .msg-whisper-row { background: rgba(170,170,170,.13); }
 .room-desc { font-size: .78rem; color: var(--bs-secondary-color); }
 .msg-delete-btn { opacity: 0; font-size: .75rem; color: var(--bs-secondary-color); cursor: pointer; }
