@@ -926,8 +926,8 @@ function buildMessage(m) {
       room_id:    m.room_id,
       created_at: m.created_at,
       content:    m.content,
-      from: { id: m.user_id,    username: m.username,            nickname: m.nickname,  nick_color: m.nick_color },
-      to:   { id: m.whisper_to, username: m.whisper_to_username, nickname: null },
+      from: { id: m.user_id,    username: m.username,            nickname: m.nickname,           nick_color: m.nick_color,          text_color: m.text_color },
+      to:   { id: m.whisper_to, username: m.whisper_to_username, nickname: m.whisper_to_nickname, nick_color: m.whisper_to_nick_color },
     };
     return buildWhisperMessage(normalized, isSent);
   }
@@ -961,7 +961,7 @@ function buildWhisperMessage(m, isSent) {
   const replyName = esc(displayName(reply));
   return `<div class="msg msg-whisper-row" data-id="${replyId}" data-name="${replyName}" id="msg-${m.message_id}">
     <div class="msg-body">
-      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span><span class="msg-username">${fromName}</span> <span class="msg-sep">»»»</span> <span class="msg-username">${toName}</span>: <span class="msg-content">${m.content}</span>
+      <span class="msg-time">${time}</span><span class="msg-sep"> »»» </span><span class="msg-username" style="color:${esc(effectiveColor(from.nick_color))}">${fromName}</span> <span class="msg-sep">»»»</span> <span class="msg-username" style="color:${esc(effectiveColor(to.nick_color))}">${toName}</span>: <span class="msg-content msg-inline-content" style="color:${esc(effectiveColor(from.text_color))} !important">${m.content}</span>
     </div>
   </div>`;
 }
