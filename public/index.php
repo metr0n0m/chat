@@ -17,20 +17,24 @@ $user = $router->getUser();
 $nonce = base64_encode(random_bytes(16));
 $csrfToken = CSRF::token();
 $isLoggedIn = (bool) $user;
-$_sysMsgColor    = '#DEC8A4';
-$_timeFormat     = 'HH:mm:ss';
-$_datetimeFormat = 'DD.MM.YY HH:mm';
-if ($isLoggedIn) {
-    try {
-        $db = \Chat\DB\Connection::getInstance();
-        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color'");
-        if ($row && !empty($row['value'])) $_sysMsgColor = (string) $row['value'];
-        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'time_format'");
-        if ($row && !empty($row['value'])) $_timeFormat = (string) $row['value'];
-        $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'datetime_format'");
-        if ($row && !empty($row['value'])) $_datetimeFormat = (string) $row['value'];
-    } catch (\Throwable $e) {}
-}
+$_sysMsgColor      = '#DEC8A4';
+$_sysMsgColorLight = '#7a6a4a';
+$_sysMsgColorDark  = '#DEC8A4';
+$_timeFormat       = 'HH:mm:ss';
+$_datetimeFormat   = 'DD.MM.YY HH:mm';
+try {
+    $db = \Chat\DB\Connection::getInstance();
+    $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color'");
+    if ($row && !empty($row['value'])) $_sysMsgColor = (string) $row['value'];
+    $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color_light'");
+    if ($row && !empty($row['value'])) $_sysMsgColorLight = (string) $row['value'];
+    $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'system_message_color_dark'");
+    if ($row && !empty($row['value'])) $_sysMsgColorDark = (string) $row['value'];
+    $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'time_format'");
+    if ($row && !empty($row['value'])) $_timeFormat = (string) $row['value'];
+    $row = $db->fetchOne("SELECT value FROM app_settings WHERE name = 'datetime_format'");
+    if ($row && !empty($row['value'])) $_datetimeFormat = (string) $row['value'];
+} catch (\Throwable $e) {}
 $userJson = $user ? json_encode([
     'id'             => (int) $user['id'],
     'username'       => $user['username'],
@@ -54,7 +58,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style nonce="<?= $nonce ?>">
-:root { --sidebar-w: 260px; --right-panel-w: 220px; --sys-msg-color: <?= htmlspecialchars($_sysMsgColor, ENT_QUOTES) ?>; }
+:root { --sidebar-w: 260px; --right-panel-w: 220px; --sys-msg-color: <?= htmlspecialchars($_sysMsgColor, ENT_QUOTES) ?>; --sys-msg-color-light: <?= htmlspecialchars($_sysMsgColorLight, ENT_QUOTES) ?>; --sys-msg-color-dark: <?= htmlspecialchars($_sysMsgColorDark, ENT_QUOTES) ?>; }
 body { height: 100vh; margin: 0; }
 .chat-layout { display: flex; height: 100vh; overflow: hidden; }
 
