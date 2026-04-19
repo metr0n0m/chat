@@ -654,7 +654,6 @@ let oldestMessageId = null;
 let rooms = [];
 let numera = [];
 const ignoredUserIds = new Set();
-const pendingInviteRooms = new Map();
 const onlineCountsByRoom = new Map();
 const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 
@@ -1516,14 +1515,10 @@ function onInviteAccepted(data) {
 }
 
 function onInviteDeclined(data) {
-  const invitationId = Number(data?.invitation_id || 0);
-  if (invitationId) pendingInviteRooms.delete(invitationId);
   showToast('Приглашение отклонено.');
 }
 
 function onInviteExpired(data) {
-  const invitationId = Number(data?.invitation_id || 0);
-  if (invitationId) pendingInviteRooms.delete(invitationId);
   showToast('Приглашение истекло.');
 }
 
