@@ -6,6 +6,7 @@ namespace Chat\Chat;
 use Chat\DB\Connection;
 use Chat\Security\HMAC;
 use Chat\Support\Lang;
+use Chat\Support\Timestamp;
 
 /**
  * Логика whisper-сообщений и их архива.
@@ -53,6 +54,7 @@ class WhisperController
             [$roomId, $fromId, $content, $hmac, 'whisper', $toId]
         );
         $msgId = (int) $db->lastInsertId();
+        $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
 
         $toUser = $db->fetchOne(
             'SELECT id, username, nickname, custom_status, nick_color, text_color, avatar_url FROM users WHERE id = ?',
@@ -73,7 +75,7 @@ class WhisperController
             ],
             'to' => $toUser,
             'content' => $content,
-            'created_at' => date('Y-m-d H:i:s.000'),
+            'created_at' => Timestamp::isoUtc($createdAt === null ? null : (string) $createdAt),
         ];
     }
 
@@ -129,6 +131,7 @@ class WhisperController
         $total = (int) ($db->fetchOne($countSql, $params)['c'] ?? 0);
 
         $items = $db->fetchAll($sql, $params);
+        $items = Timestamp::normalizeRows($items, ['created_at']);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'whispers' => $items, 'total' => $total, 'page' => $page], JSON_UNESCAPED_UNICODE);
         exit;

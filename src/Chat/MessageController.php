@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
+use Chat\Support\Timestamp;
 
 class MessageController
 {
@@ -70,6 +71,8 @@ class MessageController
             $params
         );
 
+        $messages = Timestamp::normalizeRows($messages, ['created_at']);
+
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'messages' => array_reverse($messages)], JSON_UNESCAPED_UNICODE);
         exit;
@@ -111,8 +114,11 @@ class MessageController
             );
         }
 
+        $msgId = (int) $db->lastInsertId();
+        $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
+
         return [
-            'id' => (int) $db->lastInsertId(),
+            'id' => $msgId,
             'room_id' => $roomId,
             'user_id' => $actorId,
             'username' => $actor['username'],
@@ -125,7 +131,7 @@ class MessageController
             'content' => $content,
             'embed_data' => $embed,
             'type' => 'text',
-            'created_at' => date('Y-m-d H:i:s.000'),
+            'created_at' => Timestamp::isoUtc($createdAt === null ? null : (string) $createdAt),
         ];
     }
 

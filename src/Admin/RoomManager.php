@@ -5,6 +5,7 @@ namespace Chat\Admin;
 
 use Chat\DB\Connection;
 use Chat\Security\CSRF;
+use Chat\Support\Timestamp;
 
 /**
  * Администрирование комнат и архива нумеров.
@@ -35,6 +36,7 @@ class RoomManager
              ORDER BY r.id DESC
              LIMIT 50 OFFSET $offset"
         );
+        $rooms = Timestamp::normalizeRows($rooms, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'rooms' => $rooms, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -130,6 +132,7 @@ class RoomManager
              ORDER BY r.created_at DESC
              LIMIT 50 OFFSET $offset"
         );
+        $numera = Timestamp::normalizeRows($numera, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'numera' => $numera, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -151,6 +154,7 @@ class RoomManager
              ORDER BY FIELD(rm.room_role, "owner","local_admin","local_moderator","member","banned"), u.username',
             [$roomId]
         );
+        $members = Timestamp::normalizeRows($members, ['joined_at', 'banned_at']);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'members' => $members], JSON_UNESCAPED_UNICODE);
         exit;
@@ -264,6 +268,7 @@ class RoomManager
              LIMIT 50 OFFSET ' . $offset,
             $params
         );
+        $rooms = Timestamp::normalizeRows($rooms, ['created_at', 'closed_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'numera' => $rooms, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -291,6 +296,7 @@ class RoomManager
              ORDER BY m.created_at ASC',
             [$roomId]
         );
+        $messages = Timestamp::normalizeRows($messages, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
@@ -330,6 +336,7 @@ class RoomManager
              LIMIT 50 OFFSET $offset",
             $params
         );
+        $messages = Timestamp::normalizeRows($messages, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode([

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
+use Chat\Support\Timestamp;
 
 class NumerPage
 {
@@ -47,6 +48,7 @@ class NumerPage
              ORDER BY m.id DESC LIMIT 80",
             [$roomId]
         ));
+        $messages = Timestamp::normalizeRows($messages, ['created_at']);
 
         $roomNameHtml = htmlspecialchars((string) $room['name'], ENT_QUOTES);
         $membersJson  = json_encode($members,  JSON_HEX_TAG | JSON_HEX_AMP);

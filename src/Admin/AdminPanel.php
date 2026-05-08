@@ -5,6 +5,7 @@ namespace Chat\Admin;
 
 use Chat\DB\Connection;
 use Chat\Security\{Session, CSRF};
+use Chat\Support\Timestamp;
 
 /**
  * Методы админ-панели верхнего уровня.
@@ -68,6 +69,7 @@ class AdminPanel
         $mods = $db->fetchAll(
             "SELECT id, username, email, created_at FROM users WHERE global_role = 'moderator' ORDER BY username"
         );
+        $mods = Timestamp::normalizeRows($mods, ['created_at']);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'moderators' => $mods], JSON_UNESCAPED_UNICODE);
         exit;

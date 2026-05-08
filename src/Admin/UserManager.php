@@ -6,6 +6,7 @@ namespace Chat\Admin;
 use Chat\DB\Connection;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
+use Chat\Support\Timestamp;
 
 class UserManager
 {
@@ -40,6 +41,7 @@ class UserManager
              LIMIT 50 OFFSET ' . $offset,
             $params
         );
+        $users = Timestamp::normalizeRows($users, ['created_at', 'last_seen_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'users' => $users, 'total' => $total, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -189,6 +191,7 @@ class UserManager
         $user['social_whatsapp'] = (string)($user['social_whatsapp'] ?? '');
         $user['social_vk'] = (string)($user['social_vk'] ?? '');
         $user['hide_last_seen'] = (int)($user['hide_last_seen'] ?? 0);
+        $user = Timestamp::normalizeFields($user, ['created_at', 'last_seen_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'user' => $user], JSON_UNESCAPED_UNICODE);
@@ -341,6 +344,7 @@ class UserManager
             'SELECT ' . implode(', ', $select) . ' FROM users WHERE id = ?',
             [$userId]
         );
+        $updated = Timestamp::normalizeFields($updated, ['created_at', 'last_seen_at']);
 
         self::jsonSuccess(['updated' => true, 'user' => $updated]);
     }
@@ -564,6 +568,9 @@ class UserManager
              WHERE rm.muted_until IS NOT NULL AND rm.muted_until > NOW()
              ORDER BY rm.muted_until DESC"
         );
+        $global = Timestamp::normalizeRows($global, ['banned_at', 'banned_until']);
+        $room = Timestamp::normalizeRows($room, ['banned_at', 'banned_until']);
+        $mutes = Timestamp::normalizeRows($mutes, ['banned_at', 'banned_until']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'global' => $global, 'room' => $room, 'mutes' => $mutes], JSON_UNESCAPED_UNICODE);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\WebSocket;
 
 use Ratchet\ConnectionInterface;
+use Chat\Support\Timestamp;
 
 class ConnectionManager
 {
@@ -118,7 +119,7 @@ class ConnectionManager
 
     public function sendToUser(int $userId, array $event): void
     {
-        $payload = json_encode($event);
+        $payload = $this->encodeEvent($event);
         foreach (array_keys($this->userConnections[$userId] ?? []) as $connId) {
             if (isset($this->connections[$connId])) {
                 $this->connections[$connId]->send($payload);
@@ -128,7 +129,7 @@ class ConnectionManager
 
     public function sendToRoom(int $roomId, array $event, ?int $excludeUserId = null): void
     {
-        $payload = json_encode($event);
+        $payload = $this->encodeEvent($event);
         foreach (array_keys($this->roomMembers[$roomId] ?? []) as $userId) {
             if ($excludeUserId !== null && $userId === $excludeUserId) {
                 continue;
@@ -143,7 +144,7 @@ class ConnectionManager
 
     public function sendToConnection(ConnectionInterface $conn, array $event): void
     {
-        $conn->send(json_encode($event));
+        $conn->send($this->encodeEvent($event));
     }
 
     public function checkRateLimit(int $userId): bool
@@ -182,7 +183,7 @@ class ConnectionManager
 
     public function sendToAll(array $event): void
     {
-        $payload = json_encode($event);
+        $payload = $this->encodeEvent($event);
         foreach ($this->connections as $conn) {
             $conn->send($payload);
         }
@@ -196,5 +197,10 @@ class ConnectionManager
     public function getUserRooms(int $userId): array
     {
         return array_keys($this->userRooms[$userId] ?? []);
+    }
+
+    private function encodeEvent(array $event): string
+    {
+        return (string) json_encode(Timestamp::normalizeOutgoingPayload($event));
     }
 }

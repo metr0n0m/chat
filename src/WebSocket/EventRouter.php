@@ -7,6 +7,7 @@ use Ratchet\ConnectionInterface;
 use Chat\DB\Connection;
 use Chat\Chat\{MessageController, WhisperController, RoomController, NumerController};
 use Chat\Support\Lang;
+use Chat\Support\Timestamp;
 
 /**
  * Маршрутизатор входящих WS-событий.
@@ -491,7 +492,7 @@ class EventRouter
             $this->cm->sendToUser((int) $result['target_user_id'], [
                 'event' => 'muted_in_room',
                 'room_id' => $roomId,
-                'muted_until' => $result['muted_until'] ?? null,
+                'muted_until' => Timestamp::isoUtc(isset($result['muted_until']) ? (string) $result['muted_until'] : null),
                 'reason' => $result['reason'] ?? null,
             ]);
         }
@@ -509,11 +510,12 @@ class EventRouter
             [$roomId, $fromUserId, $content, '', 'system']
         );
         $msgId = (int) $db->lastInsertId();
+        $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
 
         $this->cm->sendToRoom($roomId, [
             'event'   => 'system_message',
             'room_id' => $roomId,
-            'message' => ['id' => $msgId, 'content' => $content, 'type' => 'system', 'created_at' => date('Y-m-d H:i:s')],
+            'message' => ['id' => $msgId, 'content' => $content, 'type' => 'system', 'created_at' => Timestamp::isoUtc($createdAt === null ? null : (string) $createdAt)],
         ]);
     }
 
@@ -615,7 +617,7 @@ class EventRouter
                 (string) ($room['name'] ?? ('#' . $roomId))
             ),
             'type' => 'system',
-            'created_at' => date('Y-m-d H:i:s.000'),
+            'created_at' => Timestamp::nowIsoUtc(),
         ];
 
         foreach ($staff as $member) {

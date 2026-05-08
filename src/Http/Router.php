@@ -8,6 +8,7 @@ use Chat\Auth\{LoginHandler, RegisterHandler, VKOAuth, GoogleOAuth};
 use Chat\Chat\{RoomController, MessageController, WhisperController, NumerPage};
 use Chat\Admin\{AdminPanel, UserManager, RoomManager};
 use Chat\DB\Connection;
+use Chat\Support\Timestamp;
 
 class Router
 {
@@ -170,6 +171,7 @@ class Router
              ORDER BY u.username",
             [$userId, $userId, $userId]
         );
+        $friends = Timestamp::normalizeRows($friends, ['last_seen_at']);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'friends' => $friends]);
         exit;

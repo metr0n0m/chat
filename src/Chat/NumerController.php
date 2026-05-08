@@ -5,6 +5,7 @@ namespace Chat\Chat;
 
 use Chat\DB\Connection;
 use Chat\Support\Lang;
+use Chat\Support\Timestamp;
 
 /**
  * Управление приватными сессиями (нумера).
@@ -61,7 +62,7 @@ class NumerController
             ],
             'to_user_id' => $toId,
             'to_username' => $toUser['username'],
-            'expires_at' => $expiresAt,
+            'expires_at' => Timestamp::isoUtc($expiresAt),
         ];
     }
 

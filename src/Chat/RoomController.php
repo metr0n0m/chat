@@ -5,6 +5,7 @@ namespace Chat\Chat;
 
 use Chat\DB\Connection;
 use Chat\Security\CSRF;
+use Chat\Support\Timestamp;
 
 class RoomController
 {
@@ -272,7 +273,7 @@ class RoomController
             'muted' => true,
             'target_user_id' => $targetId,
             'room_id' => $roomId,
-            'muted_until' => $row['muted_until'] ?? null,
+            'muted_until' => Timestamp::isoUtc(isset($row['muted_until']) ? (string) $row['muted_until'] : null),
             'reason' => $row['mute_reason'] ?? null,
         ];
     }
@@ -330,6 +331,7 @@ class RoomController
              WHERE r.type = 'numer' AND r.is_closed = 0",
             [$userId]
         );
+        $rooms = Timestamp::normalizeRows($rooms, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'numera' => $rooms], JSON_UNESCAPED_UNICODE);
