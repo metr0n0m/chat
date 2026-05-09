@@ -1742,29 +1742,3 @@ function showToast(msg, type) {
 }
 
 }
-
-// Auth forms
-// SECTION: AUTH
-$('#loginForm').on('submit', function(e) {
-  e.preventDefault();
-  $('#loginError').addClass('d-none');
-  $.post('/auth/login', $(this).serialize(), function(resp) {
-    if (resp.success) location.href = resp.redirect || '/';
-    else $('#loginError').text(resp.error).removeClass('d-none');
-  }).fail(function(xhr) {
-    const err = xhr.responseJSON?.error || 'Ошибка';
-    $('#loginError').text(err).removeClass('d-none');
-  });
-});
-
-$('#registerForm').on('submit', function(e) {
-  e.preventDefault();
-  $('#registerError').addClass('d-none');
-  $.post('/auth/register', $(this).serialize(), function(resp) {
-    if (resp.success) location.href = resp.redirect || '/';
-    else $('#registerError').text(resp.error).removeClass('d-none');
-  }).fail(function(xhr) {
-    const err = xhr.responseJSON?.error || 'Ошибка';
-    $('#registerError').text(err).removeClass('d-none');
-  });
-});

@@ -531,5 +531,6 @@ window.CHAT_BOOTSTRAP = window.ChatConfig;
 </script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-utils.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat.js"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-auth.js"></script>
 </body>
 </html>
