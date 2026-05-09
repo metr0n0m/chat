@@ -528,6 +528,7 @@ window.CHAT_BOOTSTRAP = {
   datetimeFormat: <?= json_encode($_datetimeFormat) ?>
 };
 </script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-utils.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat.js"></script>
 </body>
 </html>

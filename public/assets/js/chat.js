@@ -1,12 +1,14 @@
 dayjs.locale('ru');
 dayjs.extend(dayjs_plugin_relativeTime);
 
+// SECTION: BOOTSTRAP
 const CSRF_TOKEN = window.CHAT_BOOTSTRAP.csrfToken;
 const CURRENT_USER = window.CHAT_BOOTSTRAP.currentUser;
 const CHAT_TIME_FORMAT     = window.CHAT_BOOTSTRAP.timeFormat;
 const CHAT_DATETIME_FORMAT = window.CHAT_BOOTSTRAP.datetimeFormat;
 
 if (CURRENT_USER) {
+// SECTION: THEME
 // ════════════════════════════════════════════════
 //  THEME
 // ════════════════════════════════════════════════
@@ -27,6 +29,7 @@ $('#themeToggle').on('click', function() {
 // ════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════
+// SECTION: STATE
 let ws = null;
 let currentRoomId = null;       // currently VIEWED room (public or numer)
 let currentPublicRoomId = null; // public room you're WS-subscribed to
@@ -47,6 +50,7 @@ const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
 // ════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════
+// SECTION: APP INIT
 $(function() {
   initUser();
   loadRooms();
@@ -75,6 +79,7 @@ $(function() {
 // ════════════════════════════════════════════════
 //  USER INIT
 // ════════════════════════════════════════════════
+// SECTION: USER INIT
 function initUser() {
   if (!CURRENT_USER) return;
   $('#my-username').text(displayName(CURRENT_USER)).css('color', effectiveColor(CURRENT_USER.nick_color));
@@ -87,6 +92,7 @@ function initUser() {
 // ════════════════════════════════════════════════
 //  WEBSOCKET
 // ════════════════════════════════════════════════
+// SECTION: WEBSOCKET
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/wss`);
@@ -164,6 +170,7 @@ function onWSConnected(data) {
 // ════════════════════════════════════════════════
 //  ROOMS
 // ════════════════════════════════════════════════
+// SECTION: ROOMS
 function updateRoomBadge(roomId) {
   const count = onlineCountsByRoom.get(Number(roomId)) || 0;
   const $item = $(`.room-item[data-id="${roomId}"]`);
@@ -294,6 +301,7 @@ function onUserLeft(data) {
 // ════════════════════════════════════════════════
 //  MESSAGES
 // ════════════════════════════════════════════════
+// SECTION: MESSAGES
 function buildMessage(m) {
   if (m.type === 'system') {
     const sysTime = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
@@ -460,6 +468,7 @@ $('#messages-list').on('click', '.msg-whisper-row', function() {
 // ════════════════════════════════════════════════
 //  INPUT & SEND
 // ════════════════════════════════════════════════
+// SECTION: INPUT AND SEND
 function initInput() {
   const $input = $('#msg-input');
   const $send  = $('#send-btn');
@@ -548,6 +557,7 @@ function wrapSelection(el, marker) {
 // ════════════════════════════════════════════════
 //  WHISPER MODE
 // ════════════════════════════════════════════════
+// SECTION: WHISPER MODE
 function activateWhisperMode(userId, username) {
   whisperToId   = userId;
   whisperToName = username;
@@ -566,6 +576,7 @@ function clearWhisperMode() {
 // ════════════════════════════════════════════════
 //  ONLINE USERS LIST
 // ════════════════════════════════════════════════
+// SECTION: ONLINE USERS
 function renderOnlineList(users) {
   currentOnlineUsers = users.slice();
   const $list = $('#online-users-list').empty();
@@ -591,6 +602,7 @@ function removeFromOnlineList(userId) {
   $('#room-online-count').text(`${cnt} онлайн`);
 }
 
+// SECTION: ONLINE USER ACTIONS
 function buildOnlineUser(u) {
   const role = visibleRoleLabel(u);
   const roleBadge = role ? `<span class="badge ${visibleRoleClass(u)}" style="font-size:.65rem">${role}</span>` : '';
@@ -885,6 +897,7 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
 //  НУМЕРА — открываем в отдельном окне браузера
 // ════════════════════════════════════════════════
 
+// SECTION: NUMER FLOW
 function onNumerJoined(data) {
   if (data.room_id) openNumerWindow(data.room_id);
   loadRooms();
@@ -959,6 +972,7 @@ function onInviteReceived(inv) {
 // ════════════════════════════════════════════════
 //  KICK / BAN / DELETE
 // ════════════════════════════════════════════════
+// SECTION: ROOM EXIT AND MODERATION EVENTS
 function onKickedFromRoom(data) {
   if (Number(data.room_id) === Number(currentPublicRoomId)) {
     showToast('Вы были удалены из комнаты.', 'warning');
@@ -996,6 +1010,7 @@ function onRoomDeleted(data) {
 // ════════════════════════════════════════════════
 //  FRIENDS
 // ════════════════════════════════════════════════
+// SECTION: FRIENDS
 function loadFriends() {
   $.get('/api/friends', function(resp) {
     if (!resp.success) return;
@@ -1020,6 +1035,7 @@ $('#friend-search').on('input', function() { loadFriends(); });
 // ════════════════════════════════════════════════
 //  SETTINGS
 // ════════════════════════════════════════════════
+// SECTION: SETTINGS
 function openSettingsModal() {
   const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
   $('[name="username"]').val(CURRENT_USER.username);
@@ -1120,6 +1136,7 @@ function initSettings() {
 //  SIDEBAR TOGGLE
 // ════════════════════════════════════════════════
 
+// SECTION: SIDEBAR AND ROOM MANAGEMENT
 function initSidebar() {
   $('#settings-btn, #my-avatar, #my-username-wrap').on('click', openSettingsModal);
 
@@ -1203,6 +1220,7 @@ function initSidebar() {
   });
 }
 
+// SECTION: ADMIN
 function initAdmin() {
   if (!CURRENT_USER || !['platform_owner', 'admin'].includes(CURRENT_USER.global_role)) return;
 
@@ -1681,6 +1699,7 @@ $('#adminSettingsForm').on('submit', function(e) {
 // ════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════
+// SECTION: HELPERS
 function scrollToBottom() {
   const el = document.getElementById('messages-container');
   el.scrollTop = el.scrollHeight;
@@ -1688,48 +1707,7 @@ function scrollToBottom() {
   $('#scroll-bottom-btn').hide();
 }
 
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function displayName(u) {
-  if (!u) return '';
-  const n = (u.nickname || '').trim();
-  return n ? n : (u.username || '');
-}
-
-function isDarkTheme() {
-  return document.documentElement.getAttribute('data-bs-theme') === 'dark';
-}
-
 const _effectiveColorCache = new Map();
-
-function hexToHsl(hex) {
-  let r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
-  let h = 0, s = 0, l = (max + min) / 2;
-  if (d) {
-    s = d / (1 - Math.abs(2*l - 1));
-    h = max === r ? ((g-b)/d + (g<b?6:0))/6 : max === g ? ((b-r)/d + 2)/6 : ((r-g)/d + 4)/6;
-  }
-  return [h, s, l];
-}
-
-function hslToHex(h, s, l) {
-  const f = n => { const k=(n+h*12)%12, a=s*Math.min(l,1-l); return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1)))); };
-  return '#' + [f(0),f(8),f(4)].map(v=>v.toString(16).padStart(2,'0')).join('');
-}
-
-function wcagLuminance(hex) {
-  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]
-    .map(c => { c/=255; return c<=0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4; })
-    .reduce((sum,c,i) => sum + c * [0.2126,0.7152,0.0722][i], 0);
-}
-
-function wcagContrast(h1, h2) {
-  const l1 = wcagLuminance(h1), l2 = wcagLuminance(h2);
-  return (Math.max(l1,l2) + 0.05) / (Math.min(l1,l2) + 0.05);
-}
 
 function effectiveColor(hex, fallback = 'inherit') {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return fallback;
@@ -1762,17 +1740,10 @@ function showToast(msg, type) {
   setTimeout(() => $t.fadeOut(400, function(){ $(this).remove(); }), 3500);
 }
 
-function roleLabel(role) {
-  return {platform_owner:'Владелец', admin:'Глобальный администратор', moderator:'Глобальный модератор', user:''}[role] || role;
-}
-
-function roomRoleLabel(role) {
-  return {owner:'Владелец комнаты', local_admin:'Локальный администратор', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
-}
-
 }
 
 // Auth forms
+// SECTION: AUTH
 $('#loginForm').on('submit', function(e) {
   e.preventDefault();
   $('#loginError').addClass('d-none');
