@@ -44,7 +44,8 @@ class Server implements MessageComponentInterface
 
         try {
             $session = Session::validate($token, $ip, $ua);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            echo '[WS] Session validation error: ' . $e::class . ': ' . $e->getMessage() . PHP_EOL;
             $this->reject($conn, 'Ошибка сессии.');
             return;
         }

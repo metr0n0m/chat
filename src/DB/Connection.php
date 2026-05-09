@@ -7,14 +7,20 @@ class Connection
 {
     private static ?self $instance = null;
     private \PDO $pdo;
+    private string $dsn;
 
     private function __construct()
     {
-        $dsn = sprintf(
+        $this->dsn = sprintf(
             'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
             DB_HOST, DB_PORT, DB_NAME
         );
-        $this->pdo = new \PDO($dsn, DB_USER, DB_PASS, [
+        $this->connect();
+    }
+
+    private function connect(): void
+    {
+        $this->pdo = new \PDO($this->dsn, DB_USER, DB_PASS, [
             \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
             \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
             \PDO::ATTR_EMULATE_PREPARES   => false,
@@ -42,9 +48,7 @@ class Connection
 
     public function execute(string $sql, array $params = []): \PDOStatement
     {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt;
+        return $this->executeWithRetry($sql, $params, true);
     }
 
     public function fetchOne(string $sql, array $params = []): ?array
@@ -77,5 +81,29 @@ class Connection
     public function rollBack(): void
     {
         $this->pdo->rollBack();
+    }
+
+    private function executeWithRetry(string $sql, array $params, bool $canRetry): \PDOStatement
+    {
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt;
+        } catch (\PDOException $e) {
+            if (!$canRetry || !$this->isLostConnection($e)) {
+                throw $e;
+            }
+
+            $this->connect();
+            return $this->executeWithRetry($sql, $params, false);
+        }
+    }
+
+    private function isLostConnection(\PDOException $e): bool
+    {
+        $info = $e->errorInfo;
+        $driverCode = isset($info[1]) ? (int) $info[1] : 0;
+
+        return $driverCode === 2006 || $driverCode === 2013;
     }
 }
