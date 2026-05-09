@@ -191,10 +191,14 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
         <button class="md-btn" data-md="__" title="Подчёркнутый"><u>U</u></button>
         <button class="md-btn" data-md="~~" title="Зачёркнутый"><s>S</s></button>
       </div>
-      <textarea id="msg-input" class="form-control" rows="1" placeholder="Сообщение..." maxlength="2000" style="resize:none"></textarea>
-      <div class="d-flex justify-content-between align-items-center mt-1">
-        <div class="char-counter"><span id="char-count">0</span>/2000</div>
-        <button id="send-btn" class="btn btn-primary btn-sm" disabled><i class="fa fa-paper-plane"></i></button>
+      <div class="chat-composer">
+        <div class="chat-composer-main">
+          <div class="chat-input-wrap">
+            <textarea id="msg-input" class="form-control" rows="1" placeholder="Сообщение..." maxlength="2000" style="resize:none"></textarea>
+            <div class="char-counter"><span id="char-count">0</span>/2000</div>
+          </div>
+          <button id="send-btn" class="btn btn-primary btn-sm" disabled><i class="fa fa-paper-plane"></i></button>
+        </div>
       </div>
     </div>
   </div>
