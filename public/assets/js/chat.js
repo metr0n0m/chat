@@ -416,26 +416,6 @@ function shouldShowSystemMessages() {
   return localStorage.getItem('show_system_messages') !== '0';
 }
 
-function avatarMarkup(url, size = 42) {
-  return `<img src="${esc(url || DEFAULT_AVATAR_URL)}" width="${size}" height="${size}" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR_URL}'">`;
-}
-
-function visibleRoleLabel(u) {
-  if (u && Number(u.id) === Number(CURRENT_USER.id) && CURRENT_USER.custom_status) return String(CURRENT_USER.custom_status);
-  if (u.custom_status) return String(u.custom_status);
-  if (u.room_role && !['member', 'banned'].includes(u.room_role)) return roomRoleLabel(u.room_role);
-  if (u.global_role && u.global_role !== 'user') return roleLabel(u.global_role);
-  return '';
-}
-
-function visibleRoleClass(u) {
-  if (u.room_role && !['member', 'banned'].includes(u.room_role)) return 'bg-info';
-  if (u.global_role === 'platform_owner') return 'bg-dark';
-  if (u.global_role === 'admin') return 'bg-danger';
-  if (u.global_role === 'moderator') return 'bg-warning text-dark';
-  return 'bg-secondary';
-}
-
 function appendInputToken(token) {
   const $input = $('#msg-input');
   const base = $input.val();
