@@ -22,13 +22,15 @@ $loop->addPeriodicTimer(10, function () {
     } catch (\Throwable) {}
 });
 
+$bindHost = defined('WS_BIND_HOST') ? WS_BIND_HOST : WS_HOST;
+
 $server = IoServer::factory(
     new HttpServer(new WsServer(new Server())),
     WS_PORT,
-    WS_HOST,
+    $bindHost,
     $loop
 );
 
-echo '[WS] Starting WebSocket server on ' . WS_HOST . ':' . WS_PORT . PHP_EOL;
+echo '[WS] Starting WebSocket server on ' . $bindHost . ':' . WS_PORT . PHP_EOL;
 
 $server->run();

@@ -14,8 +14,10 @@ define('APP_LOCALE', 'ru');
 define('APP_SECRET', 'REPLACE_WITH_64_HEX_CHARS_GENERATED_ABOVE');
 
 // WebSocket
+// WS_HOST is the public/client host. WS_BIND_HOST is the local address used by ws-server.php.
 define('WS_PORT', 8080);
-define('WS_HOST', '0.0.0.0');
+define('WS_HOST', 'yourdomain.com');
+define('WS_BIND_HOST', '127.0.0.1');
 
 // VK OAuth 2.0 — vk.com/editapp
 define('VK_CLIENT_ID', '');
