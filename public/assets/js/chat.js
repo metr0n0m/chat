@@ -2,10 +2,11 @@ dayjs.locale('ru');
 dayjs.extend(dayjs_plugin_relativeTime);
 
 // SECTION: BOOTSTRAP
-const CSRF_TOKEN = window.CHAT_BOOTSTRAP.csrfToken;
-const CURRENT_USER = window.CHAT_BOOTSTRAP.currentUser;
-const CHAT_TIME_FORMAT     = window.CHAT_BOOTSTRAP.timeFormat;
-const CHAT_DATETIME_FORMAT = window.CHAT_BOOTSTRAP.datetimeFormat;
+const ChatConfig = window.ChatConfig || window.CHAT_BOOTSTRAP || {};
+const CSRF_TOKEN = ChatConfig.csrfToken;
+const CURRENT_USER = ChatConfig.currentUser;
+const CHAT_TIME_FORMAT     = ChatConfig.timeFormat;
+const CHAT_DATETIME_FORMAT = ChatConfig.datetimeFormat;
 
 if (CURRENT_USER) {
 // SECTION: THEME

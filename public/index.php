@@ -521,12 +521,13 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
 <script nonce="<?= $nonce ?>" src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/relativeTime.js"></script>
 <script nonce="<?= $nonce ?>" src="https://cdn.jsdelivr.net/npm/autosize@6.0.1/dist/autosize.min.js"></script>
 <script nonce="<?= $nonce ?>">
-window.CHAT_BOOTSTRAP = {
+window.ChatConfig = {
   csrfToken: <?= json_encode($csrfToken) ?>,
   currentUser: <?= $userJson ?>,
   timeFormat: <?= json_encode($_timeFormat) ?>,
   datetimeFormat: <?= json_encode($_datetimeFormat) ?>
 };
+window.CHAT_BOOTSTRAP = window.ChatConfig;
 </script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-utils.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat.js"></script>
