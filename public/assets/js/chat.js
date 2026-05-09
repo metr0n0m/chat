@@ -305,7 +305,7 @@ function onUserLeft(data) {
 // SECTION: MESSAGES
 function buildMessage(m) {
   if (m.type === 'system') {
-    const sysTime = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+    const sysTime = formatChatTime(m.created_at);
     return shouldShowSystemMessages()
       ? `<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`
       : '';
@@ -324,7 +324,7 @@ function buildMessage(m) {
     return buildWhisperMessage(normalized, isSent);
   }
 
-  const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+  const time = formatChatTime(m.created_at);
   const canDelete = canDeleteMessage(m);
   const deleteBtn = canDelete ? ` <span class="msg-delete-btn" data-id="${m.id}" title="Удалить"><i class="fa fa-trash"></i></span>` : '';
 
@@ -343,7 +343,7 @@ function buildMessage(m) {
 }
 
 function buildWhisperMessage(m, isSent) {
-  const time = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+  const time = formatChatTime(m.created_at);
   const from = m.from || {};
   const to   = m.to   || {};
   const fromName  = esc(displayName(from));
@@ -389,7 +389,7 @@ function onSystemMessage(m) {
     return;
   }
   if (!shouldShowSystemMessages()) return;
-  const sysTime = dayjs(m.created_at).format(CHAT_TIME_FORMAT);
+  const sysTime = formatChatTime(m.created_at);
   $('#messages-list').append(`<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`);
   if (isScrolledToBottom) scrollToBottom();
 }
@@ -671,7 +671,7 @@ function openUserInfo(uid, uname = '') {
     const showLastSeen = !(Number(u.hide_last_seen || 0) === 1) || canModerateCurrentRoom() || ['platform_owner', 'admin'].includes(CURRENT_USER.global_role);
     const roleText = roleLabel(u.global_role) || roomRoleLabel(u.room_role || '') || 'Пользователь';
     const lastSeenText = showLastSeen
-      ? (u.last_seen_at ? dayjs(u.last_seen_at).format(CHAT_DATETIME_FORMAT) : 'нет данных')
+      ? (u.last_seen_at ? formatChatDateTime(u.last_seen_at) : 'нет данных')
       : 'скрыт';
 
     const contacts = [];
@@ -1468,7 +1468,7 @@ function loadAdminNumera() {
     };
     let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th><th></th></tr></thead><tbody>';
     resp.numera.forEach(r => {
-      const started = r.created_at && dayjs(r.created_at).isValid() ? dayjs(r.created_at).format(CHAT_DATETIME_FORMAT) : '—';
+      const started = r.created_at && dayjs(r.created_at).isValid() ? formatChatDateTime(r.created_at) : '—';
       const duration = fmtDuration(Number(r.minutes_running) || 0);
       const statusDot = Number(r.member_count) > 0
         ? '<span class="badge bg-success">Активен</span>'
@@ -1497,7 +1497,7 @@ function loadAdminWhispers() {
     if (!resp.success) return;
     let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Комната</th><th>От</th><th>Кому</th><th>Время</th><th>Текст</th></tr></thead><tbody>';
     resp.whispers.forEach(w => {
-      html += `<tr><td>${w.id}</td><td>${esc(w.room_name)}</td><td>${esc(w.from_username)}</td><td>${esc(w.to_username)}</td><td>${dayjs(w.created_at).format(CHAT_DATETIME_FORMAT)}</td><td>${w.content}</td></tr>`;
+      html += `<tr><td>${w.id}</td><td>${esc(w.room_name)}</td><td>${esc(w.from_username)}</td><td>${esc(w.to_username)}</td><td>${formatChatDateTime(w.created_at)}</td><td>${w.content}</td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-whispers-table').html(html);
@@ -1513,7 +1513,7 @@ function loadAdminBans() {
     }
     let html = '<table class="table table-sm"><thead><tr><th>Пользователь</th><th>Комната</th><th>Роль</th><th>Кляп до</th><th></th></tr></thead><tbody>';
     resp.bans.forEach(b => {
-      const mutedUntil = b.muted_until && dayjs(b.muted_until).isValid() ? dayjs(b.muted_until).format(CHAT_DATETIME_FORMAT) : '—';
+      const mutedUntil = b.muted_until && dayjs(b.muted_until).isValid() ? formatChatDateTime(b.muted_until) : '—';
       const unbanBtn = b.room_role === 'banned'
         ? `<button class="btn btn-xs btn-sm btn-outline-success admin-unban-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Разбанить"><i class="fa fa-unlock"></i></button>`
         : '';
@@ -1570,7 +1570,7 @@ function openRoomHistory(roomId, roomName) {
       rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
       resp.messages.forEach(m => {
-        rows += `<tr><td style="white-space:nowrap">${dayjs(m.created_at).format(CHAT_DATETIME_FORMAT)}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${formatChatDateTime(m.created_at)}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
     }
     $('#admin-rooms-table').html(`
@@ -1590,7 +1590,7 @@ function openNumerHistory(numerId) {
       rows = '<tr><td colspan="3" class="text-muted">Сообщений нет.</td></tr>';
     } else {
       resp.messages.forEach(m => {
-        rows += `<tr><td style="white-space:nowrap">${m.created_at && dayjs(m.created_at).isValid() ? dayjs(m.created_at).format(CHAT_DATETIME_FORMAT) : '—'}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
+        rows += `<tr><td style="white-space:nowrap">${m.created_at && dayjs(m.created_at).isValid() ? formatChatDateTime(m.created_at) : '—'}</td><td>${esc(m.username||'—')}</td><td>${esc(m.content||'')}</td></tr>`;
       });
     }
     $('#admin-numera-table').html(`
