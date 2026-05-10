@@ -10,6 +10,27 @@
     return mq.matches;
   }
 
+  function isVisible($el) {
+    const el = $el[0];
+    if (!el) return false;
+
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width > 0
+      && rect.height > 0;
+  }
+
+  function canUseLeftDrawer() {
+    return isVisible($('#toggleSidebar'));
+  }
+
+  function canUseRightDrawer() {
+    return isVisible($('#toggleUsersPanel'));
+  }
+
   function elements() {
     return {
       left: $('#sidebar-left'),
@@ -30,7 +51,11 @@
   }
 
   function openLeft() {
-    if (!isMobile()) return;
+    if (!canUseLeftDrawer()) {
+      closeAll();
+      return;
+    }
+
     const els = elements();
     els.right.removeClass('show');
     els.left.addClass('show');
@@ -38,7 +63,11 @@
   }
 
   function openRight() {
-    if (!isMobile()) return;
+    if (!canUseRightDrawer()) {
+      closeAll();
+      return;
+    }
+
     const els = elements();
     els.left.removeClass('show');
     els.right.addClass('show');
@@ -62,7 +91,7 @@
   }
 
   function handleViewportChange() {
-    if (!isMobile()) {
+    if (!canUseLeftDrawer() && !canUseRightDrawer()) {
       closeAll();
     }
   }
@@ -71,8 +100,14 @@
     if (initialized) return;
     initialized = true;
 
-    $('#toggleSidebar').on('click.chatShell', toggleLeft);
-    $('#toggleUsersPanel').on('click.chatShell', toggleRight);
+    $('#toggleSidebar').on('click.chatShell', function(e) {
+      e.preventDefault();
+      toggleLeft();
+    });
+    $('#toggleUsersPanel').on('click.chatShell', function(e) {
+      e.preventDefault();
+      toggleRight();
+    });
     $('#chat-shell-backdrop').on('click.chatShell', closeAll);
 
     $(document).on('keydown.chatShell', function(e) {
