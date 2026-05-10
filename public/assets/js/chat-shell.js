@@ -106,10 +106,10 @@
     return user?.nickname || user?.username || '';
   }
 
-  function renderMobileOnline(users) {
+  function renderMobileUsersRail(users) {
     const list = Array.isArray(users) ? users : [];
-    const $count = $('#mobile-online-count');
-    const $users = $('#mobile-online-users');
+    const $count = $('#mobile-users-rail-count');
+    const $users = $('#mobile-users-rail-list');
 
     if (!$count.length || !$users.length) return;
 
@@ -121,10 +121,9 @@
       const avatar = user?.avatar_url || '/assets/avatar-default.svg';
 
       $users.append(
-        `<div class="mobile-online-user" title="${esc(name)}">
+        `<button type="button" class="mobile-users-rail-user" title="${esc(name)}" aria-label="${esc(name)}">
           <img src="${esc(avatar)}" alt="">
-          <span class="mobile-online-name">${esc(name)}</span>
-        </div>`
+        </button>`
       );
     });
   }
@@ -142,6 +141,10 @@
       toggleRight();
     });
     $('#chat-shell-backdrop').on('click.chatShell', closeAll);
+    $('#mobile-users-rail').on('click.chatShell', function(e) {
+      e.preventDefault();
+      openRight();
+    });
 
     $(document).on('keydown.chatShell', function(e) {
       if (e.key === 'Escape') {
@@ -161,7 +164,7 @@
     closeAll: closeAll,
     openLeft: openLeft,
     openRight: openRight,
-    renderMobileOnline: renderMobileOnline
+    renderMobileUsersRail: renderMobileUsersRail
   };
 
   $(init);

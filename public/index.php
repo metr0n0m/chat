@@ -170,16 +170,18 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
       <?php endif; ?>
     </div>
 
-    <div id="mobile-online-strip" class="mobile-online-strip d-md-none" aria-label="Online users in room">
-      <div id="mobile-online-count" class="mobile-online-count">0</div>
-      <div id="mobile-online-users" class="mobile-online-users"></div>
-    </div>
-
-    <div id="messages-container">
-      <div id="load-more-btn-wrap" class="text-center d-none py-2">
-        <button id="load-more-btn" class="btn btn-sm btn-outline-secondary">Загрузить ещё</button>
+    <div class="chat-mobile-body">
+      <div id="messages-container">
+        <div id="load-more-btn-wrap" class="text-center d-none py-2">
+          <button id="load-more-btn" class="btn btn-sm btn-outline-secondary">Загрузить ещё</button>
+        </div>
+        <div id="messages-list"></div>
       </div>
-      <div id="messages-list"></div>
+
+      <aside id="mobile-users-rail" class="mobile-users-rail d-md-none" aria-label="Online users in room">
+        <div id="mobile-users-rail-count" class="mobile-users-rail-count">0</div>
+        <div id="mobile-users-rail-list" class="mobile-users-rail-list"></div>
+      </aside>
     </div>
 
     <button id="scroll-bottom-btn" class="btn btn-primary scroll-bottom-btn">
@@ -187,6 +189,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
     </button>
 
     <div id="input-area">
+      <div class="composer-dock-main">
       <div id="whisper-bar">
         <i class="fa fa-user-secret me-1"></i> Шёпот для <strong id="whisper-target-name"></strong>
         <button type="button" class="btn-close btn-sm float-end" id="cancel-whisper"></button>
@@ -206,6 +209,8 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
           <button id="send-btn" class="btn btn-primary btn-sm" disabled><i class="fa fa-paper-plane"></i></button>
         </div>
       </div>
+      </div>
+      <div class="mobile-dock-rail d-md-none" aria-hidden="true"></div>
     </div>
   </div>
 

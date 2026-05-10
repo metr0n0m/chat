@@ -535,7 +535,7 @@ function renderOnlineList(users) {
   $('#panel-online-count').text(users.length);
   $('#room-online-count').text(`${users.length} онлайн`);
   users.forEach(u => $list.append(buildOnlineUser(u)));
-  window.ChatShell?.renderMobileOnline?.(users);
+  window.ChatShell?.renderMobileUsersRail?.(users);
 }
 
 function addToOnlineList(u) {
