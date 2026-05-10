@@ -30,10 +30,7 @@ class Session
         $ipUaHash = self::ipUaHash($ip, $userAgent);
         $expiresAt = date('Y-m-d H:i:s', time() + SESSION_LIFETIME);
 
-        $db->execute(
-            'DELETE FROM sessions WHERE user_id = ? AND ip_ua_hash = ?',
-            [$userId, $ipUaHash]
-        );
+        $db->execute('DELETE FROM sessions WHERE expires_at <= NOW()');
 
         $db->execute(
             'INSERT INTO sessions (user_id, token_hash, ip_ua_hash, expires_at) VALUES (?, ?, ?, ?)',
@@ -51,8 +48,6 @@ class Session
 
         $db = Connection::getInstance();
         $tokenHash = self::hash($token);
-        $ipUaHash = self::ipUaHash($ip, $userAgent);
-
         $session = $db->fetchOne(
             'SELECT s.id AS session_id, s.expires_at,
                     u.id, u.username, u.nickname, u.email, u.avatar_url,
@@ -62,8 +57,8 @@ class Session
                     u.social_telegram, u.social_whatsapp, u.social_vk
              FROM sessions s
              JOIN users u ON u.id = s.user_id
-             WHERE s.token_hash = ? AND s.ip_ua_hash = ? AND s.expires_at > NOW()',
-            [$tokenHash, $ipUaHash]
+             WHERE s.token_hash = ? AND s.expires_at > NOW()',
+            [$tokenHash]
         );
 
         if (!$session || $session['is_banned']) {
