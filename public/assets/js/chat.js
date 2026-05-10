@@ -73,8 +73,6 @@ $(function() {
   });
   $('#scroll-bottom-btn').on('click', scrollToBottom);
 
-  // Mobile sidebar
-  $('#toggleSidebar').on('click', () => $('#sidebar-left').toggleClass('show'));
 });
 
 // ════════════════════════════════════════════════

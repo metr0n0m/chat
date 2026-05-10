@@ -157,7 +157,8 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
   <!-- ─── MAIN CHAT ─── -->
   <div id="chat-main">
     <div id="chat-header">
-      <button class="btn btn-sm btn-outline-secondary d-md-none" id="toggleSidebar"><i class="fa fa-bars"></i></button>
+      <button type="button" class="btn btn-sm btn-outline-secondary d-md-none" id="toggleSidebar" aria-label="Open rooms panel"><i class="fa fa-bars"></i></button>
+      <button type="button" class="btn btn-sm btn-outline-secondary d-md-none" id="toggleUsersPanel" aria-label="Open users panel"><i class="fa fa-users"></i></button>
       <div class="flex-1 overflow-hidden">
         <div id="room-title" class="fw-bold">Выберите комнату</div>
         <div id="room-description" class="room-desc d-none"></div>
@@ -210,6 +211,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
     </div>
     <div id="online-users-list"></div>
   </div>
+  <div id="chat-shell-backdrop" class="chat-shell-backdrop"></div>
 </div>
 
 <!-- ─── Modals ─── -->
@@ -537,6 +539,7 @@ window.CHAT_BOOTSTRAP = window.ChatConfig;
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-display.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-input.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-time.js"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-shell.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat.js"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-auth.js"></script>
 </body>
