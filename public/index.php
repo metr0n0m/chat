@@ -170,6 +170,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdel
       <?php endif; ?>
     </div>
 
+    <div id="mobile-online-strip" class="mobile-online-strip d-md-none" aria-label="Online users in room">
+      <div id="mobile-online-count" class="mobile-online-count">0</div>
+      <div id="mobile-online-users" class="mobile-online-users"></div>
+    </div>
+
     <div id="messages-container">
       <div id="load-more-btn-wrap" class="text-center d-none py-2">
         <button id="load-more-btn" class="btn btn-sm btn-outline-secondary">Загрузить ещё</button>

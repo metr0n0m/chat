@@ -96,6 +96,39 @@
     }
   }
 
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[ch];
+    });
+  }
+
+  function displayName(user) {
+    return user?.nickname || user?.username || '';
+  }
+
+  function renderMobileOnline(users) {
+    const list = Array.isArray(users) ? users : [];
+    const $count = $('#mobile-online-count');
+    const $users = $('#mobile-online-users');
+
+    if (!$count.length || !$users.length) return;
+
+    $count.text(list.length);
+    $users.empty();
+
+    list.forEach(function(user) {
+      const name = displayName(user);
+      const avatar = user?.avatar_url || '/assets/avatar-default.svg';
+
+      $users.append(
+        `<div class="mobile-online-user" title="${esc(name)}">
+          <img src="${esc(avatar)}" alt="">
+          <span class="mobile-online-name">${esc(name)}</span>
+        </div>`
+      );
+    });
+  }
+
   function init() {
     if (initialized) return;
     initialized = true;
@@ -127,7 +160,8 @@
     init: init,
     closeAll: closeAll,
     openLeft: openLeft,
-    openRight: openRight
+    openRight: openRight,
+    renderMobileOnline: renderMobileOnline
   };
 
   $(init);
