@@ -101,16 +101,19 @@ class MessageController
         $content = self::format($raw);
         $embed = EmbedProcessor::process($raw);
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;
+        $senderSessionId = isset($actor['session_id']) && (int) $actor['session_id'] > 0
+            ? (int) $actor['session_id']
+            : null;
 
         if (self::hasMessageColorColumns()) {
             $db->execute(
-                'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data, nick_color, text_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [$roomId, $actorId, $content, '', 'text', $embedData, $actor['nick_color'], $actor['text_color']]
+                'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, embed_data, nick_color, text_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$roomId, $actorId, $senderSessionId, $content, '', 'text', $embedData, $actor['nick_color'], $actor['text_color']]
             );
         } else {
             $db->execute(
-                'INSERT INTO messages (room_id, user_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?)',
-                [$roomId, $actorId, $content, '', 'text', $embedData]
+                'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$roomId, $actorId, $senderSessionId, $content, '', 'text', $embedData]
             );
         }
 

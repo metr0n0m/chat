@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `room_id`       INT UNSIGNED NOT NULL,
   `user_id`       INT UNSIGNED NOT NULL,
+  `sender_session_id` INT UNSIGNED DEFAULT NULL,
   `content`       TEXT NOT NULL,
   `content_hmac`  CHAR(64) NOT NULL,
   `type`          ENUM('text','system','whisper') DEFAULT 'text',
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `deleted_by`    INT UNSIGNED,
   `created_at`    DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   INDEX `idx_room_time` (`room_id`, `created_at`),
+  INDEX `idx_sender_session` (`sender_session_id`),
   INDEX `idx_whisper` (`whisper_to`),
   FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)

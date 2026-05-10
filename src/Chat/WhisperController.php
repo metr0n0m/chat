@@ -48,10 +48,13 @@ class WhisperController
 
         $content = MessageController::format($raw);
         $hmac = HMAC::sign($content);
+        $senderSessionId = isset($from['session_id']) && (int) $from['session_id'] > 0
+            ? (int) $from['session_id']
+            : null;
 
         $db->execute(
-            'INSERT INTO messages (room_id, user_id, content, content_hmac, type, whisper_to) VALUES (?, ?, ?, ?, ?, ?)',
-            [$roomId, $fromId, $content, $hmac, 'whisper', $toId]
+            'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, whisper_to) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$roomId, $fromId, $senderSessionId, $content, $hmac, 'whisper', $toId]
         );
         $msgId = (int) $db->lastInsertId();
         $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
