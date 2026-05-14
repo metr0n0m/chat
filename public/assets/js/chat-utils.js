@@ -46,3 +46,22 @@ function roleLabel(role) {
 function roomRoleLabel(role) {
   return {owner:'Владелец комнаты', local_admin:'Локальный администратор', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
 }
+
+function systemAlert(msg, type, duration) {
+  type = type || 'success';
+  duration = (duration === undefined) ? 4000 : duration;
+  const container = document.getElementById('system-alerts');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = 'alert alert-' + type + ' alert-dismissible shadow mb-2 py-2 px-3';
+  el.style.cssText = 'opacity:0;transition:opacity .25s;pointer-events:auto';
+  el.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+  container.appendChild(el);
+  requestAnimationFrame(function() { el.style.opacity = '1'; });
+  if (duration > 0) {
+    setTimeout(function() {
+      el.style.opacity = '0';
+      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 280);
+    }, duration);
+  }
+}

@@ -24,7 +24,7 @@ class LoginHandler
 
         $db = Connection::getInstance();
         $user = $db->fetchOne(
-            'SELECT id, password_hash, is_banned, global_role
+            'SELECT id, password_hash, is_banned, email_verified, global_role
              FROM users
              WHERE email = ? OR username = ?
              LIMIT 1',
@@ -37,6 +37,10 @@ class LoginHandler
 
         if ((int) ($user['is_banned'] ?? 0) === 1) {
             self::jsonError('Ваш аккаунт заблокирован.');
+        }
+
+        if ((int) ($user['email_verified'] ?? 0) === 0) {
+            self::jsonError('Подтвердите email. Проверьте почту или запросите новое письмо.', 403);
         }
 
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';

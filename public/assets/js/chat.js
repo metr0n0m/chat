@@ -1418,16 +1418,24 @@ function loadAdminRooms() {
     if (!resp.success) return;
     const catLabel = {permanent:'Постоянная', user:'Пользовательская', commercial:'Коммерческая'};
     const catColor = {permanent:'secondary', user:'primary', commercial:'warning'};
+    const categoryOptions = resp.room_category_options || [];
     let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Название</th><th>Категория</th><th>Участников</th><th>Сообщений</th><th>Владелец</th><th>Дней</th><th></th></tr></thead><tbody>';
     resp.rooms.forEach(r => {
       const cat = r.room_category || 'user';
+      const categoryControl = categoryOptions.length
+        ? `<div class="d-inline-flex align-items-center flex-nowrap admin-room-category-control">
+            <select class="form-select form-select-sm room-category-select" data-id="${r.id}" data-original="${esc(cat)}" style="min-width:112px;max-width:150px">
+              ${categoryOptions.map(opt => `<option value="${esc(opt)}" ${opt === cat ? 'selected' : ''}>${catLabel[opt] || opt}</option>`).join('')}
+            </select>
+          </div>`
+        : `<span class="badge bg-${catColor[cat]||'secondary'}">${catLabel[cat]||cat}</span>`;
       const delBtn = cat !== 'permanent'
         ? `<button class="btn btn-sm btn-danger room-del-btn" data-id="${r.id}" title="Удалить"><i class="fa fa-trash"></i></button>`
-        : `<span class="text-muted small">—</span>`;
+        : `<button class="btn btn-sm btn-outline-secondary" disabled title="Постоянную комнату нельзя удалить"><i class="fa fa-trash"></i></button>`;
       html += `<tr>
         <td>${r.id}</td>
         <td>${esc(r.name)}</td>
-        <td><span class="badge bg-${catColor[cat]||'secondary'}">${catLabel[cat]||cat}</span></td>
+        <td>${categoryControl}</td>
         <td>${r.member_count}</td>
         <td>${r.message_count}</td>
         <td>${esc(r.owner_username||'—')}</td>
@@ -1450,6 +1458,29 @@ $('#admin-rooms-table').on('click', '.room-del-btn', function() {
     headers: {'X-CSRF-Token': CSRF_TOKEN},
     success: () => { showToast('Удалена.', 'success'); loadAdminRooms(); },
     error: (xhr) => showToast(xhr.responseJSON?.error || 'Не удалось удалить.', 'danger'),
+  });
+});
+
+$(document).off('change.adminRoomsCategory', '.room-category-select').on('change.adminRoomsCategory', '.room-category-select', function() {
+  const $select = $(this);
+  if ($select.prop('disabled')) return;
+
+  const category = $select.val();
+  if (String(category) === String($select.data('original'))) return;
+
+  const id = $select.data('id');
+  $select.prop('disabled', true).addClass('opacity-75');
+
+  $.post(`/api/admin/rooms/${id}/category`, {
+    csrf_token: CSRF_TOKEN,
+    category
+  }, function(resp) {
+    const success = !!resp.success;
+    showToast(success ? 'Категория обновлена.' : (resp.error || 'Не удалось обновить категорию.'), success ? 'success' : 'danger');
+    loadAdminRooms();
+  }, 'json').fail(function(xhr) {
+    showToast(xhr.responseJSON?.error || 'Не удалось обновить категорию.', 'danger');
+    loadAdminRooms();
   });
 });
 

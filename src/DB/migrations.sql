@@ -16,11 +16,16 @@ CREATE TABLE IF NOT EXISTS `users` (
   `oauth_id`        VARCHAR(100),
   `can_create_room` TINYINT(1) DEFAULT 0,
   `is_banned`       TINYINT(1) DEFAULT 0,
+  `banned_at`       DATETIME     DEFAULT NULL,
+  `banned_by`       INT UNSIGNED DEFAULT NULL,
+  `banned_until`    DATETIME     DEFAULT NULL,
+  `ban_reason`      VARCHAR(255) DEFAULT NULL,
   `last_seen_at`    DATETIME,
   `created_at`      DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY `unique_username` (`username`),
   INDEX `idx_global_role` (`global_role`),
-  INDEX `idx_oauth` (`oauth_provider`, `oauth_id`)
+  INDEX `idx_oauth` (`oauth_provider`, `oauth_id`),
+  CONSTRAINT `fk_users_banned_by` FOREIGN KEY (`banned_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `sessions` (
@@ -56,10 +61,12 @@ CREATE TABLE IF NOT EXISTS `room_members` (
   `joined_at`  DATETIME DEFAULT CURRENT_TIMESTAMP,
   `banned_at`  DATETIME,
   `banned_by`  INT UNSIGNED,
+  `ban_reason` VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (`room_id`, `user_id`),
   INDEX `idx_room_role` (`room_id`, `room_role`),
-  FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_rm_room`      FOREIGN KEY (`room_id`)  REFERENCES `rooms`(`id`)  ON DELETE CASCADE,
+  CONSTRAINT `fk_rm_user`      FOREIGN KEY (`user_id`)  REFERENCES `users`(`id`)  ON DELETE CASCADE,
+  CONSTRAINT `fk_rm_banned_by` FOREIGN KEY (`banned_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `messages` (
@@ -78,8 +85,10 @@ CREATE TABLE IF NOT EXISTS `messages` (
   INDEX `idx_room_time` (`room_id`, `created_at`),
   INDEX `idx_sender_session` (`sender_session_id`),
   INDEX `idx_whisper` (`whisper_to`),
-  FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+  CONSTRAINT `fk_msg_room`       FOREIGN KEY (`room_id`)    REFERENCES `rooms`(`id`)  ON DELETE CASCADE,
+  CONSTRAINT `fk_msg_user`       FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`)  ON DELETE CASCADE,
+  CONSTRAINT `fk_msg_whisper`    FOREIGN KEY (`whisper_to`) REFERENCES `users`(`id`)  ON DELETE SET NULL,
+  CONSTRAINT `fk_msg_deleted_by` FOREIGN KEY (`deleted_by`) REFERENCES `users`(`id`)  ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `invitations` (
@@ -159,6 +168,22 @@ ALTER TABLE `messages`
 ALTER TABLE `messages`
   ADD COLUMN IF NOT EXISTS `nick_color` CHAR(7) NULL DEFAULT NULL AFTER `embed_data`,
   ADD COLUMN IF NOT EXISTS `text_color` CHAR(7) NULL DEFAULT NULL AFTER `nick_color`;
+
+ALTER TABLE `users`
+  ADD COLUMN IF NOT EXISTS `email_verified` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_banned`,
+  ADD COLUMN IF NOT EXISTS `reactor_raw` TEXT DEFAULT NULL AFTER `password_hash`;
+
+CREATE TABLE IF NOT EXISTS `email_verifications` (
+  `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id`    INT UNSIGNED NOT NULL,
+  `token_hash` CHAR(64) NOT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` DATETIME NOT NULL,
+  `used_at`    DATETIME DEFAULT NULL,
+  UNIQUE KEY `unique_token` (`token_hash`),
+  INDEX `idx_user` (`user_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET foreign_key_checks = 1;
 

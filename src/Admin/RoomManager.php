@@ -13,6 +13,8 @@ use Chat\Support\Timestamp;
  */
 class RoomManager
 {
+    private static ?array $roomCategoryOptions = null;
+
     /**
      * Список комнат с пагинацией.
      * Last updated: 2026-04-17.
@@ -39,7 +41,12 @@ class RoomManager
         $rooms = Timestamp::normalizeRows($rooms, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'rooms' => $rooms, 'page' => $page], JSON_UNESCAPED_UNICODE);
+        echo json_encode([
+            'success' => true,
+            'rooms' => $rooms,
+            'page' => $page,
+            'room_category_options' => self::roomCategoryOptions(),
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -48,7 +55,7 @@ class RoomManager
         if (!CSRF::verifyRequest()) {
             self::jsonError('CSRF.', 403);
         }
-        if (!in_array($category, ['permanent', 'user', 'commercial'], true)) {
+        if (!in_array($category, self::roomCategoryOptions(), true)) {
             self::jsonError('Недопустимая категория.');
         }
         $db = Connection::getInstance();
@@ -57,6 +64,21 @@ class RoomManager
         }
         $db->execute('UPDATE rooms SET room_category = ? WHERE id = ?', [$category, $roomId]);
         self::jsonSuccess(['updated' => true, 'room_category' => $category]);
+    }
+
+    private static function roomCategoryOptions(): array
+    {
+        if (self::$roomCategoryOptions !== null) {
+            return self::$roomCategoryOptions;
+        }
+
+        $row = Connection::getInstance()->fetchOne("SHOW COLUMNS FROM rooms LIKE 'room_category'");
+        $type = (string) ($row['Type'] ?? '');
+
+        preg_match_all("/'([^']+)'/", $type, $matches);
+        self::$roomCategoryOptions = $matches[1] ?? [];
+
+        return self::$roomCategoryOptions;
     }
 
     /**

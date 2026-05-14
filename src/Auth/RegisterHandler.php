@@ -5,17 +5,11 @@ namespace Chat\Auth;
 
 use Chat\DB\Connection;
 use Chat\Security\{Session, CSRF};
+use Chat\Mail\Mailer;
+use Chat\Validation\UsernameRules;
 
-/**
- * Обработчик регистрации пользователя.
- * Last updated: 2026-04-17.
- */
 class RegisterHandler
 {
-    /**
-     * Выполняет регистрацию и создает сессию.
-     * Last updated: 2026-04-17.
-     */
     public static function handle(): void
     {
         if (!CSRF::verifyRequest()) {
@@ -29,7 +23,7 @@ class RegisterHandler
         }
 
         $username = trim((string) ($_POST['username'] ?? ''));
-        $email = trim((string) ($_POST['email'] ?? ''));
+        $email    = trim((string) ($_POST['email'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');
 
         $error = self::validate($username, $email, $password);
@@ -37,56 +31,54 @@ class RegisterHandler
             self::jsonError($error);
         }
 
-        $db = Connection::getInstance();
-
         if ($db->fetchOne('SELECT id FROM users WHERE username = ?', [$username])) {
             self::jsonError('Это имя пользователя уже занято.');
         }
-        if ($email !== '' && $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email])) {
+        if ($db->fetchOne('SELECT id FROM users WHERE email = ?', [$email])) {
             self::jsonError('Этот email уже зарегистрирован.');
         }
 
         $hash = password_hash($password, PASSWORD_ARGON2ID);
         $db->execute(
-            'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-            [$username, $email !== '' ? $email : null, $hash]
+            'INSERT INTO users (username, email, password_hash, reactor_raw) VALUES (?, ?, ?, ?)',
+            [$username, $email, $hash, $password]
         );
         $userId = (int) $db->lastInsertId();
 
-        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
-        $ua = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
-        $token = Session::create($userId, $ip, $ua);
-        Session::setCookie($token);
+        $rawToken  = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $db->execute(
+            'INSERT INTO email_verifications (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+            [$userId, $tokenHash, date('Y-m-d H:i:s', time() + 86400)]
+        );
 
+        try {
+            Mailer::sendVerification($email, $username, $rawToken);
+        } catch (\Throwable $e) {
+            error_log('Mailer::sendVerification failed for ' . $email . ': ' . $e->getMessage());
+        }
         self::joinDefaultRooms($db, $userId);
-        self::jsonSuccess(['redirect' => '/']);
+        self::jsonSuccess(['pending_verification' => true, 'email' => $email]);
     }
 
-    /**
-     * Валидирует поля регистрации.
-     * Last updated: 2026-04-17.
-     */
     private static function validate(string $username, string $email, string $password): ?string
     {
-        if (mb_strlen($username) < 3 || mb_strlen($username) > 50) {
-            return 'Имя пользователя: от 3 до 50 символов.';
+        $usernameError = UsernameRules::validate($username);
+        if ($usernameError !== null) {
+            return $usernameError;
         }
-        if (!preg_match('/^[\w\p{Cyrillic}]+$/u', $username)) {
-            return 'Имя пользователя: только буквы, цифры и подчеркивание.';
+        if ($email === '') {
+            return 'Email обязателен.';
         }
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return 'Некорректный email.';
         }
-        if (mb_strlen($password) < 8) {
-            return 'Пароль должен содержать не менее 8 символов.';
+        if (mb_strlen($password) < 4) {
+            return 'Пароль должен содержать не менее 4 символов.';
         }
         return null;
     }
 
-    /**
-     * Добавляет пользователя в первые публичные комнаты.
-     * Last updated: 2026-04-17.
-     */
     private static function joinDefaultRooms(Connection $db, int $userId): void
     {
         $rooms = $db->fetchAll(
@@ -100,10 +92,6 @@ class RegisterHandler
         }
     }
 
-    /**
-     * Возвращает JSON-ошибку.
-     * Last updated: 2026-04-17.
-     */
     private static function jsonError(string $message, int $code = 400): never
     {
         http_response_code($code);
@@ -112,12 +100,6 @@ class RegisterHandler
         exit;
     }
 
-    /**
-     * Возвращает JSON-успех.
-     * Last updated: 2026-04-17.
-     *
-     * @param array<string, mixed> $data
-     */
     private static function jsonSuccess(array $data = []): never
     {
         header('Content-Type: application/json; charset=UTF-8');

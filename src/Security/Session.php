@@ -86,7 +86,7 @@ class Session
             'domain'   => COOKIE_DOMAIN,
             'secure'   => !empty($_SERVER['HTTPS']) || ($_SERVER['SERVER_PORT'] ?? 80) == 443,
             'httponly' => true,
-            'samesite' => 'Strict',
+            'samesite' => 'Lax',
         ]);
     }
 
@@ -98,7 +98,7 @@ class Session
             'domain'   => COOKIE_DOMAIN,
             'secure'   => !empty($_SERVER['HTTPS']) || ($_SERVER['SERVER_PORT'] ?? 80) == 443,
             'httponly' => true,
-            'samesite' => 'Strict',
+            'samesite' => 'Lax',
         ]);
     }
 

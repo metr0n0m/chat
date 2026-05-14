@@ -76,9 +76,30 @@ class VKOAuth
             $userId = (int) $user['id'];
         } else {
             $username = self::generateUsername($profile, $db);
+
+            // Check if email already exists — link OAuth to existing account
+            if ($email) {
+                $existing = $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email]);
+                if ($existing) {
+                    $db->execute(
+                        "UPDATE users SET oauth_provider = 'vk', oauth_id = ? WHERE id = ?",
+                        [$vkUserId, $existing['id']]
+                    );
+                    $userId = (int) $existing['id'];
+                    self::storeToken($db, $userId, 'vk', $accessToken);
+                    $ip    = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $ua    = $_SERVER['HTTP_USER_AGENT'] ?? '';
+                    $token = Session::create($userId, $ip, $ua);
+                    Session::setCookie($token);
+                    setcookie('oauth_state', '', ['expires' => time() - 1, 'path' => '/']);
+                    header('Location: /');
+                    exit;
+                }
+            }
+
             $db->execute(
-                'INSERT INTO users (username, email, oauth_provider, oauth_id, avatar_url) VALUES (?, ?, ?, ?, ?)',
-                [$username, $email, 'vk', $vkUserId, $profile['photo_200'] ?? null]
+                'INSERT INTO users (username, email, oauth_provider, oauth_id, avatar_url, email_verified) VALUES (?, ?, ?, ?, ?, ?)',
+                [$username, $email, 'vk', $vkUserId, $profile['photo_200'] ?? null, 0]
             );
             $userId = (int) $db->lastInsertId();
             self::joinDefaultRooms($db, $userId);

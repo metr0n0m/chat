@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Chat\Http;
 
 use Chat\Security\{Session, CSRF};
-use Chat\Auth\{LoginHandler, RegisterHandler, VKOAuth, GoogleOAuth};
+use Chat\Auth\{LoginHandler, RegisterHandler, GoogleOAuth, EmailVerification};
 use Chat\Chat\{RoomController, MessageController, WhisperController, NumerPage};
 use Chat\Admin\{AdminPanel, UserManager, RoomManager};
 use Chat\DB\Connection;
@@ -76,12 +76,12 @@ class Router
 
     private function dispatchAuth(): void
     {
-        if ($this->method === 'POST' && $this->path === '/auth/login')    LoginHandler::handle();
-        if ($this->method === 'POST' && $this->path === '/auth/register') RegisterHandler::handle();
-        if ($this->path === '/auth/vk')                                   VKOAuth::redirect();
-        if ($this->path === '/auth/vk/callback')                          VKOAuth::callback();
-        if ($this->path === '/auth/google')                               GoogleOAuth::redirect();
-        if ($this->path === '/auth/google/callback')                      GoogleOAuth::callback();
+        if ($this->method === 'POST' && $this->path === '/auth/login')              LoginHandler::handle();
+        if ($this->method === 'POST' && $this->path === '/auth/register')         RegisterHandler::handle();
+        if ($this->method === 'GET'  && $this->path === '/auth/verify')           EmailVerification::verify();
+        if ($this->method === 'POST' && $this->path === '/auth/resend-verification') EmailVerification::resend();
+        if ($this->path === '/auth/google')                                       GoogleOAuth::redirect();
+        if ($this->path === '/auth/google/callback')                              GoogleOAuth::callback();
     }
 
     private function dispatchApi(): void

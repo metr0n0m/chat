@@ -83,31 +83,56 @@ if (!$isLoggedIn) {
     <div class="tab-content">
       <!-- Login -->
       <div class="tab-pane fade show active" id="loginTab">
-        <form id="loginForm">
+        <form id="loginForm" novalidate>
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
-          <div class="mb-3"><label class="form-label">Email</label>
-            <input type="text" class="form-control" name="email" required></div>
-          <div class="mb-3"><label class="form-label">Пароль</label>
-            <input type="password" class="form-control" name="password" required></div>
+          <div class="mb-3">
+            <label class="form-label">Email или имя пользователя</label>
+            <input type="text" class="form-control" name="email" required
+                   placeholder="Звёздочка99">
+            <div class="invalid-feedback">Введите email или имя пользователя.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Пароль</label>
+            <input type="password" class="form-control" name="password"
+                   minlength="4" maxlength="128" required
+                   placeholder="Минимум 4 символа">
+            <div class="invalid-feedback">Пароль: от 4 до 128 символов.</div>
+          </div>
           <button type="submit" class="btn btn-primary w-100">Войти</button>
         </form>
         <hr>
         <div class="d-grid gap-2">
-          <a href="/auth/vk" class="btn btn-outline-primary"><i class="fab fa-vk me-2"></i>Войти через VK</a>
           <a href="/auth/google" class="btn btn-outline-danger"><i class="fab fa-google me-2"></i>Войти через Google</a>
         </div>
         <div id="loginError" class="alert alert-danger mt-2 d-none"></div>
       </div>
       <!-- Register -->
       <div class="tab-pane fade" id="registerTab">
-        <form id="registerForm">
+        <form id="registerForm" novalidate>
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES) ?>">
-          <div class="mb-3"><label class="form-label">Имя пользователя</label>
-            <input type="text" class="form-control" name="username" minlength="3" maxlength="50" required></div>
-          <div class="mb-3"><label class="form-label">Email (необязательно)</label>
-            <input type="email" class="form-control" name="email"></div>
-          <div class="mb-3"><label class="form-label">Пароль (мин. 8 символов)</label>
-            <input type="password" class="form-control" name="password" minlength="8" required></div>
+          <div class="mb-3">
+            <label class="form-label">Имя пользователя</label>
+            <input type="text" class="form-control" name="username"
+                   minlength="3" maxlength="50" required
+                   pattern="[a-zA-Zа-яёА-ЯЁ0-9_\-\.]+"
+                   placeholder="Звёздочка99">
+            <div class="form-text text-muted">3–50 символов: буквы (рус/англ), цифры, _ - .</div>
+            <div class="invalid-feedback">Только буквы, цифры, _ - . — от 3 до 50 символов.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email"
+                   required placeholder="example@company.com">
+            <div class="invalid-feedback">Введите корректный email-адрес.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Пароль</label>
+            <input type="password" class="form-control" name="password"
+                   minlength="4" maxlength="128" required
+                   placeholder="Минимум 4 символа">
+            <div class="form-text text-muted">От 4 до 128 символов.</div>
+            <div class="invalid-feedback">Пароль: от 4 до 128 символов.</div>
+          </div>
           <button type="submit" class="btn btn-success w-100">Зарегистрироваться</button>
         </form>
         <div id="registerError" class="alert alert-danger mt-2 d-none"></div>
@@ -535,6 +560,8 @@ if (!$isLoggedIn) {
 
 <?php endif; ?>
 
+<div id="system-alerts" style="position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:9999;min-width:300px;max-width:90vw;pointer-events:none"></div>
+
 <script nonce="<?= $nonce ?>" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script nonce="<?= $nonce ?>" src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script nonce="<?= $nonce ?>" src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
@@ -550,12 +577,19 @@ window.ChatConfig = {
 };
 window.CHAT_BOOTSTRAP = window.ChatConfig;
 </script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-utils.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-display.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-input.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-time.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-shell.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat.js"></script>
-<script nonce="<?= $nonce ?>" src="/assets/js/chat-auth.js"></script>
+<?php
+$_jsDir = __DIR__ . '/assets/js/';
+$_jsV = static function(string $f) use ($_jsDir): string {
+    $t = @filemtime($_jsDir . $f);
+    return $t ? '?v=' . $t : '';
+};
+?>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-utils.js<?= $_jsV('chat-utils.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-display.js<?= $_jsV('chat-display.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-input.js<?= $_jsV('chat-input.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-time.js<?= $_jsV('chat-time.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-shell.js<?= $_jsV('chat-shell.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat.js<?= $_jsV('chat.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-auth.js<?= $_jsV('chat-auth.js') ?>"></script>
 </body>
 </html>

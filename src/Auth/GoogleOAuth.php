@@ -62,6 +62,10 @@ class GoogleOAuth
         $email    = $profile['email'] ?? null;
         $avatar   = $profile['picture'] ?? null;
 
+        if (!$email) {
+            self::fail('Не удалось получить email от Google.');
+        }
+
         $db   = Connection::getInstance();
         $user = $db->fetchOne(
             "SELECT id, is_banned FROM users WHERE oauth_provider = 'google' AND oauth_id = ?",
@@ -74,20 +78,23 @@ class GoogleOAuth
             }
             $userId = (int) $user['id'];
         } else {
-            if ($email) {
-                $existing = $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email]);
-                if ($existing) {
-                    $db->execute(
-                        "UPDATE users SET oauth_provider = 'google', oauth_id = ? WHERE id = ?",
-                        [$googleId, $existing['id']]
-                    );
-                    $userId = (int) $existing['id'];
-                } else {
-                    $userId = self::createUser($db, $profile, $googleId, $email, $avatar);
-                }
+            $existing = $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email]);
+            if ($existing) {
+                $emailVerified = ($profile['email_verified'] ?? false) === true ? 1 : 0;
+                $db->execute(
+                    "UPDATE users SET oauth_provider = 'google', oauth_id = ?, email_verified = IF(? = 1, 1, email_verified) WHERE id = ?",
+                    [$googleId, $emailVerified, $existing['id']]
+                );
+                $userId = (int) $existing['id'];
             } else {
-                $userId = self::createUser($db, $profile, $googleId, null, $avatar);
+                $userId = self::createUser($db, $profile, $googleId, $email, $avatar);
             }
+        }
+
+        $row = $db->fetchOne('SELECT email_verified FROM users WHERE id = ?', [$userId]);
+        if ((int) ($row['email_verified'] ?? 0) === 0) {
+            setcookie('oauth_state', '', ['expires' => time() - 1, 'path' => '/']);
+            self::fail('Подтвердите email-адрес для входа.');
         }
 
         self::storeToken($db, $userId, 'google', $tokenData['access_token'], $tokenData['refresh_token'] ?? null);
@@ -104,10 +111,11 @@ class GoogleOAuth
 
     private static function createUser(Connection $db, array $profile, string $googleId, ?string $email, ?string $avatar): int
     {
-        $username = self::generateUsername($profile, $db);
+        $username      = self::generateUsername($profile, $db);
+        $emailVerified = ($profile['email_verified'] ?? false) === true ? 1 : 0;
         $db->execute(
-            'INSERT INTO users (username, email, oauth_provider, oauth_id, avatar_url) VALUES (?, ?, ?, ?, ?)',
-            [$username, $email, 'google', $googleId, $avatar]
+            'INSERT INTO users (username, email, oauth_provider, oauth_id, avatar_url, email_verified) VALUES (?, ?, ?, ?, ?, ?)',
+            [$username, $email, 'google', $googleId, $avatar, $emailVerified]
         );
         $userId = (int) $db->lastInsertId();
         self::joinDefaultRooms($db, $userId);

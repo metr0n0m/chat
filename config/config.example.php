@@ -19,10 +19,10 @@ define('WS_PORT', 8080);
 define('WS_HOST', 'yourdomain.com');
 define('WS_BIND_HOST', '127.0.0.1');
 
-// VK OAuth 2.0 — vk.com/editapp
-define('VK_CLIENT_ID', '');
-define('VK_CLIENT_SECRET', '');
-define('VK_REDIRECT_URI', APP_URL . '/auth/vk/callback');
+// VK OAuth — disabled
+// define('VK_CLIENT_ID', '');
+// define('VK_CLIENT_SECRET', '');
+// define('VK_REDIRECT_URI', APP_URL . '/auth/vk/callback');
 
 // Google OAuth 2.0 — console.cloud.google.com
 define('GOOGLE_CLIENT_ID', '');
@@ -41,6 +41,13 @@ define('SESSION_LIFETIME', 30 * 24 * 60 * 60);
 // AES key for OAuth token encryption (32 bytes = 256 bits)
 // Generate: php -r "echo base64_encode(random_bytes(32));"
 define('OAUTH_ENCRYPT_KEY', 'REPLACE_WITH_BASE64_OF_32_RANDOM_BYTES');
+
+// Mail / SMTP
+define('SMTP_HOST', 'smtp.example.com');
+define('SMTP_PORT', 587);
+define('SMTP_USER', 'noreply@example.com');
+define('SMTP_PASS', 'REPLACE_WITH_SMTP_PASSWORD');
+define('MAIL_FROM', 'noreply@example.com');
 
 // Rate limiting (in-memory for HTTP, ReactPHP for WS)
 define('MSG_RATE_LIMIT_SEC', 1);

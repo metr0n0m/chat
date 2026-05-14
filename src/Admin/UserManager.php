@@ -7,6 +7,7 @@ use Chat\DB\Connection;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 use Chat\Support\Timestamp;
+use Chat\Validation\UsernameRules;
 
 class UserManager
 {
@@ -152,7 +153,12 @@ class UserManager
 
         self::assertHigherRole($actor, $target, $targetId);
 
-        $db->execute('DELETE FROM users WHERE id = ?', [$targetId]);
+        try {
+            $db->execute('DELETE FROM users WHERE id = ?', [$targetId]);
+        } catch (\PDOException $e) {
+            error_log('User delete id=' . $targetId . ': ' . $e->getMessage());
+            self::jsonError('Ошибка при удалении пользователя.', 500);
+        }
         self::jsonSuccess(['deleted' => true]);
     }
 
@@ -221,8 +227,9 @@ class UserManager
 
         if (isset($post['username'])) {
             $username = trim((string) $post['username']);
-            if (mb_strlen($username) < 3 || mb_strlen($username) > 50 || !preg_match('/^[\w\p{Cyrillic}]+$/u', $username)) {
-                self::jsonError('Некорректное имя пользователя.');
+            $usernameError = UsernameRules::validate($username);
+            if ($usernameError !== null) {
+                self::jsonError($usernameError);
             }
             $exists = $db->fetchOne('SELECT id FROM users WHERE username = ? AND id != ?', [$username, $userId]);
             if ($exists) {
