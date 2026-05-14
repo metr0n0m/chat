@@ -160,7 +160,7 @@ class GoogleOAuth
         while ($db->fetchOne('SELECT id FROM users WHERE username = ?', [$username])) {
             $username = $base . $i++;
         }
-        return substr($username, 0, 50);
+        return substr($username, 0, 25);
     }
 
     private static function storeToken(Connection $db, int $userId, string $provider, string $access, ?string $refresh): void

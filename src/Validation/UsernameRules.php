@@ -7,7 +7,7 @@ final class UsernameRules
 {
     public const PATTERN = '/^[a-zA-Zа-яёА-ЯЁ0-9_\-\.]+$/u';
     public const MIN     = 3;
-    public const MAX     = 50;
+    public const MAX     = 25;
 
     private function __construct() {}
 

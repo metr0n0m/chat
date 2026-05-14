@@ -113,11 +113,11 @@ if (!$isLoggedIn) {
           <div class="mb-3">
             <label class="form-label">Имя пользователя</label>
             <input type="text" class="form-control" name="username"
-                   minlength="3" maxlength="50" required
+                   minlength="3" maxlength="25" required
                    pattern="[a-zA-Zа-яёА-ЯЁ0-9_\-\.]+"
                    placeholder="Придумайте логин">
-            <div class="form-text text-muted">3–50 символов: буквы (рус/англ), цифры, _ - .</div>
-            <div class="invalid-feedback">Только буквы, цифры, _ - . — от 3 до 50 символов.</div>
+            <div class="form-text text-muted">3–25 символов: буквы (рус/англ), цифры, _ - .</div>
+            <div class="invalid-feedback">Только буквы, цифры, _ - . — от 3 до 25 символов.</div>
           </div>
           <div class="mb-3">
             <label class="form-label">Email</label>
@@ -285,7 +285,7 @@ if (!$isLoggedIn) {
             <div class="row g-2">
               <div class="col-md-6">
                 <label class="form-label">Имя пользователя (ник)</label>
-                <input type="text" class="form-control" name="username" minlength="3" maxlength="50" id="usernameInput" autocomplete="off">
+                <input type="text" class="form-control" name="username" minlength="3" maxlength="25" id="usernameInput" autocomplete="off">
                 <div id="username-check" class="small mt-1"></div>
               </div>
               <div class="col-md-6">
@@ -378,7 +378,7 @@ if (!$isLoggedIn) {
       <form id="createUserForm">
         <div class="mb-3">
           <label class="form-label">Имя пользователя (ник) *</label>
-          <input type="text" class="form-control" name="username" minlength="3" maxlength="50" required>
+          <input type="text" class="form-control" name="username" minlength="3" maxlength="25" required>
         </div>
         <div class="mb-3">
           <label class="form-label">Email (необязательно)</label>

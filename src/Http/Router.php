@@ -222,7 +222,7 @@ class Router
     {
         $username = trim((string) ($_GET['username'] ?? ''));
         $available = false;
-        if (mb_strlen($username) >= 3 && mb_strlen($username) <= 50) {
+        if (mb_strlen($username) >= 3 && mb_strlen($username) <= 25) {
             $row = Connection::getInstance()->fetchOne(
                 'SELECT id FROM users WHERE username = ? AND id != ?',
                 [$username, (int) $this->user['id']]
