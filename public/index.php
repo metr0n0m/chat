@@ -88,7 +88,7 @@ if (!$isLoggedIn) {
           <div class="mb-3">
             <label class="form-label">Email или имя пользователя</label>
             <input type="text" class="form-control" name="email" required
-                   placeholder="Email или имя пользователя">
+                   placeholder="Ваш email или логин">
             <div class="invalid-feedback">Введите email или имя пользователя.</div>
           </div>
           <div class="mb-3">
@@ -115,14 +115,14 @@ if (!$isLoggedIn) {
             <input type="text" class="form-control" name="username"
                    minlength="3" maxlength="50" required
                    pattern="[a-zA-Zа-яёА-ЯЁ0-9_\-\.]+"
-                   placeholder="ivan_petrov">
+                   placeholder="Придумайте логин">
             <div class="form-text text-muted">3–50 символов: буквы (рус/англ), цифры, _ - .</div>
             <div class="invalid-feedback">Только буквы, цифры, _ - . — от 3 до 50 символов.</div>
           </div>
           <div class="mb-3">
             <label class="form-label">Email</label>
             <input type="email" class="form-control" name="email"
-                   required placeholder="ivan@example.com">
+                   required placeholder="Ваш email">
             <div class="invalid-feedback">Введите корректный email-адрес.</div>
           </div>
           <div class="mb-3">
