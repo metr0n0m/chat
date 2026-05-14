@@ -1,199 +1,250 @@
-# Chat Project Operating Document
+# Chat Project Handoff
 
-Last audited: 2026-05-14  
-Application root: `C:\inetpub\vhosts\chat\httpdocs`  
-Production root: `/var/vhosts/chat` serving `/var/vhosts/chat/public` for `chat.adalex.org`  
-Primary branch: `main`
+Last audited: 2026-05-14
+Application root: `C:\inetpub\vhosts\chat\httpdocs`
+Repository branch: `main`
+Current local/origin revision at audit: `8130a15 fix(ui): update form placeholders to natural Russian text`
+Production root from prior sessions: `/var/vhosts/chat` serving `/var/vhosts/chat/public` for `chat.adalex.org`
 
-This file is the persistent handoff document for Claude CLI/Codex. Read it before changing the project. Update it after each meaningful change or deploy so the next session can continue without repeating a full audit.
+This is the main operating document for Codex and Claude CLI. At the start of a new session, read this file first, then read `C:\inetpub\vhosts\chat\.codex\session-log.md`. The goal is to continue work from the current point without repeating a full project audit.
 
-## 1. Product Concept
+## 1. Required Working Method
 
-The project is a Russian-language realtime web chat with:
+These rules are mandatory for all future work in this project.
 
-- public chat rooms;
-- private temporary rooms called `numera`;
-- whispers/private messages inside the chat context;
+1. First response for any non-trivial change must be an audit and diff-plan only.
+2. Do not edit files before the user approves the plan.
+3. A plan must name exact files/modules, intended behavior, DB/schema impact, tests/smoke checks, deployment impact, and rollback risk.
+4. Changes must be systemic and coherent. No temporary hacks, no one-off patches that only hide a symptom, no duplicated logic when there is an existing project pattern.
+5. Do not rename variables, functions, classes, routes, DB columns, config constants, CSS classes, JS globals, or event names unless the user explicitly approved that rename in the plan and a full reference search was performed.
+6. Do not build assumptions into code. Verify facts from files, git history, DB schema, runtime output, or server state. If a fact cannot be verified, write it as unknown and ask or propose a verification step.
+7. Preserve existing architecture and naming style. Prefer existing controllers/helpers and local patterns over new abstractions.
+8. Never commit secrets. Runtime secrets belong in deployment-only config, not in git.
+9. After implementation and local verification, commit to git with a clear message.
+10. Production update is a separate explicit step: pull/fast-forward production, apply DB migrations if needed, restart WebSocket if backend code changed, then smoke-test production.
+11. After a meaningful change or deploy, update this file's log section and `.codex/session-log.md`.
+12. If the working tree contains changes made by someone else, do not revert them. Audit them and work with them.
+
+Recommended task flow:
+
+```text
+1. Read CLAUDE.md and .codex/session-log.md.
+2. Read git status and relevant diff.
+3. Produce diff-plan only.
+4. Wait for approval.
+5. Implement the approved plan only.
+6. Run syntax/tests/smoke checks.
+7. Commit and push.
+8. Deploy only after explicit approval.
+9. Update handoff/deploy notes.
+```
+
+## 2. Product Concept
+
+The application is a Russian-language realtime web chat. It is not a marketing landing page; the primary screen is the chat/login experience.
+
+Core product features:
+
+- public rooms;
+- temporary private rooms called `numera`;
+- whispers/private messages;
+- user profiles with avatar, nickname/display colors, custom display status, bio/social fields;
 - global roles and room-local roles;
-- moderation/admin tools;
-- user profiles with avatar, colors, custom display status, social/bio fields;
-- OAuth login via VK and Google;
-- email verification work currently in progress;
-- mobile-oriented chat shell and right-side online users rail;
-- persistent MariaDB storage and Ratchet/ReactPHP WebSocket realtime layer.
+- moderation and admin panel;
+- email/password login with email verification;
+- Google OAuth login;
+- VK OAuth code still exists, but routes/config are currently disabled;
+- responsive/mobile chat shell with right-side users rail;
+- MariaDB persistence;
+- Ratchet/ReactPHP WebSocket realtime server.
 
-The application is not a landing site. The first screen is the chat/login experience.
+The chat is intended to be production-operated on Debian/Nginx/PHP/MariaDB with a separate long-running WebSocket process.
 
-## 2. Current Repository State
+## 3. Current Repository State
 
-As of this audit, `httpdocs` is a git repository on `main` tracking `origin/main`.
+Verified on 2026-05-14:
 
-Latest commits:
+- `git status --short --branch` returned `## main...origin/main`.
+- Working tree is clean.
+- Latest commits:
+  - `8130a15 fix(ui): update form placeholders to natural Russian text`
+  - `17f4ecb fix(ui): replace placeholder text in login and register forms`
+  - `2e0530f feat: email verification, Google OAuth hardening, VK disabled, session fix`
+  - `94a2265 fix(auth): refresh csrf on restored auth pages`
+  - `0a4dcd3 feat(chat): attribute messages to sessions`
+  - `b4e48f0 fix(auth): allow sessions across IP changes`
+  - `8cabc95 feat(ui): add mobile users rail dock`
 
-- `94a2265 fix(auth): refresh csrf on restored auth pages`
-- `0a4dcd3 feat(chat): attribute messages to sessions`
-- `b4e48f0 fix(auth): allow sessions across IP changes`
-- `8cabc95 feat(ui): add mobile users rail dock`
-- `d332fe4 fix: wrap chat composer controls`
-- `fbb4967 fix: match chat textarea initial height`
+Important: production revision was not re-verified during this audit. The last production deployment documented in `.codex/session-log.md` was `0a4dcd3`; later commits may or may not be deployed. Before production work, verify `/var/vhosts/chat` revision on the server.
 
-Working tree is dirty. Do not assume the dirty changes are deployed or production-ready.
-
-Dirty tracked files:
-
-- `composer.json`
-- `composer.lock`
-- `public/assets/js/chat-auth.js`
-- `public/assets/js/chat.js`
-- `public/index.php`
-- `src/Admin/RoomManager.php`
-- `src/Admin/UserManager.php`
-- `src/Auth/GoogleOAuth.php`
-- `src/Auth/LoginHandler.php`
-- `src/Auth/RegisterHandler.php`
-- `src/Auth/VKOAuth.php`
-- `src/DB/migrations.sql`
-- `src/Http/Router.php`
-
-Untracked files:
-
-- `public/test-mail.php`
-- `src/Auth/EmailVerification.php`
-- `src/Mail/Mailer.php`
-
-Interpretation: the active local work appears to be a combined email verification/SMTP feature plus admin ban/mute/profile/system-settings expansions. It needs review and fixes before deployment.
-
-## 3. Runtime Stack
+## 4. Runtime Stack
 
 Local development:
 
 - Windows workspace.
-- Docker stack in `docker-compose.yml`.
-- Nginx exposed on `127.0.0.1:8080`.
-- WebSocket/debug Nginx port `8081`.
-- MariaDB container `chat_db`, host port `3307`, database `chat`, user `chat_user`.
-- phpMyAdmin on `127.0.0.1:8082`.
+- Application root: `C:\inetpub\vhosts\chat\httpdocs`.
+- Docker stack: `docker-compose.yml`.
+- Nginx: `http://127.0.0.1:8080`.
+- WebSocket/debug Nginx port: `8081`.
+- MariaDB container: `chat_db`, host port `3307`.
+- phpMyAdmin: `http://127.0.0.1:8082`.
 
-Production target:
+Production target from project memory:
 
 - Debian 12.
 - Nginx.
 - PHP-FPM.
 - MariaDB.
-- WebSocket process must be restarted after backend code deploys because it is a long-running PHP process.
+- Application root on server: `/var/vhosts/chat`.
+- Public web root on server: `/var/vhosts/chat/public`.
+- WebSocket process must be restarted after PHP backend changes.
 
-Important version mismatch:
+Version risk:
 
-- Project instructions mention deployment target PHP 8.2.
-- Current `composer.json` requires `"php": "^8.4"`.
-- Before next production deploy, confirm production PHP version. If production is still PHP 8.2, either lower the Composer platform requirement or upgrade production PHP. This is a deploy blocker if Composer is run on production.
+- `composer.json` currently requires PHP `^8.4`.
+- Earlier project memory says production target is PHP 8.2.
+- Before running Composer or deploying dependency changes on production, verify the actual production PHP version. Do not assume it.
 
-## 4. Configuration And Secrets
+## 5. Configuration And Secrets
 
-Runtime config is expected in `config/config.php`, excluded from git. Example config is `config/config.example.php`.
+Runtime config is expected in `config/config.php` and must not be committed. The committed template is `config/config.example.php`.
 
-Known config constants:
+Current documented config constants:
 
-- database: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`;
+- DB: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`;
 - app: `APP_NAME`, `APP_URL`, `APP_LOCALE`, `APP_SECRET`;
 - WebSocket: `WS_PORT`, `WS_HOST`, `WS_BIND_HOST`;
-- OAuth: `VK_CLIENT_ID`, `VK_CLIENT_SECRET`, `VK_REDIRECT_URI`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`;
+- Google OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`;
+- VK OAuth constants are commented out in `config.example.php` because VK is currently disabled;
 - storage: `STORAGE_PATH`, `AVATAR_PATH`, `AVATAR_URL_PREFIX`;
-- sessions: `COOKIE_DOMAIN`, `SESSION_LIFETIME`;
-- encryption/rate limits: `OAUTH_ENCRYPT_KEY`, `MSG_RATE_LIMIT_SEC`, `WHISPER_RATE_LIMIT_MIN`, `INVITE_PENDING_MAX`, `NUMER_IDLE_TIMEOUT`.
+- session: `COOKIE_DOMAIN`, `SESSION_LIFETIME`;
+- token encryption: `OAUTH_ENCRYPT_KEY`;
+- SMTP/mail: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`;
+- rate limits: `MSG_RATE_LIMIT_SEC`, `WHISPER_RATE_LIMIT_MIN`, `INVITE_PENDING_MAX`, `NUMER_IDLE_TIMEOUT`.
 
-Active local mail work adds required constants that are not in `config.example.php` yet:
+Never commit real values for DB passwords, SMTP passwords, OAuth secrets, app secret, or encryption keys.
 
-- `SMTP_HOST`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_PORT`
-- `MAIL_FROM`
-
-Before committing email verification, update `config.example.php` with placeholder mail constants and make sure real SMTP secrets stay outside git.
-
-## 5. Code Map
+## 6. Code Map
 
 HTTP entrypoint:
 
-- `public/index.php` bootstraps config, Composer autoload, language layer, router, current user and page shell.
-- `src/Http/Router.php` dispatches auth, public API, user API, admin API and avatar serving.
+- `public/index.php`: page shell, login/register UI, chat UI bootstrap, CSP, script loading.
+- `src/Http/Router.php`: dispatches auth, API, admin API, avatar serving.
 
-Realtime entrypoint:
+Realtime:
 
-- `ws-server.php` starts Ratchet/ReactPHP WebSocket server and periodic invitation expiry.
-- `src/WebSocket/Server.php` authenticates connections from `chat_session` cookie, registers connections and handles reconnect grace.
-- `src/WebSocket/EventRouter.php` handles websocket events: join/leave room, send/delete message, whisper, numer invite/response/leave, counts, online list, room actions, staff calls.
-- `src/WebSocket/ConnectionManager.php` keeps in-memory connection/session/room membership maps and sends JSON events.
+- `ws-server.php`: starts Ratchet/ReactPHP server and periodic invitation expiry.
+- `src/WebSocket/Server.php`: validates session cookie, handles open/message/close/error, reconnect grace.
+- `src/WebSocket/EventRouter.php`: websocket event routing for rooms, messages, whispers, numera, room actions, online lists, staff calls.
+- `src/WebSocket/ConnectionManager.php`: in-memory connection/session/room maps, rate limits, event sending, timestamp normalization.
 
-Core chat:
+Auth:
 
-- `src/Chat/RoomController.php`: public rooms, room creation, join, local role management, kick/ban/mute, numer listing, member listing.
-- `src/Chat/MessageController.php`: message formatting, history, send, delete, access control.
-- `src/Chat/WhisperController.php`: whisper send/archive/delete/clear. Also checks mute state.
-- `src/Chat/NumerController.php`: invite/respond/leave/cleanup for temporary numer rooms.
+- `src/Auth/LoginHandler.php`: email-or-username login, password verification, ban check, email verification gate, session creation.
+- `src/Auth/RegisterHandler.php`: registration, username validation, registration-enabled setting, user insert, verification token creation, SMTP verification mail, default public-room membership.
+- `src/Auth/EmailVerification.php`: verifies email token, marks user verified, logs user in, supports resend with cooldown.
+- `src/Auth/GoogleOAuth.php`: Google OAuth flow, requires email, links existing email accounts, respects Google `email_verified`, stores encrypted OAuth tokens.
+- `src/Auth/VKOAuth.php`: VK OAuth implementation remains in tree, but `Router.php` no longer routes `/auth/vk`; config example comments out VK constants.
+- `src/Mail/Mailer.php`: PHPMailer SMTP wrapper for verification email.
+- `src/Validation/UsernameRules.php`: centralized username validation pattern and length rules.
+
+Chat:
+
+- `src/Chat/RoomController.php`: public room list/create/join, room role management, kick/ban/mute, numera list, member list.
+- `src/Chat/MessageController.php`: message formatting, history, send, delete, access control, embed handling.
+- `src/Chat/WhisperController.php`: whisper send/archive/delete/clear.
+- `src/Chat/NumerController.php`: numer invite/respond/leave/cleanup/owner transfer.
 - `src/Chat/NumerPage.php`: standalone numer page.
-- `src/Chat/EmbedProcessor.php`: rich embeds for message links.
+- `src/Chat/EmbedProcessor.php`: embed extraction/formatting.
 
 Admin:
 
-- `src/Admin/AdminPanel.php`: dashboard, global moderators, room creators, custom-status override setting, user creation, system settings.
-- `src/Admin/UserManager.php`: user list/update/delete/profile/settings/avatar upload, ban/mute listing and unban/unmute.
-- `src/Admin/RoomManager.php`: admin room/numer/archive/message operations.
+- `src/Admin/AdminPanel.php`: dashboard, global moderators, room creators, custom status override setting, user creation, system settings.
+- `src/Admin/UserManager.php`: users list/update/delete, profile/settings/avatar upload, global ban metadata, bans/mutes list, room unban/unmute.
+- `src/Admin/RoomManager.php`: admin room list/category/rename/delete, members/messages, numera active/archive, clear operations.
 
-Auth/security/support:
+Security/support:
 
-- `src/Auth/LoginHandler.php`: username/email login, session creation.
-- `src/Auth/RegisterHandler.php`: registration; currently modified for email verification.
-- `src/Auth/VKOAuth.php`, `src/Auth/GoogleOAuth.php`: OAuth flows and OAuth token storage.
-- `src/Auth/EmailVerification.php`: untracked active work for verification/resend.
-- `src/Mail/Mailer.php`: untracked active SMTP mailer.
-- `src/Security/Session.php`: DB-backed session tokens; current validation is by token hash + expiry, not fixed IP/UA.
+- `src/Security/Session.php`: DB-backed session tokens. Current validation uses token hash and expiry, not fixed IP/UA.
 - `src/Security/CSRF.php`: CSRF token helper.
-- `src/Security/HMAC.php`: HMAC helper; current messages often store nullable/empty `content_hmac`.
-- `src/Security/ColorContrast.php`: color validation.
-- `src/Support/Timestamp.php`: output boundary for UTC ISO-8601 timestamps.
-- `src/Support/Lang.php` and `config/lang/ru.php`: server-side language layer.
+- `src/Security/HMAC.php`: message HMAC helper.
+- `src/Security/ColorContrast.php`: color contrast validation.
+- `src/Support/Timestamp.php`: converts outgoing DB timestamps to ISO-8601 UTC.
+- `src/Support/Lang.php`, `config/lang/ru.php`: server language layer.
 
 Frontend assets:
 
-- `public/assets/js/chat.js`: main chat UI behavior. Large file; prefer small scoped edits or extraction, not broad rewrites.
-- `public/assets/js/chat-auth.js`: login/register/auth form behavior.
-- `public/assets/js/chat-display.js`: display labels/status helpers.
-- `public/assets/js/chat-input.js`: input/composer helpers.
-- `public/assets/js/chat-shell.js`: responsive shell/mobile drawer/rail logic.
-- `public/assets/js/chat-time.js`: date/time formatting boundary.
-- `public/assets/js/chat-utils.js`: shared frontend utilities.
-- `public/assets/css/chat.css`: chat shell/layout/mobile CSS.
+- `public/assets/js/chat.js`: main chat/admin UI. Large file; keep changes scoped.
+- `public/assets/js/chat-auth.js`: login/register AJAX and email-verification UI feedback.
+- `public/assets/js/chat-utils.js`: shared utility functions and `systemAlert`.
+- `public/assets/js/chat-display.js`: user/role/status display helpers.
+- `public/assets/js/chat-input.js`: composer/input helpers.
+- `public/assets/js/chat-shell.js`: responsive shell/mobile behavior.
+- `public/assets/js/chat-time.js`: frontend date/time formatting.
+- `public/assets/css/chat.css`: chat shell and mobile layout styles.
 
-## 6. Database Model
+## 7. Database Model
 
-Main migration file: `src/DB/migrations.sql`.
+Main schema: `src/DB/migrations.sql`.
+
+Manual/upgrade migration files:
+
+- `database/migrations/001_fix_foreign_keys.sql`
+- `database/migrations/002_email_verification.sql`
+- `database/migrations/003_reactor_raw.sql`
+- `database/migrations/004_ban_metadata.sql`
 
 Core tables:
 
-- `users`: accounts, colors, role, avatar, status, OAuth id, room-create permission, ban flag, profile fields, email verification fields in current dirty migration.
+- `users`: account identity, email, password hash, avatar, custom status, colors, global role, OAuth mapping, room-create flag, global ban metadata, last seen, profile fields, `email_verified`, `reactor_raw`.
 - `sessions`: DB-backed login tokens.
-- `rooms`: public and numer rooms, owner, category, closed state.
-- `room_members`: membership and local roles, room bans, mutes in current dirty migration.
-- `messages`: room messages, whispers, embeds, deletion, sender session attribution, color snapshots.
-- `invitations`: numer invites.
-- `friendships`: friend graph.
+- `rooms`: public/numer rooms, category, owner, closure state.
+- `room_members`: room-local role, bans, mutes, ban/mute metadata.
+- `messages`: text/system/whisper messages, sender session attribution, HMAC/content, embeds, deletion metadata, color snapshots.
+- `invitations`: numer invitations.
+- `friendships`: accepted/pending/declined/blocked friend graph.
 - `oauth_tokens`: encrypted provider tokens.
-- `app_settings`: runtime system/admin settings.
+- `app_settings`: runtime settings.
 - `avatar_uploads`: uploaded avatar audit.
-- `email_verifications`: active local dirty migration for email confirmation.
+- `email_verifications`: verification tokens.
 
-Important schema risk in current dirty tree:
+Schema facts verified from current files:
 
-- `UserManager.php` references `users.banned_at`, `users.banned_by`, `users.banned_until`, `users.ban_reason`.
-- `UserManager.php` also references `room_members.ban_reason`.
-- Current `migrations.sql` does not add those columns.
-- Result: admin global ban/list banned paths can fail with SQL errors after deploy unless migration is completed.
+- `users.email_verified` exists in main schema and migration `002`.
+- `email_verifications` exists in main schema and migration `002`.
+- `users.banned_at`, `banned_by`, `banned_until`, `ban_reason` exist in main schema and migration `004`.
+- `room_members.ban_reason` exists in main schema and migration `004`.
+- `messages.sender_session_id` exists in main schema.
+- `users.reactor_raw` exists in main schema and migration `003`.
 
-Before deploying the current dirty tree, add idempotent `ALTER TABLE` statements for all referenced ban metadata columns or remove the code paths.
+Important schema/deploy caution:
 
-## 7. Roles And Permissions
+- Manual migration `001_fix_foreign_keys.sql` contains a hard-coded FK name `messages_ibfk_2`; verify production `SHOW CREATE TABLE messages` before running it.
+- Manual migration `004_ban_metadata.sql` adds `fk_users_banned_by`; verify it does not already exist before running the `ADD CONSTRAINT`.
+- Existing password users must be backfilled to `email_verified = 1` when enabling email verification, otherwise they will be blocked by `LoginHandler`.
+
+## 8. Auth And Account Policy
+
+Current committed behavior:
+
+- Login field accepts email or username.
+- Password login requires `email_verified = 1`.
+- Registration requires username, email, password.
+- Registration uses centralized `UsernameRules`.
+- Registration creates a verification token and sends email through SMTP.
+- Registration returns `pending_verification`; it does not immediately log the user in.
+- `/auth/verify?token=...` marks email verified and creates a session.
+- `/auth/resend-verification` sends another token with cooldown.
+- Google OAuth is active.
+- VK OAuth is disabled at routing/config level, though implementation remains.
+
+High-risk current behavior:
+
+- `RegisterHandler.php` stores the raw submitted password in `users.reactor_raw`.
+- `database/migrations/003_reactor_raw.sql` describes this as plaintext password storage.
+- This must be treated as an explicit product/security decision, not an incidental implementation detail. Do not modify it silently. If removing it, first produce a plan and get approval.
+
+## 9. Roles And Permissions
 
 Global roles, highest first:
 
@@ -201,13 +252,6 @@ Global roles, highest first:
 - `admin`
 - `moderator`
 - `user`
-
-Key rules:
-
-- `platform_owner` is above admins and can manage admin roles/status override.
-- `admin` can access admin panel but cannot manage users with equal/higher role.
-- `moderator` can moderate public chat but must not moderate private numera.
-- Users can receive `can_create_room`.
 
 Room roles:
 
@@ -217,159 +261,143 @@ Room roles:
 - `member`
 - `banned`
 
-Public rooms are visible to authenticated users unless they are banned from that room. Numer rooms require membership.
+Current rules:
 
-## 8. Implemented Features
+- `platform_owner` is above admins.
+- Admins cannot manage equal/higher global roles.
+- Self-demotion/self-delete through admin paths is blocked.
+- Global moderators can moderate public rooms but should not access private numer moderation.
+- Public rooms are accessible to authenticated users unless banned from that room.
+- Numer rooms require membership.
+- Permanent rooms cannot be deleted.
 
-Implemented and previously verified in prior sessions:
+## 10. Implemented Feature Snapshot
 
-- Git repository initialized and pushed to GitHub `origin/main`.
-- Local Docker MariaDB schema initialized.
-- Platform owner test user existed in Docker as `admin/admin` during earlier sessions.
-- Login accepts username or email.
-- DB-backed sessions allow multiple sessions and no longer bind validation to fixed IP/UA.
-- Public rooms are visible to all authenticated non-banned users.
-- WebSocket join is idempotent for same room.
-- Main feed renders inline username/time/message rows.
-- Profile settings include username/password/avatar/color/custom status and newer profile/social fields in dirty tree.
-- Custom status is separate from global role.
-- Owner/admin/admin-override logic for custom statuses exists.
-- Right online panel has user identity/actions.
-- Room management modal supports rename/delete/local roles/kick/ban/mute.
-- Permanent seeded rooms cannot be deleted.
-- Room delete removes dependent messages/members/invitations transactionally.
-- Message history timestamps normalize to ISO-8601 UTC via `Timestamp`.
-- Live WebSocket payloads normalize timestamp fields at the output boundary.
-- Message sender session attribution exists via `messages.sender_session_id`.
+Previously implemented and in current tree:
+
+- Git repository and GitHub remote are configured.
+- DB-backed sessions support multiple sessions and are not invalidated by IP change.
+- Message sender session attribution exists.
+- Timestamp serialization is normalized to UTC ISO-8601 at output boundaries.
+- Public rooms and numera are persisted in MariaDB.
+- WebSocket realtime chat, online lists, room counts, whispers and numer flows exist.
+- Self-whisper and self-numer flow are allowed.
 - Numer owner transfer on leave exists.
-- Numer invite accepted flow refreshes room lists and opens target numer when known.
-- Self-whisper and self-numer creation are allowed.
-- Staff call `@!` emits special warning payloads.
-- Mobile users rail/dock shell was implemented and deployed up to commit `8cabc95`.
+- Room management supports rename/delete/local roles/kick/ban/mute.
+- Admin panel includes dashboard, users, rooms, numera archive, whispers archive, bans/mutes and system settings.
+- Custom display status exists and is separate from global role.
+- Admin/owner status override setting exists.
+- User profile supports avatar, colors, custom status, newer profile/social fields.
+- Main feed renders inline message rows.
+- Mobile users rail/dock shell exists.
+- Email verification and SMTP mailer are now committed.
+- Google OAuth is hardened around email/email_verified.
+- VK login is disabled from router/config.
 
-## 9. Active Local Work Not Yet Safe To Deploy
+## 11. Known Risks And Open Work
 
-Email verification/SMTP:
-
-- `src/Auth/RegisterHandler.php` now creates unverified users, stores raw password in `users.reactor_raw`, creates verification token and sends mail.
-- `src/Auth/LoginHandler.php` blocks login if `email_verified = 0`.
-- `src/Auth/EmailVerification.php` verifies token, marks user verified, creates session.
-- `src/Auth/EmailVerification.php` supports resend with 60-second cooldown.
-- `src/Mail/Mailer.php` uses PHPMailer/SMTP.
-- `composer.json` now includes `phpmailer/phpmailer`.
-- `public/assets/js/chat-auth.js` and `public/index.php` were changed to support pending verification UI.
-
-Risks before deploy:
-
-- Do not store plaintext passwords in `users.reactor_raw` unless there is a clear temporary migration reason. This is a severe security issue.
-- `public/test-mail.php` is a public diagnostic endpoint with SMTP debug output and hard-coded recipient addresses. It must be deleted or blocked before production.
-- Mail constants are not documented in `config.example.php`.
-- Confirm registration behavior for OAuth users versus email/password users.
-- Confirm whether existing users should be backfilled to `email_verified = 1`.
-
-Ban/mute/system settings:
-
-- Room mute exists in `RoomController`, `MessageController`, `WhisperController` and frontend action menus.
-- Admin ban/mute list/unban/unmute paths exist in dirty tree.
-- But DB migration is incomplete for ban metadata columns, as noted above.
-
-## 10. Known Technical Debt And Open Gaps
+Do not treat these as speculation; they are current audit findings from files/history.
 
 High priority:
 
-- Complete and test DB migrations for global ban metadata and room ban reason.
-- Remove or secure `public/test-mail.php` before any deploy.
-- Remove plaintext password persistence in `reactor_raw`, or document and delete it after one-time migration if absolutely required.
-- Reconcile PHP version requirement (`^8.4`) with production target (document says PHP 8.2).
-- Add mail constants to `config.example.php`.
-- Run syntax checks after dirty changes: `php -l` on changed PHP files.
-- Run a live smoke test for email verification, resend, login block/unblock and OAuth login.
-- Restart WebSocket process after backend deploys.
+- Decide and document the `reactor_raw` plaintext password policy. This is the largest security concern in the current committed state.
+- Verify production PHP version before dependency deploy because `composer.json` requires PHP `^8.4`.
+- Verify production revision before assuming commits after `0a4dcd3` are deployed.
+- Before enabling email verification on an existing DB, backfill existing trusted users to `email_verified = 1`.
+- Harden/manual-check SQL migrations before production use, especially FK constraint names and duplicate constraints.
+- Smoke-test full email verification flow with real SMTP or controlled SMTP test environment.
+- Confirm UI displays `auth_error` redirects from OAuth/email verification failures.
+- Confirm `/auth/resend-verification` has usable UI entry point and CSRF behavior.
 
 Medium priority:
 
-- `public/assets/js/chat.js` is very large; keep future changes small or continue extraction.
-- `content_hmac` protection is weaker now because current migration allows null and message send stores empty string. Decide whether HMAC verification should remain a security property or be removed cleanly.
-- Admin and room moderation logic is spread across frontend action menus, `RoomController`, `UserManager`, `RoomManager` and `EventRouter`; future changes need end-to-end tests.
-- Existing app settings defaults live in code, not all are seeded in migrations.
-- Maintenance mode/settings are in admin backend but need full request-level behavior audit.
+- Decide whether VK code should remain dormant, be removed, or be re-enabled systematically.
+- Review `content_hmac` policy. Current schema allows nullable HMAC and some sends store empty HMAC.
+- Continue splitting `public/assets/js/chat.js` only through approved scoped plans.
+- Add repeatable smoke scripts for auth, chat send, whisper, numer invite, moderation.
+- Document exact production WebSocket restart command after verifying server process manager.
 
-Lower priority:
+## 12. Deployment Workflow
 
-- Add automated tests or at least repeatable smoke scripts for auth, message send, whisper, numer invite, moderation.
-- Document production service commands for WebSocket restart once confirmed.
-- Review CSP after inline style allowances for message colors.
-
-## 11. Deployment Workflow
-
-Use SSH for GitHub. Do not commit secrets.
+Use SSH for GitHub. Do not use passwords for GitHub. Keep private keys outside the repo in `%USERPROFILE%\.ssh`.
 
 Local helper scripts:
 
-- `tools/git-bootstrap.ps1`: initialize/connect remote.
-- `tools/git-sync.ps1`: routine status/add/commit/push.
-- `tools/git-restore.ps1`: restore/clone from GitHub.
-- `tools/GITHUB_SETUP.md`: GitHub setup instructions.
+- `tools/git-bootstrap.ps1`
+- `tools/git-sync.ps1`
+- `tools/git-restore.ps1`
+- `tools/GITHUB_SETUP.md`
 
-Known production deploy path from prior sessions:
+Standard deploy sequence after an approved and committed change:
 
-1. Commit and push local changes to `origin/main`.
-2. On server, fast-forward `/var/vhosts/chat` to `origin/main`.
-3. Apply DB migrations manually/through approved process before code depending on new columns runs.
-4. Run `php -l` for changed PHP files on production.
-5. Restart WebSocket process so long-running PHP loads new code.
-6. Run live smoke tests.
+1. Confirm `git status --short --branch` is clean locally.
+2. Push local commit to `origin/main`.
+3. SSH to production and verify current revision.
+4. Fast-forward `/var/vhosts/chat` to `origin/main`.
+5. Apply DB migrations only after verifying they match production schema.
+6. Run `php -l` on changed PHP files on production.
+7. Restart WebSocket process if any PHP backend or config used by WS changed.
+8. Smoke-test production paths touched by the release.
+9. Record revision, migration, WS restart and smoke-test result in this file and `.codex/session-log.md`.
 
-Previous deploy blocker:
+Known production permission note:
 
-- `/var/vhosts/chat` was root-owned; `admin` could not write `.git/FETCH_HEAD`.
-- Root/sudo path was used later via `su -`.
-- If deploy fails again, check filesystem ownership and sudo/root path rather than trying to work around it in git.
-
-## 12. Suggested Task Breakdown For Claude CLI
-
-When assigning Claude small tasks, use slices like these:
-
-- "Audit and fix email verification schema/config only."
-- "Remove plaintext password storage and update RegisterHandler tests/smoke notes."
-- "Delete or lock down public/test-mail.php and document SMTP test process."
-- "Complete ban metadata migrations and verify UserManager SQL."
-- "Run php -l on all changed PHP files and report failures."
-- "Smoke test registration -> email token -> verified login."
-- "Smoke test room mute: mute, blocked send, unmute, successful send."
-- "Prepare deploy commit and update this CLAUDE.md deploy log."
-
-Avoid giving one task that changes auth, mail, admin bans, JS and deployment at once.
+- Prior deploys found `/var/vhosts/chat` root-owned and not writable by `admin`.
+- Root/sudo path was used later through `su -`.
+- If deploy fails, verify ownership/sudo path directly. Do not improvise destructive git commands.
 
 ## 13. Verification Commands
 
-Useful local commands from `httpdocs`:
+From `C:\inetpub\vhosts\chat\httpdocs`:
 
 ```powershell
 git status --short --branch
 git log --oneline -12
+composer validate --no-check-publish
 php -l public/index.php
 php -l src/Http/Router.php
 php -l src/Auth/RegisterHandler.php
 php -l src/Auth/LoginHandler.php
 php -l src/Auth/EmailVerification.php
+php -l src/Auth/GoogleOAuth.php
+php -l src/Auth/VKOAuth.php
 php -l src/Mail/Mailer.php
 php -l src/Admin/UserManager.php
 php -l src/Admin/RoomManager.php
+php -l src/Validation/UsernameRules.php
 php -l src/Chat/RoomController.php
 php -l src/Chat/MessageController.php
 ```
 
-Docker URLs:
+Suggested smoke checks before deploy:
 
-- app: `http://127.0.0.1:8080`
-- phpMyAdmin: `http://127.0.0.1:8082`
+- existing verified user can log in by username and email;
+- unverified user cannot log in;
+- registration creates pending verification and sends mail;
+- verification link logs the user in;
+- resend verification works and respects cooldown;
+- Google login works for a verified Google email;
+- room send/whisper/numer invite still work after auth changes;
+- admin room category select updates category;
+- global ban with duration and room mute/unmute work.
 
-## 14. Deploy Log Template
+## 14. Task Breakdown Template For Claude CLI
 
-Append entries here after each deploy or meaningful local checkpoint.
+Use small, bounded tasks. Examples:
 
-Format:
+- Audit only: "Read `CLAUDE.md`, check git status, inspect auth files, produce diff-plan only."
+- Security: "Plan removal or formalization of `reactor_raw`; no edits until approved."
+- Email verification: "Audit registration/verification/resend UX and propose exact changes."
+- Migration: "Compare production schema with migration files and produce safe migration plan."
+- OAuth: "Decide and implement approved Google/VK policy."
+- Moderation: "Smoke-test and fix approved ban/mute paths."
+- Deploy: "Prepare commit, push, deploy to production, restart WS, smoke-test, update handoff."
+
+Avoid broad tasks that mix auth, DB migrations, frontend, admin and deploy unless the user explicitly wants a full release pass.
+
+## 15. Deploy Log Template
+
+Append entries below after every meaningful local checkpoint or deploy.
 
 ```text
 ### YYYY-MM-DD HH:mm TZ - short title
@@ -392,32 +420,35 @@ Risks/notes:
 - ...
 ```
 
-## 15. Current Checkpoint
+## 16. Current Checkpoint
 
-### 2026-05-14 - Full audit and Claude handoff document
+### 2026-05-14 - Handoff document updated after clean-tree audit
 
 Commit/deploy:
 
-- Local commit: none in this step.
-- Production revision: last known deployed from session log was `0a4dcd3` for sender session attribution, with later local head at `94a2265`; confirm production before assuming.
-- DB migration: not applied in this step.
-- WS restart: not done in this step.
+- Local commit at audit: `8130a15`.
+- Local/origin status: clean, `main...origin/main`.
+- Production revision: not verified in this audit.
+- DB migration: not applied in this audit.
+- WS restart: not done in this audit.
 
-Changed:
+Changed in this documentation update:
 
-- Created this operating document.
+- Rewrote this handoff as the primary Russian operating document.
+- Added mandatory working method: audit and diff-plan first, no edits before approval, systemic changes only, no variable/name changes without explicit approved plan.
+- Updated repository state from dirty-tree warning to clean-tree state.
+- Updated current feature map for email verification, SMTP, Google OAuth hardening, VK disabled, username validation, admin ban metadata and room category editing.
 
-Verified:
+Verified in this audit:
 
-- Read `.codex/session-log.md`.
-- Inspected repository structure, git status, recent commits, Composer dependencies, migration file, router, selected controllers, WebSocket server/connection manager and active email/mail files.
+- `git status --short --branch` is clean.
+- Recent commits include `2e0530f`, `17f4ecb`, `8130a15`.
+- Current `composer.json`, `config/config.example.php`, `src/DB/migrations.sql`, `src/Auth/RegisterHandler.php`, `src/Auth/LoginHandler.php`, `src/Http/Router.php` were read.
 
 Left for later:
 
-- Fix active dirty tree issues before deploy.
-- Run syntax checks and live smoke tests after fixes.
-
-Risks/notes:
-
-- Dirty tree contains production-risky mail test endpoint and incomplete ban metadata migration.
-- Do not deploy current dirty tree as-is.
+- Verify production revision.
+- Decide `reactor_raw` policy.
+- Verify production PHP version.
+- Smoke-test email verification and OAuth flows.
+- Verify and safely apply DB migrations before production code that depends on new columns.
