@@ -1,5 +1,17 @@
 const ChatAuthConfig = window.ChatConfig || {};
 
+window.addEventListener('pageshow', function(e) {
+  if (!e.persisted) return;
+  fetch('/api/csrf', { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.token) return;
+      ChatAuthConfig.csrfToken = d.token;
+      document.querySelectorAll('[name="csrf_token"]').forEach(el => { el.value = d.token; });
+    })
+    .catch(() => {});
+});
+
 $('#loginForm').on('submit', function(e) {
   e.preventDefault();
   $('#loginError').addClass('d-none');

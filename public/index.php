@@ -44,6 +44,11 @@ $userJson = $user ? json_encode([
 ]) : 'null';
 
 header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src-attr 'unsafe-inline'; img-src * data:; connect-src 'self' ws: wss:; font-src cdn.jsdelivr.net cdnjs.cloudflare.com;");
+if (!$isLoggedIn) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
 ?><!DOCTYPE html>
 <html lang="ru" data-bs-theme="auto">
 <head>
