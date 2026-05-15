@@ -650,6 +650,36 @@ function showUserCtxMenu(e, uid, uname) {
   $menu.css({top: e.clientY, left: e.clientX}).show();
 }
 
+function showModalAbove(el) {
+  const parentEl = document.querySelector('.modal.show');
+
+  if (parentEl && parentEl !== el) {
+    const baseZ = parseInt(getComputedStyle(parentEl).zIndex, 10) || 1055;
+    el.style.zIndex = baseZ + 10;
+
+    el.addEventListener('show.bs.modal', function onShow() {
+      el.removeEventListener('show.bs.modal', onShow);
+      requestAnimationFrame(function () {
+        const bds = document.querySelectorAll('.modal-backdrop');
+        if (bds.length > 1) bds[bds.length - 1].style.zIndex = baseZ + 5;
+      });
+    });
+
+    el.addEventListener('hidden.bs.modal', function onHide() {
+      el.removeEventListener('hidden.bs.modal', onHide);
+      el.style.zIndex = '';
+      const inst = bootstrap.Modal.getInstance(el);
+      if (inst) inst.dispose();
+    });
+
+    const existing = bootstrap.Modal.getInstance(el);
+    if (existing) existing.dispose();
+    new bootstrap.Modal(el, { focus: false }).show();
+  } else {
+    bootstrap.Modal.getOrCreateInstance(el).show();
+  }
+}
+
 function openUserInfo(uid, uname = '') {
   infoUserId = Number(uid || 0);
   infoUsername = String(uname || '').trim();
@@ -717,18 +747,7 @@ function openUserInfo(uid, uname = '') {
     $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
   });
 
-  const adminEl   = document.getElementById('adminModal');
-  const uiEl      = document.getElementById('userInfoModal');
-  const adminInst = bootstrap.Modal.getInstance(adminEl);
-  if (adminInst) {
-    $(adminEl).one('hidden.bs.modal', function () {
-      $(uiEl).one('hidden.bs.modal', function () { adminInst.show(); });
-      bootstrap.Modal.getOrCreateInstance(uiEl).show();
-    });
-    adminInst.hide();
-  } else {
-    bootstrap.Modal.getOrCreateInstance(uiEl).show();
-  }
+  showModalAbove(document.getElementById('userInfoModal'));
 }
 
 $('#user-info-actions').on('click', '.user-info-action-btn', function() {
