@@ -439,9 +439,6 @@ if (!$isLoggedIn) {
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminNumera">Нумера</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminWhispers">Шёпот</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminBans">Баны</a></li>
-        <?php if ($user['global_role'] === 'platform_owner'): ?>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminSettings">Настройки</a></li>
-        <?php endif; ?>
       </ul>
       <div class="tab-content">
         <div class="tab-pane fade show active" id="adminDash">
@@ -474,8 +471,30 @@ if (!$isLoggedIn) {
           </div>
           <div id="admin-whispers-table"></div>
         </div>
-        <?php if ($user['global_role'] === 'platform_owner'): ?>
-        <div class="tab-pane fade" id="adminSettings">
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- Owner panel modal (platform_owner only) -->
+<?php if ($user['global_role'] === 'platform_owner'): ?>
+<div class="modal fade" id="ownerModal" tabindex="-1">
+  <div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="fa fa-crown me-2"></i>Панель владельца</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <ul class="nav nav-tabs mb-3" id="ownerTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#ownerNumera">Нумера</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerWhispers">Шёпот</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerSettings">Настройки</a></li>
+      </ul>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="ownerNumera">
+          <div class="text-muted">Раздел переносится...</div>
+        </div>
+        <div class="tab-pane fade" id="ownerWhispers">
+          <div class="text-muted">Раздел переносится...</div>
+        </div>
+        <div class="tab-pane fade" id="ownerSettings">
           <form id="adminSettingsForm" class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Формат даты/времени</label>
@@ -529,33 +548,6 @@ if (!$isLoggedIn) {
               <button type="submit" class="btn btn-primary">Сохранить настройки</button>
             </div>
           </form>
-        </div>
-        <?php endif; ?>
-      </div>
-    </div>
-  </div></div>
-</div>
-
-<!-- Owner panel modal (platform_owner only) -->
-<?php if ($user['global_role'] === 'platform_owner'): ?>
-<div class="modal fade" id="ownerModal" tabindex="-1">
-  <div class="modal-dialog modal-xl"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title"><i class="fa fa-crown me-2"></i>Панель владельца</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <ul class="nav nav-tabs mb-3" id="ownerTabs">
-        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#ownerNumera">Нумера</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerWhispers">Шёпот</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerSettings">Настройки</a></li>
-      </ul>
-      <div class="tab-content">
-        <div class="tab-pane fade show active" id="ownerNumera">
-          <div class="text-muted">Раздел переносится...</div>
-        </div>
-        <div class="tab-pane fade" id="ownerWhispers">
-          <div class="text-muted">Раздел переносится...</div>
-        </div>
-        <div class="tab-pane fade" id="ownerSettings">
-          <div class="text-muted">Раздел переносится...</div>
         </div>
       </div>
     </div>

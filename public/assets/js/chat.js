@@ -1234,7 +1234,11 @@ function initAdmin() {
     if (tab === '#adminNumera')   loadAdminNumera();
     if (tab === '#adminWhispers') loadAdminWhispers();
     if (tab === '#adminBans')     loadAdminBans();
-    if (tab === '#adminSettings') loadAdminSettings();
+  });
+
+  $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
+    const tab = $(this).attr('href');
+    if (tab === '#ownerSettings') loadAdminSettings();
   });
 
   $('#admin-user-search-btn').on('click', loadAdminUsers);
