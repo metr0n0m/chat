@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Chat\Chat;
 
+use Chat\Admin\Access;
 use Chat\DB\Connection;
 use Chat\Support\Timestamp;
 
@@ -161,24 +162,7 @@ class MessageController
 
     private static function canDelete(array $msg, int $actorId, array $actor): bool
     {
-        $globalRole = (string) ($actor['global_role'] ?? 'user');
-        if (in_array($globalRole, ['platform_owner', 'admin'], true)) {
-            return true;
-        }
-
-        if ($globalRole === 'moderator') {
-            $db = Connection::getInstance();
-            $room = $db->fetchOne('SELECT type FROM rooms WHERE id = ?', [(int) $msg['room_id']]);
-            return $room && $room['type'] === 'public';
-        }
-
-        $db = Connection::getInstance();
-        $roomRole = $db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
-            [(int) $msg['room_id'], $actorId]
-        )['room_role'] ?? null;
-
-        return in_array($roomRole, ['owner', 'local_admin', 'local_moderator'], true);
+        return Access::canDeleteMessage(['id' => $actorId] + $actor, $msg);
     }
 
     private static function canPost(int $roomId, int $userId, string $globalRole): bool
@@ -215,31 +199,7 @@ class MessageController
 
     private static function canAccess(int $roomId, int $userId, string $globalRole): bool
     {
-        $db = Connection::getInstance();
-        $room = $db->fetchOne('SELECT type, is_closed FROM rooms WHERE id = ?', [$roomId]);
-
-        if (!$room || (int) $room['is_closed'] === 1) {
-            return false;
-        }
-
-        if (in_array($globalRole, ['platform_owner', 'admin'], true)) {
-            return true;
-        }
-
-        if ($room['type'] === 'public') {
-            $member = $db->fetchOne(
-                'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
-                [$roomId, $userId]
-            );
-            return !$member || $member['room_role'] !== 'banned';
-        }
-
-        $member = $db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
-            [$roomId, $userId]
-        );
-
-        return $member && $member['room_role'] !== 'banned';
+        return Access::canAccessRoom(['id' => $userId, 'global_role' => $globalRole], $roomId);
     }
 
     private static function jsonError(string $message, int $code = 400): never

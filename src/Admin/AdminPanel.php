@@ -31,7 +31,7 @@ class AdminPanel
     public static function requireAdmin(): array
     {
         $user = Session::current();
-        if (!$user || !in_array($user['global_role'], ['platform_owner', 'admin'], true)) {
+        if (!$user || !Access::canOpenAdminPanel($user)) {
             http_response_code(403);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['success' => false, 'error' => 'Доступ запрещён.'], JSON_UNESCAPED_UNICODE);
@@ -184,7 +184,7 @@ class AdminPanel
     private static function requireOwner(): array
     {
         $actor = Session::current();
-        if (!$actor || ($actor['global_role'] ?? '') !== 'platform_owner') {
+        if (!$actor || !Access::canOpenOwnerPanel($actor)) {
             http_response_code(403);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['success' => false, 'error' => 'Только владелец платформы.'], JSON_UNESCAPED_UNICODE);
