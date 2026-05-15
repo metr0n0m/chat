@@ -1613,6 +1613,7 @@ function loadAdminNumera() {
         container: 'body',
         trigger:   'click',
         html:      true,
+        sanitize:  false,
         title:     'Участники',
         content,
       });
