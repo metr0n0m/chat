@@ -717,7 +717,18 @@ function openUserInfo(uid, uname = '') {
     $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
   });
 
-  new bootstrap.Modal(document.getElementById('userInfoModal')).show();
+  const adminEl   = document.getElementById('adminModal');
+  const uiEl      = document.getElementById('userInfoModal');
+  const adminInst = bootstrap.Modal.getInstance(adminEl);
+  if (adminInst) {
+    $(adminEl).one('hidden.bs.modal', function () {
+      $(uiEl).one('hidden.bs.modal', function () { adminInst.show(); });
+      bootstrap.Modal.getOrCreateInstance(uiEl).show();
+    });
+    adminInst.hide();
+  } else {
+    bootstrap.Modal.getOrCreateInstance(uiEl).show();
+  }
 }
 
 $('#user-info-actions').on('click', '.user-info-action-btn', function() {
