@@ -662,11 +662,16 @@ function showModalAbove(el) {
     }
     document.addEventListener('focusin', _focusinGuard, true);
 
+    let elevatedBd = null;
+
     el.addEventListener('show.bs.modal', function onShow() {
       el.removeEventListener('show.bs.modal', onShow);
       requestAnimationFrame(function () {
         const bds = document.querySelectorAll('.modal-backdrop');
-        if (bds.length > 1) bds[bds.length - 1].style.zIndex = baseZ + 5;
+        if (bds.length > 1) {
+          elevatedBd = bds[bds.length - 1];
+          elevatedBd.style.zIndex = baseZ + 5;
+        }
       });
     });
 
@@ -674,6 +679,7 @@ function showModalAbove(el) {
       el.removeEventListener('hidden.bs.modal', onHide);
       el.style.zIndex = '';
       document.removeEventListener('focusin', _focusinGuard, true);
+      if (elevatedBd) { elevatedBd.style.zIndex = ''; elevatedBd = null; }
     });
   }
 
