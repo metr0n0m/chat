@@ -1488,7 +1488,7 @@ function loadAdminNumera() {
   $.get('/api/admin/numera', function(resp) {
     if (!resp.success) return;
     if (!resp.numera.length) {
-      $('#admin-numera-table').html('<div class="text-muted p-2">Активных нумеров нет.</div>');
+      $('#admin-numera-table').html('<div class="text-muted p-2">Нумеров нет.</div>');
       return;
     }
     const fmtDuration = (min) => {
@@ -1496,23 +1496,34 @@ function loadAdminNumera() {
       const h = Math.floor(min / 60), m = min % 60;
       return `${h}ч ${m}м`;
     };
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Кол-во</th><th>Идёт</th><th></th></tr></thead><tbody>';
+    const closeReasonLabel = (r) => {
+      if (!r.close_reason) return '—';
+      if (r.close_reason === 'last_left') return 'Все вышли';
+      if (r.close_reason === 'idle') return 'Простой';
+      if (r.close_reason === 'admin') return 'Админ';
+      return r.close_reason;
+    };
+    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Статус</th><th>Закрыт</th><th>Причина</th><th></th></tr></thead><tbody>';
     resp.numera.forEach(r => {
+      const isClosed = Number(r.is_closed) === 1;
       const started = r.created_at && dayjs(r.created_at).isValid() ? formatChatDateTime(r.created_at) : '—';
-      const duration = fmtDuration(Number(r.minutes_running) || 0);
-      const statusDot = Number(r.member_count) > 0
-        ? '<span class="badge bg-success">Активен</span>'
-        : '<span class="badge bg-warning text-dark">Завис</span>';
+      const closedAt = r.closed_at && dayjs(r.closed_at).isValid() ? formatChatDateTime(r.closed_at) : '—';
+      const statusCell = isClosed
+        ? '<span class="badge bg-secondary">Закрыт</span>'
+        : (Number(r.member_count) > 0
+            ? `<span class="badge bg-success">Активен</span> ${fmtDuration(Number(r.minutes_running) || 0)}`
+            : `<span class="badge bg-warning text-dark">Завис</span> ${fmtDuration(Number(r.minutes_running) || 0)}`);
+      const closeBtn = isClosed ? '' : `<button class="btn btn-sm btn-outline-danger numer-close-btn ms-1" data-id="${r.id}" title="Закрыть нумер"><i class="fa fa-xmark"></i></button>`;
       html += `<tr>
         <td>${r.id}</td>
         <td>${started}</td>
         <td>${esc(r.owner_username||'—')}</td>
         <td class="small">${esc(r.participants||'—')}</td>
-        <td>${statusDot} ${r.member_count}</td>
-        <td>${duration}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-info numer-history-btn me-1" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>
-          <button class="btn btn-sm btn-outline-danger numer-close-btn" data-id="${r.id}" title="Закрыть нумер"><i class="fa fa-xmark"></i></button>
+        <td>${statusCell}</td>
+        <td>${isClosed ? closedAt : '—'}</td>
+        <td>${isClosed ? closeReasonLabel(r) : '—'}</td>
+        <td class="text-nowrap">
+          <button class="btn btn-sm btn-outline-info numer-history-btn" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>${closeBtn}
         </td></tr>`;
     });
     html += '</tbody></table>';

@@ -173,6 +173,9 @@ ALTER TABLE `messages`
 ALTER TABLE `messages`
   ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL AFTER `deleted_by`;
 
+ALTER TABLE `rooms`
+  ADD COLUMN IF NOT EXISTS `close_reason` ENUM('last_left','idle','admin') NULL AFTER `closed_at`;
+
 ALTER TABLE `users`
   ADD COLUMN IF NOT EXISTS `email_verified` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_banned`,
   ADD COLUMN IF NOT EXISTS `reactor_raw` TEXT DEFAULT NULL AFTER `password_hash`;

@@ -149,7 +149,7 @@ class NumerController
 
         if ($remaining === 0) {
             $db->execute(
-                'UPDATE rooms SET is_closed = 1, closed_at = NOW() WHERE id = ?',
+                "UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'last_left' WHERE id = ?",
                 [$roomId]
             );
             return ['left' => true, 'room_id' => $roomId, 'destroyed' => true];

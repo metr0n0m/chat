@@ -142,7 +142,7 @@ class RoomManager
         $offset = max(0, ($page - 1) * 50);
 
         $numera = $db->fetchAll(
-            "SELECT r.id, r.name, r.created_at,
+            "SELECT r.id, r.name, r.created_at, r.is_closed, r.closed_at, r.close_reason,
                     TIMESTAMPDIFF(MINUTE, r.created_at, NOW()) AS minutes_running,
                     u.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
@@ -151,12 +151,12 @@ class RoomManager
              LEFT JOIN users u ON u.id = r.owner_id
              LEFT JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.room_role != 'banned'
              LEFT JOIN users u2 ON u2.id = rm2.user_id
-             WHERE r.type = 'numer' AND r.is_closed = 0
+             WHERE r.type = 'numer'
              GROUP BY r.id
-             ORDER BY r.created_at DESC
+             ORDER BY r.is_closed ASC, r.created_at DESC
              LIMIT 50 OFFSET $offset"
         );
-        $numera = Timestamp::normalizeRows($numera, ['created_at']);
+        $numera = Timestamp::normalizeRows($numera, ['created_at', 'closed_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'numera' => $numera, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -250,7 +250,7 @@ class RoomManager
         if (!$room) {
             self::jsonError('Нумер не найден или уже закрыт.', 404);
         }
-        $db->execute('UPDATE rooms SET is_closed = 1, closed_at = NOW() WHERE id = ?', [$roomId]);
+        $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'admin' WHERE id = ?", [$roomId]);
         self::jsonSuccess(['closed' => true, 'room_id' => $roomId]);
     }
 

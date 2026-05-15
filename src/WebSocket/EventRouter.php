@@ -569,7 +569,7 @@ class EventRouter
                 if (!$db->fetchOne("SELECT id FROM rooms WHERE id = ? AND is_closed = 0", [$roomId])) {
                     return;
                 }
-                $db->execute('UPDATE rooms SET is_closed = 1, closed_at = NOW() WHERE id = ?', [$roomId]);
+                $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'idle' WHERE id = ?", [$roomId]);
                 $cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
                 $cm->clearRoom($roomId);
                 $self->broadcastRoomCount($roomId);
