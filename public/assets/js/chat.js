@@ -657,6 +657,11 @@ function showModalAbove(el) {
     const baseZ = parseInt(getComputedStyle(parentEl).zIndex, 10) || 1055;
     el.style.zIndex = baseZ + 10;
 
+    function _focusinGuard(e) {
+      if (el.contains(e.target)) e.stopPropagation();
+    }
+    document.addEventListener('focusin', _focusinGuard, true);
+
     el.addEventListener('show.bs.modal', function onShow() {
       el.removeEventListener('show.bs.modal', onShow);
       requestAnimationFrame(function () {
@@ -668,16 +673,11 @@ function showModalAbove(el) {
     el.addEventListener('hidden.bs.modal', function onHide() {
       el.removeEventListener('hidden.bs.modal', onHide);
       el.style.zIndex = '';
-      const inst = bootstrap.Modal.getInstance(el);
-      if (inst) inst.dispose();
+      document.removeEventListener('focusin', _focusinGuard, true);
     });
-
-    const existing = bootstrap.Modal.getInstance(el);
-    if (existing) existing.dispose();
-    new bootstrap.Modal(el, { focus: false }).show();
-  } else {
-    bootstrap.Modal.getOrCreateInstance(el).show();
   }
+
+  bootstrap.Modal.getOrCreateInstance(el).show();
 }
 
 function openUserInfo(uid, uname = '') {
