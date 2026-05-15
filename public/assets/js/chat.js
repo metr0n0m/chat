@@ -1219,6 +1219,12 @@ function initAdmin() {
     new bootstrap.Modal(document.getElementById('adminModal')).show();
   });
 
+  $('#owner-btn').on('click', function(e) {
+    e.preventDefault();
+    const el = document.getElementById('ownerModal');
+    if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+  });
+
   // Tab switch
   $('#adminTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');

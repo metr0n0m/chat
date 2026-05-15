@@ -198,6 +198,9 @@ if (!$isLoggedIn) {
 <?php if (in_array($user['global_role'], ['platform_owner', 'admin'], true)): ?>
       <a href="#" id="admin-btn" class="btn btn-sm btn-outline-warning" title="Администрирование"><i class="fa fa-shield-alt"></i></a>
       <?php endif; ?>
+<?php if ($user['global_role'] === 'platform_owner'): ?>
+      <a href="#" id="owner-btn" class="btn btn-sm btn-outline-info" title="Панель владельца"><i class="fa fa-crown"></i></a>
+      <?php endif; ?>
     </div>
 
     <div class="chat-mobile-body">
@@ -532,6 +535,33 @@ if (!$isLoggedIn) {
     </div>
   </div></div>
 </div>
+
+<!-- Owner panel modal (platform_owner only) -->
+<?php if ($user['global_role'] === 'platform_owner'): ?>
+<div class="modal fade" id="ownerModal" tabindex="-1">
+  <div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="fa fa-crown me-2"></i>Панель владельца</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <ul class="nav nav-tabs mb-3" id="ownerTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#ownerNumera">Нумера</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerWhispers">Шёпот</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerSettings">Настройки</a></li>
+      </ul>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="ownerNumera">
+          <div class="text-muted">Раздел переносится...</div>
+        </div>
+        <div class="tab-pane fade" id="ownerWhispers">
+          <div class="text-muted">Раздел переносится...</div>
+        </div>
+        <div class="tab-pane fade" id="ownerSettings">
+          <div class="text-muted">Раздел переносится...</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+<?php endif; ?>
 
 <!-- User info modal -->
 <div class="modal fade" id="userInfoModal" tabindex="-1">
