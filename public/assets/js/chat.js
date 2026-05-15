@@ -1500,14 +1500,8 @@ function loadAdminNumera() {
   const buildParticipantsCell = (participants, memberCount) => {
     const count = Number(memberCount) || 0;
     if (!count && !participants) return '0';
-    const names = participants
-      ? participants.split(', ').map(n => esc(n.trim())).join('<br>')
-      : '';
-    const title = esc(participants || '');
-    return `<button class="btn btn-link p-0 numer-part-btn" data-bs-toggle="popover"
-      data-bs-trigger="click" data-bs-html="true"
-      data-bs-content="${names || '—'}" data-bs-title="Участники"
-      title="${title}" style="text-decoration:underline dotted">${count}</button>`;
+    return `<span class="numer-part-btn" data-parts="${esc(participants||'')}"
+      style="cursor:pointer;border-bottom:1px dotted currentColor">${count}</span>`;
   };
 
   $.when(
@@ -1568,10 +1562,30 @@ function loadAdminNumera() {
     html += '</tbody></table>';
     $('#admin-numera-table').html(html);
 
-    document.querySelectorAll('#admin-numera-table [data-bs-toggle="popover"]').forEach(el => {
+    document.querySelectorAll('#admin-numera-table .numer-part-btn').forEach(el => {
       const existing = bootstrap.Popover.getInstance(el);
       if (existing) existing.dispose();
-      new bootstrap.Popover(el, { container: 'body', trigger: 'click', html: true });
+
+      const parts = el.getAttribute('data-parts') || '';
+      let content = '—';
+      if (parts) {
+        content = parts.split(', ').map(entry => {
+          const sep = entry.indexOf(':');
+          if (sep < 1) return `<span>${esc(entry.trim())}</span>`;
+          const uid  = parseInt(entry.substring(0, sep).trim(), 10);
+          const name = entry.substring(sep + 1).trim();
+          if (!uid)  return `<span>${esc(name)}</span>`;
+          return `<a href="#" class="numer-user-link d-block" data-uid="${uid}" data-uname="${esc(name)}">${esc(name)}</a>`;
+        }).join('');
+      }
+
+      new bootstrap.Popover(el, {
+        container: 'body',
+        trigger:   'click',
+        html:      true,
+        title:     'Участники',
+        content,
+      });
     });
   });
 }
@@ -1655,6 +1669,26 @@ $('#admin-numera-table').on('click', '.numer-clear-archive-btn', function() {
     if (resp.success) { showToast('Переписка нумера #' + id + ' удалена из архива.', 'success'); loadAdminNumera(); }
     else showToast(resp.error || 'Ошибка', 'danger');
   }, 'json');
+});
+
+$(document).on('click', function(e) {
+  if ($(e.target).closest('.popover, .numer-part-btn').length) return;
+  document.querySelectorAll('#admin-numera-table .numer-part-btn').forEach(el => {
+    const pop = bootstrap.Popover.getInstance(el);
+    if (pop) pop.hide();
+  });
+});
+
+$(document).on('click', '.numer-user-link', function(e) {
+  e.preventDefault();
+  const uid   = parseInt($(this).data('uid'), 10);
+  const uname = String($(this).data('uname') || '');
+  if (!uid) return;
+  document.querySelectorAll('#admin-numera-table .numer-part-btn').forEach(el => {
+    const pop = bootstrap.Popover.getInstance(el);
+    if (pop) pop.hide();
+  });
+  openUserInfo(uid, uname);
 });
 
 function openRoomHistory(roomId, roomName) {

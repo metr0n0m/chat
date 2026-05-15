@@ -147,7 +147,7 @@ class RoomManager
                     u.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
                     (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id AND m.is_deleted = 0) AS message_count,
-                    GROUP_CONCAT(u2.username ORDER BY rm2.joined_at SEPARATOR ', ') AS participants
+                    GROUP_CONCAT(CONCAT(u2.id, ':', u2.username) ORDER BY rm2.joined_at SEPARATOR ', ') AS participants
              FROM rooms r
              LEFT JOIN users u ON u.id = r.owner_id
              LEFT JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.room_role != 'banned'
@@ -287,7 +287,7 @@ class RoomManager
                     u_owner.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rc WHERE rc.room_id = r.id AND rc.room_role != \'banned\') AS member_count,
                     (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id AND m.is_deleted = 0) AS message_count,
-                    GROUP_CONCAT(u.username ORDER BY u.username SEPARATOR \', \') AS participants
+                    GROUP_CONCAT(CONCAT(u.id, \':\', u.username) ORDER BY u.username SEPARATOR \', \') AS participants
              FROM rooms r
              LEFT JOIN users u_owner ON u_owner.id = r.owner_id
              LEFT JOIN room_members rm ON rm.room_id = r.id
