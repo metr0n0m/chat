@@ -108,6 +108,14 @@ class Access
         return in_array($roomRole, ['owner', 'local_admin', 'local_moderator'], true);
     }
 
+    public static function requireOwnerPrivateArchive(?array $user): array
+    {
+        if (!$user || !self::isOwner($user)) {
+            self::denyNotFound();
+        }
+        return $user;
+    }
+
     public static function denyForbidden(): never
     {
         http_response_code(403);
@@ -119,8 +127,6 @@ class Access
     public static function denyNotFound(): never
     {
         http_response_code(404);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['error' => 'Not found'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

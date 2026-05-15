@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace Chat\Chat;
 
+use Chat\Admin\Access;
 use Chat\DB\Connection;
 use Chat\Security\HMAC;
+use Chat\Security\Session;
 use Chat\Support\Lang;
 use Chat\Support\Timestamp;
 
@@ -88,6 +90,7 @@ class WhisperController
      */
     public static function archive(int $page = 1, array $filters = []): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         $db = Connection::getInstance();
         $offset = max(0, ($page - 1) * 50);
         $where = ["m.type = 'whisper'", 'm.is_deleted = 0'];
@@ -142,6 +145,7 @@ class WhisperController
 
     public static function deleteWhisper(int $id): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         if (!\Chat\Security\CSRF::verifyRequest()) {
             http_response_code(403);
             header('Content-Type: application/json; charset=UTF-8');
@@ -159,6 +163,7 @@ class WhisperController
 
     public static function clearWhispers(array $post): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         if (!\Chat\Security\CSRF::verifyRequest()) {
             http_response_code(403);
             header('Content-Type: application/json; charset=UTF-8');

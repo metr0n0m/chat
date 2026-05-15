@@ -5,6 +5,7 @@ namespace Chat\Admin;
 
 use Chat\DB\Connection;
 use Chat\Security\CSRF;
+use Chat\Security\Session;
 use Chat\Support\Timestamp;
 
 /**
@@ -136,6 +137,7 @@ class RoomManager
      */
     public static function numeraActive(int $page = 1): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         $db     = Connection::getInstance();
         $offset = max(0, ($page - 1) * 50);
 
@@ -239,6 +241,7 @@ class RoomManager
      */
     public static function closeNumer(int $roomId): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         if (!CSRF::verifyRequest()) {
             self::jsonError('CSRF.', 403);
         }
@@ -259,6 +262,7 @@ class RoomManager
      */
     public static function numeraArchive(int $page = 1, array $filters = []): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         $db = Connection::getInstance();
         $offset = max(0, ($page - 1) * 50);
         $where = ["r.type = 'numer' AND r.is_closed = 1"];
@@ -303,6 +307,7 @@ class RoomManager
      */
     public static function numeraMessages(int $roomId): void
     {
+        Access::requireOwnerPrivateArchive(Session::current());
         $db = Connection::getInstance();
         $room = $db->fetchOne("SELECT id, type FROM rooms WHERE id = ? AND type = 'numer'", [$roomId]);
         if (!$room) {

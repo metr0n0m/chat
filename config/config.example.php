@@ -19,6 +19,10 @@ define('WS_PORT', 8080);
 define('WS_HOST', 'yourdomain.com');
 define('WS_BIND_HOST', '127.0.0.1');
 
+// WebSocket Origin allowlist — exact origins, no wildcards, no subdomains unless listed
+// define('WS_ALLOWED_ORIGINS', ['https://yourdomain.com']);
+// For local dev: define('WS_ALLOWED_ORIGINS', ['http://127.0.0.1:8080']);
+
 // VK OAuth — disabled
 // define('VK_CLIENT_ID', '');
 // define('VK_CLIENT_SECRET', '');

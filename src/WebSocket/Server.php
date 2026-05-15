@@ -5,6 +5,7 @@ namespace Chat\WebSocket;
 
 use Ratchet\ConnectionInterface;
 use Ratchet\MessageComponentInterface;
+use Chat\Security\OriginGuard;
 use Chat\Security\Session;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
@@ -29,6 +30,13 @@ class Server implements MessageComponentInterface
 
     public function onOpen(ConnectionInterface $conn): void
     {
+        $origin = $conn->httpRequest->getHeader('Origin')[0] ?? null;
+        if (!OriginGuard::isAllowed($origin)) {
+            echo '[WS] Rejected origin: ' . ($origin ?? 'null') . PHP_EOL;
+            $conn->close();
+            return;
+        }
+
         $cookies = $this->parseCookies(
             $conn->httpRequest->getHeader('Cookie')[0] ?? ''
         );
