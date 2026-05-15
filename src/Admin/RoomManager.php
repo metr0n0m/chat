@@ -382,7 +382,7 @@ class RoomManager
             self::jsonError('Комната не найдена.', 404);
         }
         $db->execute(
-            "UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE room_id = ? AND type != 'whisper' AND is_deleted = 0",
+            "UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND type != 'whisper' AND is_deleted = 0",
             [(int) ($actor['id'] ?? 0), $roomId]
         );
         self::jsonSuccess(['cleared' => true]);
@@ -396,7 +396,7 @@ class RoomManager
         $actor = \Chat\Security\Session::current();
         $db    = Connection::getInstance();
         $db->execute(
-            "UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE room_id = ? AND user_id = ? AND type != 'whisper' AND is_deleted = 0",
+            "UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND user_id = ? AND type != 'whisper' AND is_deleted = 0",
             [(int) ($actor['id'] ?? 0), $roomId, $userId]
         );
         self::jsonSuccess(['cleared' => true]);

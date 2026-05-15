@@ -154,7 +154,7 @@ class MessageController
             return ['error' => 'Нет прав.'];
         }
 
-        $db->execute('UPDATE messages SET is_deleted = 1, deleted_by = ? WHERE id = ?', [$actorId, $messageId]);
+        $db->execute('UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE id = ?', [$actorId, $messageId]);
 
         return ['deleted' => true, 'message_id' => $messageId, 'room_id' => (int) $msg['room_id']];
     }

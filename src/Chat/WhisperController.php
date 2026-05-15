@@ -149,7 +149,7 @@ class WhisperController
             exit;
         }
         Connection::getInstance()->execute(
-            "UPDATE messages SET is_deleted = 1 WHERE id = ? AND type = 'whisper'",
+            "UPDATE messages SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND type = 'whisper'",
             [$id]
         );
         header('Content-Type: application/json; charset=UTF-8');
@@ -191,7 +191,7 @@ class WhisperController
                 $params[] = (int) $u['id'];
             }
         }
-        $db->execute('UPDATE messages SET is_deleted = 1 WHERE ' . implode(' AND ', $where), $params);
+        $db->execute('UPDATE messages SET is_deleted = 1, deleted_at = NOW() WHERE ' . implode(' AND ', $where), $params);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
         exit;

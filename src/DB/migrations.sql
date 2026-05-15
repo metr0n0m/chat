@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `embed_data`    JSON,
   `is_deleted`    TINYINT(1) DEFAULT 0,
   `deleted_by`    INT UNSIGNED,
+  `deleted_at`    DATETIME NULL,
   `created_at`    DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   INDEX `idx_room_time` (`room_id`, `created_at`),
   INDEX `idx_sender_session` (`sender_session_id`),
@@ -168,6 +169,9 @@ ALTER TABLE `messages`
 ALTER TABLE `messages`
   ADD COLUMN IF NOT EXISTS `nick_color` CHAR(7) NULL DEFAULT NULL AFTER `embed_data`,
   ADD COLUMN IF NOT EXISTS `text_color` CHAR(7) NULL DEFAULT NULL AFTER `nick_color`;
+
+ALTER TABLE `messages`
+  ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL AFTER `deleted_by`;
 
 ALTER TABLE `users`
   ADD COLUMN IF NOT EXISTS `email_verified` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_banned`,
