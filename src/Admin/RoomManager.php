@@ -146,7 +146,7 @@ class RoomManager
                     TIMESTAMPDIFF(MINUTE, r.created_at, NOW()) AS minutes_running,
                     u.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
-                    (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id) AS message_count,
+                    (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id AND m.is_deleted = 0) AS message_count,
                     GROUP_CONCAT(u2.username ORDER BY rm2.joined_at SEPARATOR ', ') AS participants
              FROM rooms r
              LEFT JOIN users u ON u.id = r.owner_id
