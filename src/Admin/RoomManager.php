@@ -142,21 +142,22 @@ class RoomManager
         $offset = max(0, ($page - 1) * 50);
 
         $numera = $db->fetchAll(
-            "SELECT r.id, r.name, r.created_at, r.is_closed, r.closed_at, r.close_reason,
+            "SELECT r.id, r.name, r.created_at,
                     TIMESTAMPDIFF(MINUTE, r.created_at, NOW()) AS minutes_running,
                     u.username AS owner_username,
                     (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
+                    (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id) AS message_count,
                     GROUP_CONCAT(u2.username ORDER BY rm2.joined_at SEPARATOR ', ') AS participants
              FROM rooms r
              LEFT JOIN users u ON u.id = r.owner_id
              LEFT JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.room_role != 'banned'
              LEFT JOIN users u2 ON u2.id = rm2.user_id
-             WHERE r.type = 'numer'
+             WHERE r.type = 'numer' AND r.is_closed = 0
              GROUP BY r.id
-             ORDER BY r.is_closed ASC, r.created_at DESC
+             ORDER BY r.created_at DESC
              LIMIT 50 OFFSET $offset"
         );
-        $numera = Timestamp::normalizeRows($numera, ['created_at', 'closed_at']);
+        $numera = Timestamp::normalizeRows($numera, ['created_at']);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'numera' => $numera, 'page' => $page], JSON_UNESCAPED_UNICODE);
@@ -282,12 +283,15 @@ class RoomManager
         }
 
         $rooms = $db->fetchAll(
-            'SELECT r.id, r.name, r.closed_at, r.created_at,
-                    (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id) AS message_count,
-                    GROUP_CONCAT(u.username ORDER BY u.username SEPARATOR ", ") AS participants
+            'SELECT r.id, r.name, r.created_at, r.closed_at, r.close_reason,
+                    u_owner.username AS owner_username,
+                    (SELECT COUNT(*) FROM room_members rc WHERE rc.room_id = r.id AND rc.room_role != \'banned\') AS member_count,
+                    (SELECT COUNT(*) FROM messages m WHERE m.room_id = r.id AND m.is_deleted = 0) AS message_count,
+                    GROUP_CONCAT(u.username ORDER BY u.username SEPARATOR \', \') AS participants
              FROM rooms r
-             JOIN room_members rm ON rm.room_id = r.id
-             JOIN users u ON u.id = rm.user_id
+             LEFT JOIN users u_owner ON u_owner.id = r.owner_id
+             LEFT JOIN room_members rm ON rm.room_id = r.id
+             LEFT JOIN users u ON u.id = rm.user_id
              WHERE ' . implode(' AND ', $where) . '
              GROUP BY r.id
              ORDER BY r.closed_at DESC
@@ -403,6 +407,27 @@ class RoomManager
         $db->execute(
             "UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND user_id = ? AND type != 'whisper' AND is_deleted = 0",
             [(int) ($actor['id'] ?? 0), $roomId, $userId]
+        );
+        self::jsonSuccess(['cleared' => true]);
+    }
+
+    /**
+     * Soft-delete всех сообщений закрытого нумера (только platform_owner).
+     */
+    public static function clearNumerArchive(int $roomId): void
+    {
+        $actor = Access::requireOwnerPrivateArchive(Session::current());
+        if (!CSRF::verifyRequest()) {
+            self::jsonError('CSRF.', 403);
+        }
+        $db   = Connection::getInstance();
+        $room = $db->fetchOne("SELECT id FROM rooms WHERE id = ? AND type = 'numer' AND is_closed = 1", [$roomId]);
+        if (!$room) {
+            self::jsonError('Нумер не найден или не закрыт.', 404);
+        }
+        $db->execute(
+            'UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND is_deleted = 0',
+            [(int) ($actor['id'] ?? 0), $roomId]
         );
         self::jsonSuccess(['cleared' => true]);
     }

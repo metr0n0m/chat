@@ -1485,49 +1485,94 @@ $(document).off('change.adminRoomsCategory', '.room-category-select').on('change
 });
 
 function loadAdminNumera() {
-  $.get('/api/admin/numera', function(resp) {
-    if (!resp.success) return;
-    if (!resp.numera.length) {
+  const fmtDuration = (min) => {
+    if (min < 60) return `${min} мин`;
+    const h = Math.floor(min / 60), m = min % 60;
+    return `${h}ч ${m}м`;
+  };
+  const closeReasonLabel = (reason) => {
+    if (!reason) return '—';
+    if (reason === 'last_left') return 'Все вышли';
+    if (reason === 'idle')      return 'Простой';
+    if (reason === 'admin')     return 'Админ';
+    return esc(reason);
+  };
+  const buildParticipantsCell = (participants, memberCount) => {
+    const count = Number(memberCount) || 0;
+    if (!count && !participants) return '0';
+    const names = participants
+      ? participants.split(', ').map(n => esc(n.trim())).join('<br>')
+      : '';
+    const title = esc(participants || '');
+    return `<button class="btn btn-link p-0 numer-part-btn" data-bs-toggle="popover"
+      data-bs-trigger="click" data-bs-html="true"
+      data-bs-content="${names || '—'}" data-bs-title="Участники"
+      title="${title}" style="text-decoration:underline dotted">${count}</button>`;
+  };
+
+  $.when(
+    $.get('/api/admin/numera'),
+    $.get('/api/admin/numera/archive')
+  ).then(function([activeResp], [archiveResp]) {
+    const active   = (activeResp.success  && activeResp.numera)  ? activeResp.numera  : [];
+    const archived = (archiveResp.success && archiveResp.numera) ? archiveResp.numera : [];
+
+    if (!active.length && !archived.length) {
       $('#admin-numera-table').html('<div class="text-muted p-2">Нумеров нет.</div>');
       return;
     }
-    const fmtDuration = (min) => {
-      if (min < 60) return `${min} мин`;
-      const h = Math.floor(min / 60), m = min % 60;
-      return `${h}ч ${m}м`;
-    };
-    const closeReasonLabel = (r) => {
-      if (!r.close_reason) return '—';
-      if (r.close_reason === 'last_left') return 'Все вышли';
-      if (r.close_reason === 'idle') return 'Простой';
-      if (r.close_reason === 'admin') return 'Админ';
-      return r.close_reason;
-    };
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Создан</th><th>Создатель</th><th>Участники</th><th>Статус</th><th>Закрыт</th><th>Причина</th><th></th></tr></thead><tbody>';
-    resp.numera.forEach(r => {
-      const isClosed = Number(r.is_closed) === 1;
+
+    let html = `<table class="table table-sm">
+      <thead><tr>
+        <th>ID</th><th>Создан</th><th>Владелец</th><th>Участники</th><th>Сообщений</th>
+        <th>Статус</th><th>Закрыт</th><th>Причина</th><th></th>
+      </tr></thead><tbody>`;
+
+    active.forEach(r => {
       const started = r.created_at && dayjs(r.created_at).isValid() ? formatChatDateTime(r.created_at) : '—';
-      const closedAt = r.closed_at && dayjs(r.closed_at).isValid() ? formatChatDateTime(r.closed_at) : '—';
-      const statusCell = isClosed
-        ? '<span class="badge bg-secondary">Закрыт</span>'
-        : (Number(r.member_count) > 0
-            ? `<span class="badge bg-success">Активен</span> ${fmtDuration(Number(r.minutes_running) || 0)}`
-            : `<span class="badge bg-warning text-dark">Завис</span> ${fmtDuration(Number(r.minutes_running) || 0)}`);
-      const closeBtn = isClosed ? '' : `<button class="btn btn-sm btn-outline-danger numer-close-btn ms-1" data-id="${r.id}" title="Закрыть нумер"><i class="fa fa-xmark"></i></button>`;
+      const status = Number(r.member_count) > 0
+        ? `<span class="badge bg-success">Активен</span> ${fmtDuration(Number(r.minutes_running) || 0)}`
+        : `<span class="badge bg-warning text-dark">Завис</span> ${fmtDuration(Number(r.minutes_running) || 0)}`;
       html += `<tr>
         <td>${r.id}</td>
         <td>${started}</td>
         <td>${esc(r.owner_username||'—')}</td>
-        <td class="small">${esc(r.participants||'—')}</td>
-        <td>${statusCell}</td>
-        <td>${isClosed ? closedAt : '—'}</td>
-        <td>${isClosed ? closeReasonLabel(r) : '—'}</td>
+        <td>${buildParticipantsCell(r.participants, r.member_count)}</td>
+        <td>${Number(r.message_count)||0}</td>
+        <td>${status}</td>
+        <td>—</td><td>—</td>
         <td class="text-nowrap">
-          <button class="btn btn-sm btn-outline-info numer-history-btn" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>${closeBtn}
+          <button class="btn btn-sm btn-outline-info numer-history-btn me-1" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>
+          <button class="btn btn-sm btn-outline-danger numer-close-btn" data-id="${r.id}" title="Закрыть нумер"><i class="fa fa-xmark"></i></button>
         </td></tr>`;
     });
+
+    archived.forEach(r => {
+      const started  = r.created_at && dayjs(r.created_at).isValid() ? formatChatDateTime(r.created_at) : '—';
+      const closedAt = r.closed_at  && dayjs(r.closed_at).isValid()  ? formatChatDateTime(r.closed_at)  : '—';
+      html += `<tr class="text-muted">
+        <td>${r.id}</td>
+        <td>${started}</td>
+        <td>${esc(r.owner_username||'—')}</td>
+        <td>${buildParticipantsCell(r.participants, r.member_count)}</td>
+        <td>${Number(r.message_count)||0}</td>
+        <td><span class="badge bg-secondary">Закрыт</span></td>
+        <td>${closedAt}</td>
+        <td>${closeReasonLabel(r.close_reason)}</td>
+        <td class="text-nowrap">
+          <button class="btn btn-sm btn-outline-info numer-history-btn me-1" data-id="${r.id}" title="История"><i class="fa fa-clock-rotate-left"></i></button>
+          <button class="btn btn-sm btn-outline-secondary numer-clear-archive-btn" data-id="${r.id}" title="Удалить переписку из архива"><i class="fa fa-trash"></i></button>
+        </td></tr>`;
+    });
+
     html += '</tbody></table>';
     $('#admin-numera-table').html(html);
+
+    document.querySelectorAll('#admin-numera-table [data-bs-toggle="popover"]').forEach(el => {
+      const existing = bootstrap.Popover.getInstance(el);
+      if (existing) existing.dispose();
+      new bootstrap.Popover(el, { container: 'body', trigger: 'click', html: true });
+    });
   });
 }
 
@@ -1601,6 +1646,15 @@ $('#admin-numera-table').on('click', '.numer-close-btn', function() {
     if (resp.success) { showToast('Нумер #' + id + ' закрыт.'); loadAdminNumera(); }
     else showToast(resp.error || 'Ошибка', 'danger');
   });
+});
+
+$('#admin-numera-table').on('click', '.numer-clear-archive-btn', function() {
+  const id = $(this).data('id');
+  if (!confirm('Удалить переписку нумера #' + id + ' из архива? Сообщения будут скрыты, запись останется.')) return;
+  $.post(`/api/admin/numera/${id}/clear-archive`, {csrf_token: CSRF_TOKEN}, function(resp) {
+    if (resp.success) { showToast('Переписка нумера #' + id + ' удалена из архива.', 'success'); loadAdminNumera(); }
+    else showToast(resp.error || 'Ошибка', 'danger');
+  }, 'json');
 });
 
 function openRoomHistory(roomId, roomName) {
