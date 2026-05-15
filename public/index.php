@@ -437,7 +437,6 @@ if (!$isLoggedIn) {
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminUsers">Пользователи</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminRooms">Комнаты</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminNumera">Нумера</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminWhispers">Шёпот</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminBans">Баны</a></li>
       </ul>
       <div class="tab-content">
@@ -463,14 +462,6 @@ if (!$isLoggedIn) {
         <div class="tab-pane fade" id="adminBans">
           <div id="admin-bans-table"></div>
         </div>
-        <div class="tab-pane fade" id="adminWhispers">
-          <div class="mb-2 d-flex gap-2">
-            <input type="text" class="form-control form-control-sm" id="whisper-filter-from" placeholder="От пользователя">
-            <input type="text" class="form-control form-control-sm" id="whisper-filter-to" placeholder="Кому">
-            <button class="btn btn-sm btn-outline-primary" id="whisper-search-btn">Найти</button>
-          </div>
-          <div id="admin-whispers-table"></div>
-        </div>
       </div>
     </div>
   </div></div>
@@ -492,7 +483,12 @@ if (!$isLoggedIn) {
           <div class="text-muted">Раздел переносится...</div>
         </div>
         <div class="tab-pane fade" id="ownerWhispers">
-          <div class="text-muted">Раздел переносится...</div>
+          <div class="mb-2 d-flex gap-2">
+            <input type="text" class="form-control form-control-sm" id="whisper-filter-from" placeholder="От пользователя">
+            <input type="text" class="form-control form-control-sm" id="whisper-filter-to" placeholder="Кому">
+            <button class="btn btn-sm btn-outline-primary" id="whisper-search-btn">Найти</button>
+          </div>
+          <div id="admin-whispers-table"></div>
         </div>
         <div class="tab-pane fade" id="ownerSettings">
           <form id="adminSettingsForm" class="row g-3">

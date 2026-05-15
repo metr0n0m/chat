@@ -1232,12 +1232,12 @@ function initAdmin() {
     if (tab === '#adminUsers')    loadAdminUsers();
     if (tab === '#adminRooms')    loadAdminRooms();
     if (tab === '#adminNumera')   loadAdminNumera();
-    if (tab === '#adminWhispers') loadAdminWhispers();
     if (tab === '#adminBans')     loadAdminBans();
   });
 
   $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');
+    if (tab === '#ownerWhispers') loadAdminWhispers();
     if (tab === '#ownerSettings') loadAdminSettings();
   });
 
