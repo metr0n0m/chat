@@ -22,6 +22,12 @@ class OriginGuard
         }
 
         $allowed = defined('WS_ALLOWED_ORIGINS') ? (array) WS_ALLOWED_ORIGINS : [];
+
+        if (empty($allowed)) {
+            echo '[WS] WS_ALLOWED_ORIGINS is not configured' . PHP_EOL;
+            return false;
+        }
+
         foreach ($allowed as $entry) {
             $ep = parse_url((string) $entry);
             if (!$ep || empty($ep['scheme']) || empty($ep['host'])) {

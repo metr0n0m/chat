@@ -13,6 +13,10 @@ use React\EventLoop\Loop;
 
 Lang::init(APP_LOCALE);
 
+if (!defined('WS_ALLOWED_ORIGINS') || empty((array) WS_ALLOWED_ORIGINS)) {
+    echo '[WS] WARNING: WS_ALLOWED_ORIGINS not configured. All connections will be rejected.' . PHP_EOL;
+}
+
 $loop = Loop::get();
 
 // Expire pending invitations every 10 seconds
