@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `content`       TEXT NOT NULL,
   `content_hmac`  CHAR(64) NOT NULL,
   `type`          ENUM('text','system','whisper') DEFAULT 'text',
+  `system_importance` ENUM('normal','optional','important') DEFAULT NULL,
+  `system_scope`  VARCHAR(64) DEFAULT NULL,
   `whisper_to`    INT UNSIGNED DEFAULT NULL,
   `embed_data`    JSON,
   `is_deleted`    TINYINT(1) DEFAULT 0,
@@ -172,6 +174,10 @@ ALTER TABLE `messages`
 
 ALTER TABLE `messages`
   ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL AFTER `deleted_by`;
+
+ALTER TABLE `messages`
+  ADD COLUMN IF NOT EXISTS `system_importance` ENUM('normal','optional','important') NULL DEFAULT NULL AFTER `type`,
+  ADD COLUMN IF NOT EXISTS `system_scope` VARCHAR(64) NULL DEFAULT NULL AFTER `system_importance`;
 
 ALTER TABLE `rooms`
   ADD COLUMN IF NOT EXISTS `close_reason` ENUM('last_left','idle','admin') NULL AFTER `closed_at`;

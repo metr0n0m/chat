@@ -452,3 +452,35 @@ Left for later:
 - Verify production PHP version.
 - Smoke-test email verification and OAuth flows.
 - Verify and safely apply DB migrations before production code that depends on new columns.
+
+### 2026-05-16 - System message infrastructure first wave
+
+Commit/deploy:
+
+- Local commit: included in the system-message infrastructure commit.
+- Production revision: not changed.
+- DB migration: added locally as `database/migrations/009_system_messages.sql`; not applied to production.
+- WS restart: not done.
+
+Changed:
+
+- Added nullable `messages.system_importance` and `messages.system_scope`.
+- Added `SystemMessageService` as the single local path for first-wave system messages.
+- Routed only `room_join`, `room_leave`, and `@!` moderation call through the service.
+- Kept visibility storage and profile setting migration out of this wave.
+
+Verified:
+
+- `php -l` passed for `src/Chat/SystemMessageService.php`, `src/WebSocket/EventRouter.php`, and `src/Chat/MessageController.php`.
+- `git diff --check` passed with only CRLF warnings.
+
+Left for later:
+
+- Review full diff before production.
+- Apply DB migration only in an explicit deploy step.
+- Add persisted multi-layer visibility only when a real persisted non-`all` system message is introduced.
+
+Risks/notes:
+
+- Production deploy requires DB migration before WS/PHP code using the new insert columns.
+- WebSocket process must be restarted after deploy.

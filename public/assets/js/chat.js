@@ -304,7 +304,7 @@ function onUserLeft(data) {
 function buildMessage(m) {
   if (m.type === 'system') {
     const sysTime = formatChatTime(m.created_at);
-    return shouldShowSystemMessages()
+    return shouldShowSystemMessage(m)
       ? `<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`
       : '';
   }
@@ -380,13 +380,14 @@ function onMessageDeleted(data) {
 }
 
 function onSystemMessage(m) {
-  if (m.scope === 'staff_call') {
+  const scope = m.system_scope || m.scope || '';
+  if (scope === 'moderation_call' || scope === 'staff_call') {
     showToast(m.content || 'Вызов персонала.', 'warning');
-    if (m.room_id !== currentRoomId || !shouldShowSystemMessages()) return;
+    if (m.room_id !== currentRoomId || !shouldShowSystemMessage(m)) return;
   } else if (m.room_id !== currentRoomId) {
     return;
   }
-  if (!shouldShowSystemMessages()) return;
+  if (!shouldShowSystemMessage(m)) return;
   const sysTime = formatChatTime(m.created_at);
   $('#messages-list').append(`<div class="msg-system"><span class="msg-time">${sysTime}</span><span class="msg-sep"> » </span>${esc(m.content)}</div>`);
   if (isScrolledToBottom) scrollToBottom();
@@ -412,6 +413,12 @@ function canDeleteMessage(m) {
 
 function shouldShowSystemMessages() {
   return localStorage.getItem('show_system_messages') !== '0';
+}
+
+function shouldShowSystemMessage(m) {
+  const importance = (m && m.system_importance) ? m.system_importance : 'optional';
+  if (importance === 'important') return true;
+  return shouldShowSystemMessages();
 }
 
 function appendInputToken(token) {

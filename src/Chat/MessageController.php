@@ -12,6 +12,7 @@ class MessageController
     private const PAGE_SIZE = 50;
 
     private static ?bool $hasColorCols = null;
+    private static ?bool $hasSystemMessageCols = null;
 
     private static function hasMessageColorColumns(): bool
     {
@@ -22,6 +23,18 @@ class MessageController
             self::$hasColorCols = in_array('nick_color', $cols, true);
         }
         return self::$hasColorCols;
+    }
+
+    private static function hasSystemMessageColumns(): bool
+    {
+        if (self::$hasSystemMessageCols === null) {
+            $db = Connection::getInstance();
+            $rows = $db->fetchAll('SHOW COLUMNS FROM messages');
+            $cols = array_column($rows, 'Field');
+            self::$hasSystemMessageCols = in_array('system_importance', $cols, true)
+                && in_array('system_scope', $cols, true);
+        }
+        return self::$hasSystemMessageCols;
     }
 
     public static function format(string $raw): string
@@ -54,6 +67,9 @@ class MessageController
         $colorSelect = self::hasMessageColorColumns()
             ? 'COALESCE(m.nick_color, u.nick_color) AS nick_color, COALESCE(m.text_color, u.text_color) AS text_color'
             : 'u.nick_color, u.text_color';
+        $systemSelect = self::hasSystemMessageColumns()
+            ? 'm.system_importance, m.system_scope'
+            : 'NULL AS system_importance, NULL AS system_scope';
 
         $messages = $db->fetchAll(
             'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.room_id,
@@ -61,6 +77,7 @@ class MessageController
                     wt.nick_color AS whisper_to_nick_color,
                     u.username, u.nickname, u.custom_status, u.avatar_url, u.global_role,
                     ' . $colorSelect . ',
+                    ' . $systemSelect . ',
                     rm.room_role
              FROM messages m
              JOIN users u ON u.id = m.user_id
@@ -73,6 +90,22 @@ class MessageController
         );
 
         $messages = Timestamp::normalizeRows($messages, ['created_at']);
+        $actor = ['id' => $actorId, 'global_role' => $actorRole];
+        $messages = array_values(array_filter(
+            $messages,
+            static fn(array $message): bool => SystemMessageService::canUserSeeSystemMessage($actor, $message)
+        ));
+        foreach ($messages as &$message) {
+            if (($message['type'] ?? '') !== 'system') {
+                continue;
+            }
+            $message['system_importance'] = SystemMessageService::normalizeImportance(
+                (string) ($message['system_importance'] ?? 'optional')
+            );
+            $message['system_scope'] = (string) ($message['system_scope'] ?? 'legacy');
+            $message['scope'] = $message['system_scope'];
+        }
+        unset($message);
 
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'messages' => array_reverse($messages)], JSON_UNESCAPED_UNICODE);

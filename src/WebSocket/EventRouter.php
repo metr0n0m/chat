@@ -5,7 +5,7 @@ namespace Chat\WebSocket;
 
 use Ratchet\ConnectionInterface;
 use Chat\DB\Connection;
-use Chat\Chat\{MessageController, WhisperController, RoomController, NumerController};
+use Chat\Chat\{MessageController, WhisperController, RoomController, NumerController, SystemMessageService};
 use Chat\Support\Lang;
 use Chat\Support\Timestamp;
 
@@ -108,7 +108,13 @@ class EventRouter
                     'room_id' => $roomId,
                     'user'    => $this->userPayload($session),
                 ], $userId);
-                $this->broadcastSystemMessage($roomId, $session['username'] . ' вошёл(а) в комнату', $userId);
+                SystemMessageService::emitRoomLifecycle(
+                    $this->cm,
+                    $roomId,
+                    $userId,
+                    $session['username'] . ' вошёл(а) в комнату',
+                    'room_join'
+                );
                 $this->broadcastRoomCount($roomId);
             } elseif ($room['type'] === 'numer') {
                 $this->cm->sendToRoom($roomId, [
@@ -137,7 +143,13 @@ class EventRouter
             'room_id' => $roomId,
             'user_id' => $userId,
         ]);
-        $this->broadcastSystemMessage($roomId, $session['username'] . ' покинул(а) комнату', $userId);
+        SystemMessageService::emitRoomLifecycle(
+            $this->cm,
+            $roomId,
+            $userId,
+            $session['username'] . ' покинул(а) комнату',
+            'room_leave'
+        );
         $this->broadcastRoomCount($roomId);
     }
 
@@ -168,7 +180,7 @@ class EventRouter
         ]);
 
         if (str_contains((string) ($data['content'] ?? ''), '@!')) {
-            $this->notifyGlobalStaffCall($roomId, $session);
+            SystemMessageService::emitModerationCall($this->cm, $roomId, $session);
         }
     }
 
@@ -500,25 +512,6 @@ class EventRouter
         $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $result]);
     }
 
-    private function broadcastSystemMessage(int $roomId, string $text, int $fromUserId): void
-    {
-        $content = htmlspecialchars($text, ENT_QUOTES);
-
-        $db = Connection::getInstance();
-        $db->execute(
-            'INSERT INTO messages (room_id, user_id, content, content_hmac, type) VALUES (?, ?, ?, ?, ?)',
-            [$roomId, $fromUserId, $content, '', 'system']
-        );
-        $msgId = (int) $db->lastInsertId();
-        $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
-
-        $this->cm->sendToRoom($roomId, [
-            'event'   => 'system_message',
-            'room_id' => $roomId,
-            'message' => ['id' => $msgId, 'content' => $content, 'type' => 'system', 'created_at' => Timestamp::isoUtc($createdAt === null ? null : (string) $createdAt)],
-        ]);
-    }
-
     private function getOnlineList(int $roomId, Connection $db): array
     {
         $userIds = $this->cm->getRoomUserIds($roomId);
@@ -598,39 +591,6 @@ class EventRouter
             'room_id' => $roomId,
             'count'   => $count,
         ]);
-    }
-
-    private function notifyGlobalStaffCall(int $roomId, array $session): void
-    {
-        $db = Connection::getInstance();
-        $room = $db->fetchOne('SELECT name FROM rooms WHERE id = ?', [$roomId]);
-        $staff = $db->fetchAll(
-            "SELECT id FROM users WHERE global_role IN ('platform_owner', 'admin', 'moderator') AND is_banned = 0"
-        );
-
-        $message = [
-            'room_id' => $roomId,
-            'scope' => 'staff_call',
-            'content' => sprintf(
-                'Вызов персонала: %s позвал(а) в комнату "%s".',
-                (string) ($session['username'] ?? 'Пользователь'),
-                (string) ($room['name'] ?? ('#' . $roomId))
-            ),
-            'type' => 'system',
-            'created_at' => Timestamp::nowIsoUtc(),
-        ];
-
-        foreach ($staff as $member) {
-            $staffId = (int) ($member['id'] ?? 0);
-            if ($staffId === (int) ($session['id'] ?? 0)) {
-                continue;
-            }
-
-            $this->cm->sendToUser($staffId, [
-                'event' => 'system_message',
-                'message' => $message,
-            ]);
-        }
     }
 
 }
