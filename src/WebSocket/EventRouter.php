@@ -271,15 +271,19 @@ class EventRouter
         $loop = \React\EventLoop\Loop::get();
         $cm   = $this->cm;
         $loop->addTimer($seconds, function () use ($invId, $toId, $fromId, $cm) {
-            $db  = Connection::getInstance();
-            $inv = $db->fetchOne(
-                "SELECT status FROM invitations WHERE id = ?",
-                [$invId]
-            );
-            if ($inv && $inv['status'] === 'pending') {
-                $db->execute("UPDATE invitations SET status = 'expired' WHERE id = ?", [$invId]);
-                $cm->sendToUser($toId,   ['event' => 'invite_expired', 'invitation_id' => $invId]);
-                $cm->sendToUser($fromId, ['event' => 'invite_expired', 'invitation_id' => $invId]);
+            try {
+                $db  = Connection::getInstance();
+                $inv = $db->fetchOne(
+                    "SELECT status FROM invitations WHERE id = ?",
+                    [$invId]
+                );
+                if ($inv && $inv['status'] === 'pending') {
+                    $db->execute("UPDATE invitations SET status = 'expired' WHERE id = ?", [$invId]);
+                    $cm->sendToUser($toId,   ['event' => 'invite_expired', 'invitation_id' => $invId]);
+                    $cm->sendToUser($fromId, ['event' => 'invite_expired', 'invitation_id' => $invId]);
+                }
+            } catch (\Throwable $e) {
+                echo '[WS] invite expiry error (inv=' . $invId . '): ' . $e->getMessage() . PHP_EOL;
             }
         });
     }
@@ -559,15 +563,19 @@ class EventRouter
         $this->numerTimers[$roomId] = \React\EventLoop\Loop::get()->addTimer(
             $seconds,
             function () use ($roomId, $cm, $self) {
-                unset($self->numerTimers[$roomId]);
-                $db = Connection::getInstance();
-                if (!$db->fetchOne("SELECT id FROM rooms WHERE id = ? AND is_closed = 0", [$roomId])) {
-                    return;
+                try {
+                    unset($self->numerTimers[$roomId]);
+                    $db = Connection::getInstance();
+                    if (!$db->fetchOne("SELECT id FROM rooms WHERE id = ? AND is_closed = 0", [$roomId])) {
+                        return;
+                    }
+                    $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'idle' WHERE id = ?", [$roomId]);
+                    $cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                    $cm->clearRoom($roomId);
+                    $self->broadcastRoomCount($roomId);
+                } catch (\Throwable $e) {
+                    echo '[WS] numer countdown error (room=' . $roomId . '): ' . $e->getMessage() . PHP_EOL;
                 }
-                $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'idle' WHERE id = ?", [$roomId]);
-                $cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
-                $cm->clearRoom($roomId);
-                $self->broadcastRoomCount($roomId);
             }
         );
     }

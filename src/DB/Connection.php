@@ -94,7 +94,12 @@ class Connection
                 throw $e;
             }
 
-            $this->connect();
+            try {
+                $this->connect();
+            } catch (\Throwable $connectEx) {
+                error_log('[DB] Lost connection (' . $e->getCode() . '): ' . $e->getMessage() . ' | Reconnect failed: ' . $connectEx->getMessage());
+                throw $e;
+            }
             return $this->executeWithRetry($sql, $params, false);
         }
     }

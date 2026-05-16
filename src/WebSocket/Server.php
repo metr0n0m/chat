@@ -141,7 +141,11 @@ class Server implements MessageComponentInterface
                 if ($roomId <= 0) {
                     continue;
                 }
-                $this->router->handleRoomLeave($userId, $roomId);
+                try {
+                    $this->router->handleRoomLeave($userId, $roomId);
+                } catch (\Throwable $e) {
+                    echo '[WS] handleRoomLeave error (uid=' . $userId . ', room=' . $roomId . '): ' . $e->getMessage() . PHP_EOL;
+                }
             }
         });
     }
