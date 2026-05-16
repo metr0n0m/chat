@@ -412,6 +412,9 @@ function canDeleteMessage(m) {
 }
 
 function shouldShowSystemMessages() {
+  if (CURRENT_USER && typeof CURRENT_USER.show_system_messages !== 'undefined') {
+    return Number(CURRENT_USER.show_system_messages) !== 0;
+  }
   return localStorage.getItem('show_system_messages') !== '0';
 }
 
@@ -1062,9 +1065,6 @@ function openSettingsModal() {
 }
 
 function initSettings() {
-  $('#showSystemMessagesSetting').on('change', function() {
-    localStorage.setItem('show_system_messages', $(this).is(':checked') ? '1' : '0');
-  });
 
   let usernameCheckTimer = null;
   $('#usernameInput').on('input', function() {
@@ -1097,6 +1097,7 @@ function initSettings() {
     const fd = new FormData(this);
     fd.set('csrf_token', CSRF_TOKEN);
     fd.set('hide_last_seen', $('#hideLastSeenSetting').is(':checked') ? '1' : '0');
+    fd.set('show_system_messages', $('#showSystemMessagesSetting').is(':checked') ? '1' : '0');
     $('#settings-error').addClass('d-none');
     $('#settings-success').addClass('d-none');
     $.ajax({
@@ -1110,7 +1111,6 @@ function initSettings() {
           if (resp.user) {
             Object.assign(CURRENT_USER, resp.user);
           }
-          localStorage.setItem('show_system_messages', $('#showSystemMessagesSetting').is(':checked') ? '1' : '0');
           $('#settings-success').removeClass('d-none');
           initUser();
           if (ws && ws.readyState === WebSocket.OPEN) {

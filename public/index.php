@@ -40,7 +40,8 @@ $userJson = $user ? json_encode([
     'avatar_url'     => $user['avatar_url'],
     'custom_status'  => $user['custom_status'] ?? null,
     'global_role'    => $user['global_role'],
-    'can_create_room'=> (bool) $user['can_create_room'],
+    'can_create_room'        => (bool) $user['can_create_room'],
+    'show_system_messages'   => isset($user['show_system_messages']) ? (int) $user['show_system_messages'] : 1,
 ]) : 'null';
 
 header("Content-Security-Policy: default-src 'self'; script-src 'self' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com 'nonce-$nonce'; style-src-attr 'unsafe-inline'; img-src * data:; connect-src 'self' ws: wss:; font-src cdn.jsdelivr.net cdnjs.cloudflare.com;");

@@ -65,6 +65,7 @@ class SystemMessageService
              WHERE global_role IN ('platform_owner', 'admin', 'moderator') AND is_banned = 0"
         );
 
+        $layers = self::visibilityForScope('moderation_call');
         $message = self::buildPayload([
             'room_id' => $roomId,
             'content' => sprintf(
@@ -82,6 +83,9 @@ class SystemMessageService
             if ($targetId === (int) ($actor['id'] ?? 0)) {
                 continue;
             }
+            if (!self::canUserSeeAnyLayer($target, $roomId, $layers)) {
+                continue;
+            }
             $cm->sendToUser($targetId, [
                 'event'   => 'system_message',
                 'message' => $message,
@@ -89,11 +93,14 @@ class SystemMessageService
         }
     }
 
-    // Placeholder: все persisted system messages первой волны имеют visibility=all.
-    // Реализовать через canUserSeeAnyLayer() при появлении первого persisted non-all visibility сообщения.
     public static function canUserSeeSystemMessage(array $user, array $message): bool
     {
-        return true;
+        if (($message['type'] ?? '') !== 'system') {
+            return true;
+        }
+        $scope = (string) ($message['system_scope'] ?? 'legacy');
+        $layers = self::visibilityForScope($scope);
+        return self::canUserSeeAnyLayer($user, (int) ($message['room_id'] ?? 0), $layers);
     }
 
     public static function canUserSeeAnyLayer(array $user, int $roomId, array $layers): bool
@@ -139,6 +146,14 @@ class SystemMessageService
     public static function normalizeImportance(string $importance): string
     {
         return in_array($importance, self::IMPORTANCES, true) ? $importance : 'optional';
+    }
+
+    private static function visibilityForScope(string $scope): array
+    {
+        return match ($scope) {
+            'moderation_call' => ['global_moderators', 'global_admins', 'platform_owners'],
+            default           => ['all'],
+        };
     }
 
     private static function roomRole(int $roomId, int $userId): ?string

@@ -170,7 +170,7 @@ class UserManager
             'id', 'username', 'nickname', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
-        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $optional) {
             if (self::hasUsersColumn($db, $optional)) {
                 $select[] = $optional;
             }
@@ -269,6 +269,11 @@ class UserManager
             $params[] = (int)(bool)$post['hide_last_seen'];
         }
 
+        if (self::hasUsersColumn($db, 'show_system_messages') && array_key_exists('show_system_messages', $post)) {
+            $set[] = 'show_system_messages = ?';
+            $params[] = (int)(bool)$post['show_system_messages'];
+        }
+
         if (array_key_exists('custom_status', $post)) {
             $customStatus = trim(strip_tags((string) $post['custom_status']));
             $customStatus = mb_substr($customStatus, 0, 80);
@@ -341,7 +346,7 @@ class UserManager
             'id', 'username', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
-        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen'] as $optional) {
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $optional) {
             if (self::hasUsersColumn($db, $optional)) {
                 $select[] = $optional;
             }
