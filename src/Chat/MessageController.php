@@ -11,16 +11,23 @@ class MessageController
 {
     private const PAGE_SIZE = 50;
 
-    private static ?bool $hasColorCols = null;
-    private static ?bool $hasSystemMessageCols = null;
+    private static ?bool  $hasColorCols         = null;
+    private static ?bool  $hasSystemMessageCols = null;
+    private static ?array $messageColumns       = null;
+
+    private static function messageColumnNames(): array
+    {
+        if (self::$messageColumns === null) {
+            $rows = Connection::getInstance()->fetchAll('SHOW COLUMNS FROM messages');
+            self::$messageColumns = array_column($rows, 'Field');
+        }
+        return self::$messageColumns;
+    }
 
     private static function hasMessageColorColumns(): bool
     {
         if (self::$hasColorCols === null) {
-            $db   = Connection::getInstance();
-            $rows = $db->fetchAll('SHOW COLUMNS FROM messages');
-            $cols = array_column($rows, 'Field');
-            self::$hasColorCols = in_array('nick_color', $cols, true);
+            self::$hasColorCols = in_array('nick_color', self::messageColumnNames(), true);
         }
         return self::$hasColorCols;
     }
@@ -28,9 +35,7 @@ class MessageController
     private static function hasSystemMessageColumns(): bool
     {
         if (self::$hasSystemMessageCols === null) {
-            $db = Connection::getInstance();
-            $rows = $db->fetchAll('SHOW COLUMNS FROM messages');
-            $cols = array_column($rows, 'Field');
+            $cols = self::messageColumnNames();
             self::$hasSystemMessageCols = in_array('system_importance', $cols, true)
                 && in_array('system_scope', $cols, true);
         }

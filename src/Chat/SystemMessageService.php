@@ -30,29 +30,28 @@ class SystemMessageService
         string $content,
         string $scope
     ): void {
-        $db = Connection::getInstance();
+        $db         = Connection::getInstance();
         $importance = self::normalizeImportance('optional');
-        $safeContent = htmlspecialchars($content, ENT_QUOTES, 'UTF-8');
 
         $db->execute(
             'INSERT INTO messages (room_id, user_id, content, content_hmac, type, system_importance, system_scope)
              VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [$roomId, $actorId, $safeContent, '', 'system', $importance, $scope]
+            [$roomId, $actorId, $content, '', 'system', $importance, $scope]
         );
 
-        $msgId = (int) $db->lastInsertId();
+        $msgId     = (int) $db->lastInsertId();
         $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
 
         $cm->sendToRoom($roomId, [
-            'event' => 'system_message',
+            'event'   => 'system_message',
             'room_id' => $roomId,
             'message' => self::buildPayload([
-                'id' => $msgId,
-                'room_id' => $roomId,
-                'content' => $safeContent,
-                'created_at' => $createdAt,
+                'id'                => $msgId,
+                'room_id'           => $roomId,
+                'content'           => $content,
+                'created_at'        => $createdAt,
                 'system_importance' => $importance,
-                'system_scope' => $scope,
+                'system_scope'      => $scope,
             ]),
         ]);
     }
@@ -83,24 +82,17 @@ class SystemMessageService
             if ($targetId === (int) ($actor['id'] ?? 0)) {
                 continue;
             }
-
-            if (!self::canUserSeeAnyLayer($target, $roomId, ['global_moderators', 'global_admins', 'platform_owners'])) {
-                continue;
-            }
-
             $cm->sendToUser($targetId, [
-                'event' => 'system_message',
+                'event'   => 'system_message',
                 'message' => $message,
             ]);
         }
     }
 
+    // Placeholder: все persisted system messages первой волны имеют visibility=all.
+    // Реализовать через canUserSeeAnyLayer() при появлении первого persisted non-all visibility сообщения.
     public static function canUserSeeSystemMessage(array $user, array $message): bool
     {
-        if (($message['type'] ?? '') !== 'system') {
-            return true;
-        }
-
         return true;
     }
 
