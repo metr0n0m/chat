@@ -6,6 +6,7 @@ namespace Chat\Admin;
 use Chat\DB\Connection;
 use Chat\Security\{Session, CSRF};
 use Chat\Support\Timestamp;
+use Chat\Validation\UsernameRules;
 
 /**
  * Методы админ-панели верхнего уровня.
@@ -158,10 +159,11 @@ class AdminPanel
         $password = (string) ($post['password'] ?? '');
         $role     = (string) ($post['global_role'] ?? 'user');
 
-        if (mb_strlen($username) < 3 || mb_strlen($username) > 50 || !preg_match('/^[\w\p{Cyrillic}]+$/u', $username)) {
+        $usernameError = UsernameRules::validate($username);
+        if ($usernameError !== null) {
             http_response_code(400);
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Некорректное имя пользователя.'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => false, 'error' => $usernameError], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
