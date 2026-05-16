@@ -475,10 +475,26 @@ class UserManager
 
     private static function headRequest(string $url): array
     {
+        $parsed = parse_url($url);
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
+            return [];
+        }
+
+        $host = strtolower((string) ($parsed['host'] ?? ''));
+        if ($host === '') {
+            return [];
+        }
+
+        // Block loopback, link-local, and RFC-1918 private ranges
+        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : (gethostbyname($host) ?: '');
+        if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return [];
+        }
+
         $context = stream_context_create([
             'http' => [
-                'method' => 'HEAD',
-                'timeout' => 5,
+                'method'        => 'HEAD',
+                'timeout'       => 5,
                 'ignore_errors' => true,
             ],
         ]);

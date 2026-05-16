@@ -128,7 +128,7 @@ class Access
     {
         http_response_code(403);
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['error' => 'Доступ запрещён.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

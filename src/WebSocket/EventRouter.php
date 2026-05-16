@@ -434,6 +434,8 @@ class EventRouter
         if ($room['type'] === 'public') {
             $this->cm->leaveRoom($userId, $roomId);
             $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $userId]);
+            $username = (string) ($db->fetchOne('SELECT username FROM users WHERE id = ?', [$userId])['username'] ?? 'Пользователь');
+            SystemMessageService::emitRoomLifecycle($this->cm, $roomId, $userId, $username . ' покинул(а) комнату', 'room_leave');
             $this->broadcastRoomCount($roomId);
             return;
         }
@@ -487,18 +489,18 @@ class EventRouter
             return;
         }
         if ($result['kicked'] ?? false) {
-            $this->cm->sendToUser((int) $result['target_user_id'], [
-                'event'   => 'kicked_from_room',
-                'room_id' => $roomId,
-            ]);
-            $this->cm->leaveRoom((int) $result['target_user_id'], $roomId);
+            $targetId = (int) $result['target_user_id'];
+            $this->cm->sendToUser($targetId, ['event' => 'kicked_from_room', 'room_id' => $roomId]);
+            $this->cm->leaveRoom($targetId, $roomId);
+            $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $targetId]);
+            $this->broadcastRoomCount($roomId);
         }
         if ($result['banned'] ?? false) {
-            $this->cm->sendToUser((int) $result['target_user_id'], [
-                'event'   => 'banned_from_room',
-                'room_id' => $roomId,
-            ]);
-            $this->cm->leaveRoom((int) $result['target_user_id'], $roomId);
+            $targetId = (int) $result['target_user_id'];
+            $this->cm->sendToUser($targetId, ['event' => 'banned_from_room', 'room_id' => $roomId]);
+            $this->cm->leaveRoom($targetId, $roomId);
+            $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $targetId]);
+            $this->broadcastRoomCount($roomId);
         }
         if ($result['muted'] ?? false) {
             $this->cm->sendToUser((int) $result['target_user_id'], [

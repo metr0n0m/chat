@@ -185,6 +185,11 @@ class Router
     {
         if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
         $toId = (int) ($_POST['to_user_id'] ?? 0);
+        if ($toId <= 0 || $toId === (int) $this->user['id']) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Некорректный пользователь.']);
+            exit;
+        }
         Connection::getInstance()->execute(
             'INSERT IGNORE INTO friendships (requester_id, addressee_id) VALUES (?, ?)',
             [(int) $this->user['id'], $toId]

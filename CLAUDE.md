@@ -273,49 +273,64 @@ Current rules:
 
 ## 10. Implemented Feature Snapshot
 
-Previously implemented and in current tree:
+Verified in current tree (audit 2026-05-16):
 
 - Git repository and GitHub remote are configured.
 - DB-backed sessions support multiple sessions and are not invalidated by IP change.
-- Message sender session attribution exists.
+- Message sender session attribution (`sender_session_id`) exists.
 - Timestamp serialization is normalized to UTC ISO-8601 at output boundaries.
 - Public rooms and numera are persisted in MariaDB.
 - WebSocket realtime chat, online lists, room counts, whispers and numer flows exist.
 - Self-whisper and self-numer flow are allowed.
 - Numer owner transfer on leave exists.
-- Room management supports rename/delete/local roles/kick/ban/mute.
-- Admin panel includes dashboard, users, rooms, numera archive, whispers archive, bans/mutes and system settings.
+- Room management: rename/delete/local roles/kick/ban/mute — kick and ban now correctly emit `user_left` and update room count for other users.
+- Admin panel includes dashboard, users, rooms, numera archive, whispers archive, bans/mutes, system settings, owner overview tab.
+- Owner panel: whisper sessions view, owner overview dashboard with grouped metrics.
 - Custom display status exists and is separate from global role.
 - Admin/owner status override setting exists.
-- User profile supports avatar, colors, custom status, newer profile/social fields.
+- User profile supports avatar, colors, custom status, bio, social fields.
+- Avatar upload: file validated via finfo (MIME), resized to 200×200 JPEG server-side.
+- Avatar URL: validated for scheme and private-IP SSRF (headRequest guards against internal network access).
 - Main feed renders inline message rows.
 - Mobile users rail/dock shell exists.
-- Email verification and SMTP mailer are now committed.
+- Email verification and SMTP mailer are committed.
 - Google OAuth is hardened around email/email_verified.
 - VK login is disabled from router/config.
+- System messages: room_join, room_leave, moderation_call. Visibility chain connected via `visibilityForScope()`.
+- User preference `show_system_messages` persisted to DB (not localStorage).
+- DB migrations 001–010 applied locally and on production.
+- `migrations.sql` is synced with actual schema (room_category, close_reason, show_system_messages, sender_session_id).
+- Password minimum is consistently 8 characters across register, createUser, updateSettings.
+- Self-friend request is blocked at API level.
+- `Access::denyForbidden()` returns Russian error text.
+- CSRF protected via cookie+header double-submit; DELETE requests use `X-CSRF-Token` header (verified in frontend).
 
 ## 11. Known Risks And Open Work
 
 Do not treat these as speculation; they are current audit findings from files/history.
 
-High priority:
+**Policy decision (won't change):**
 
-- Decide and document the `reactor_raw` plaintext password policy. This is the largest security concern in the current committed state.
-- Verify production PHP version before dependency deploy because `composer.json` requires PHP `^8.4`.
-- Verify production revision before assuming commits after `0a4dcd3` are deployed.
-- Before enabling email verification on an existing DB, backfill existing trusted users to `email_verified = 1`.
-- Harden/manual-check SQL migrations before production use, especially FK constraint names and duplicate constraints.
-- Smoke-test full email verification flow with real SMTP or controlled SMTP test environment.
-- Confirm UI displays `auth_error` redirects from OAuth/email verification failures.
-- Confirm `/auth/resend-verification` has usable UI entry point and CSRF behavior.
+- `reactor_raw` stores the raw submitted password in plaintext. This is an explicit product decision. Do not modify without owner approval.
 
-Medium priority:
+**Active known limitations:**
 
-- Decide whether VK code should remain dormant, be removed, or be re-enabled systematically.
-- Review `content_hmac` policy. Current schema allows nullable HMAC and some sends store empty HMAC.
+- WS session is stale: session data (role, colors, status) is captured at WS connect and not refreshed until reconnect. Role change takes effect on next reconnect.
+- Global ban does not terminate active WS connections. Banned user stays connected until disconnect or session expiry.
+- `Access::resolveLevel()` (Access.php) and `RoomController::resolvePermission()` implement the same permission level hierarchy independently. Kept in sync manually.
+- Friendship table allows A→B and B→A as separate rows. Frontend correctly aggregates, but DB may accumulate redundant rows.
+- Room list (`GET /api/rooms`) has no pagination. Will degrade with many rooms.
+- `handleRoomLeave()` (disconnect-triggered leave from numer) can attempt DB writes during race conditions if room was already destroyed.
+
+**Infrastructure:**
+
+- Verify production PHP version before Composer dependency changes (`composer.json` requires PHP `^8.4`).
+- Smoke-test full email verification flow with real SMTP.
+- Confirm `/auth/resend-verification` has usable UI entry point.
+- Decide whether VK OAuth code should remain dormant or be removed.
+- Review `content_hmac` policy (nullable; some sends store empty string).
+- Production WS restart uses `at now` via SSH (no systemd service). Consider adding a systemd unit.
 - Continue splitting `public/assets/js/chat.js` only through approved scoped plans.
-- Add repeatable smoke scripts for auth, chat send, whisper, numer invite, moderation.
-- Document exact production WebSocket restart command after verifying server process manager.
 
 ## 12. Deployment Workflow
 

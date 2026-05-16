@@ -73,8 +73,8 @@ class RegisterHandler
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return 'Некорректный email.';
         }
-        if (mb_strlen($password) < 4) {
-            return 'Пароль должен содержать не менее 4 символов.';
+        if (mb_strlen($password) < 8) {
+            return 'Пароль должен содержать не менее 8 символов.';
         }
         return null;
     }
