@@ -64,7 +64,7 @@ class AdminPanel
      */
     public static function ownerOverview(): void
     {
-        Access::requireOwnerPrivateArchive(Session::current());
+        Access::requireOwnerOnly(Session::current());
         $db = Connection::getInstance();
 
         $stats = [

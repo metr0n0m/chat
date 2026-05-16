@@ -108,6 +108,14 @@ class Access
         return in_array($roomRole, ['owner', 'local_admin', 'local_moderator'], true);
     }
 
+    public static function requireOwnerOnly(?array $user): array
+    {
+        if (!$user || !self::isOwner($user)) {
+            self::denyNotFound();
+        }
+        return $user;
+    }
+
     public static function requireOwnerPrivateArchive(?array $user): array
     {
         if (!$user || !self::isOwner($user)) {
