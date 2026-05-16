@@ -1667,24 +1667,24 @@ function loadOwnerWhisperSessions(page) {
       html = '<div class="text-muted p-2">Сессий не найдено.</div>';
     } else {
       html = '<table class="table table-sm table-hover"><thead><tr>'
-           + '<th>Инициатор</th><th>Участники</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th>Превью</th><th></th>'
+           + '<th>Инициатор</th><th>Собеседник</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th></th>'
            + '</tr></thead><tbody>';
       resp.sessions.forEach(function(s) {
-        const label = s.user1.username + ' ↔ ' + s.user2.username;
+        const other = s.initiator.id === s.user1.id ? s.user2 : s.user1;
+        const label = s.initiator.username + ' → ' + other.username;
         html += '<tr>'
           + '<td>' + esc(s.initiator.username) + '</td>'
-          + '<td><strong>' + esc(s.user1.username) + '</strong> ↔ <strong>' + esc(s.user2.username) + '</strong></td>'
+          + '<td>' + esc(other.username) + '</td>'
           + '<td class="text-nowrap">' + formatChatDateTime(s.started_at) + '</td>'
           + '<td class="text-nowrap">' + formatChatDateTime(s.ended_at) + '</td>'
           + '<td>' + s.count + '</td>'
-          + '<td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.preview) + '</td>'
-          + '<td><button class="btn btn-sm btn-outline-primary owner-session-open-btn"'
+          + '<td><button class="btn btn-sm btn-outline-info owner-session-open-btn"'
           + ' data-token="' + esc(s.session_token) + '"'
           + ' data-label="' + esc(label) + '"'
           + ' data-started="' + esc(s.started_at) + '"'
           + ' data-ended="' + esc(s.ended_at) + '"'
           + ' data-count="' + s.count + '"'
-          + '>Открыть</button></td>'
+          + ' title="Открыть переписку"><i class="fa fa-eye"></i></button></td>'
           + '</tr>';
       });
       html += '</tbody></table>';
