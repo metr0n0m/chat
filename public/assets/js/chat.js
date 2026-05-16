@@ -1221,7 +1221,7 @@ function initAdmin() {
 
   $('#owner-btn').on('click', function(e) {
     e.preventDefault();
-    loadAdminNumera();
+    loadOwnerOverview();
     const el = document.getElementById('ownerModal');
     if (el) bootstrap.Modal.getOrCreateInstance(el).show();
   });
@@ -1237,9 +1237,10 @@ function initAdmin() {
 
   $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');
-    if (tab === '#ownerNumera')   loadAdminNumera();
-    if (tab === '#ownerWhispers') loadOwnerWhisperSessions();
-    if (tab === '#ownerSettings') loadAdminSettings();
+    if (tab === '#ownerOverview')  loadOwnerOverview();
+    if (tab === '#ownerNumera')    loadAdminNumera();
+    if (tab === '#ownerWhispers')  loadOwnerWhisperSessions();
+    if (tab === '#ownerSettings')  loadAdminSettings();
   });
 
   $('#admin-user-search-btn').on('click', loadAdminUsers);
@@ -1274,6 +1275,37 @@ function initAdmin() {
         $('#create-user-error').text(xhr.responseJSON?.error || 'Не удалось создать.').removeClass('d-none');
       }
     });
+  });
+}
+
+function loadOwnerOverview() {
+  $.get('/api/admin/owner-overview', function(resp) {
+    if (!resp.success) return;
+    const s = resp.stats;
+    const html = ''
+      + '<h6 class="text-muted mt-2 mb-2">Пользователи</h6>'
+      + '<div class="row g-3">'
+      + statCard('Всего', s.users_total, 'fa-users', 'primary')
+      + statCard('Активность за час', s.users_active_1h, 'fa-circle', 'success')
+      + '</div>'
+      + '<h6 class="text-muted mt-3 mb-2">Комнаты</h6>'
+      + '<div class="row g-3">'
+      + statCard('Всего комнат', s.rooms_total, 'fa-door-open', 'secondary')
+      + statCard('Публичных активных', s.rooms_public, 'fa-door-open', 'info')
+      + statCard('Нумеров активных', s.numera_active, 'fa-lock', 'warning')
+      + '</div>'
+      + '<h6 class="text-muted mt-3 mb-2">Шёпот</h6>'
+      + '<div class="row g-3">'
+      + statCard('Whisper сообщений', s.whisper_messages, 'fa-comment', 'primary')
+      + statCard('Уникальных пар', s.whisper_pairs, 'fa-comments', 'info')
+      + '</div>'
+      + '<h6 class="text-muted mt-3 mb-2">Система</h6>'
+      + '<div class="row g-3">'
+      + statCard('Сообщений всего', s.messages_total, 'fa-envelope', 'secondary')
+      + statCard('Сообщений за 24ч', s.messages_24h, 'fa-clock', 'success')
+      + statCard('Активных банов', s.active_bans, 'fa-ban', 'danger')
+      + '</div>';
+    $('#ownerOverview-stats').html(html);
   });
 }
 

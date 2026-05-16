@@ -60,6 +60,32 @@ class AdminPanel
     }
 
     /**
+     * Сводные метрики owner overview (только platform_owner).
+     */
+    public static function ownerOverview(): void
+    {
+        Access::requireOwnerPrivateArchive(Session::current());
+        $db = Connection::getInstance();
+
+        $stats = [
+            'users_total'     => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM users')['c'],
+            'users_active_1h' => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM users WHERE last_seen_at >= NOW() - INTERVAL 60 MINUTE')['c'],
+            'rooms_total'     => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM rooms')['c'],
+            'rooms_public'    => (int) $db->fetchOne("SELECT COUNT(*) AS c FROM rooms WHERE type = 'public' AND is_closed = 0")['c'],
+            'numera_active'   => (int) $db->fetchOne("SELECT COUNT(*) AS c FROM rooms WHERE type = 'numer' AND is_closed = 0")['c'],
+            'whisper_messages'=> (int) $db->fetchOne("SELECT COUNT(*) AS c FROM messages WHERE type = 'whisper' AND is_deleted = 0")['c'],
+            'whisper_pairs'   => (int) $db->fetchOne("SELECT COUNT(DISTINCT CONCAT(LEAST(user_id, whisper_to), '_', GREATEST(user_id, whisper_to))) AS c FROM messages WHERE type = 'whisper' AND is_deleted = 0")['c'],
+            'messages_total'  => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM messages WHERE is_deleted = 0')['c'],
+            'messages_24h'    => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM messages WHERE is_deleted = 0 AND created_at >= NOW() - INTERVAL 24 HOUR')['c'],
+            'active_bans'     => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM users WHERE is_banned = 1')['c'],
+        ];
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['success' => true, 'stats' => $stats], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
      * Список глобальных модераторов.
      * Last updated: 2026-04-17.
      */

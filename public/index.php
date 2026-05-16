@@ -470,12 +470,16 @@ if (!$isLoggedIn) {
     <div class="modal-header"><h5 class="modal-title"><i class="fa fa-crown me-2"></i>Панель владельца</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
     <div class="modal-body">
       <ul class="nav nav-tabs mb-3" id="ownerTabs">
-        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#ownerNumera">Нумера</a></li>
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#ownerOverview">Обзор</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerNumera">Нумера</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerWhispers">Шёпот</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#ownerSettings">Настройки</a></li>
       </ul>
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="ownerNumera">
+        <div class="tab-pane fade show active" id="ownerOverview">
+          <div id="ownerOverview-stats"></div>
+        </div>
+        <div class="tab-pane fade" id="ownerNumera">
           <div id="admin-numera-table"></div>
         </div>
         <div class="tab-pane fade" id="ownerWhispers">
