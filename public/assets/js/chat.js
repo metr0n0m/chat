@@ -147,7 +147,7 @@ function handleWS(data) {
     case 'room_count_changed':       onRoomCountChanged(data); break;
     case 'numer_destroyed':
       loadRooms();
-      if ($('#adminModal').hasClass('show') && $('#adminNumera').hasClass('active')) loadAdminNumera();
+      if ($('#ownerModal').hasClass('show') && $('#ownerNumera').hasClass('active')) loadAdminNumera();
       break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onKickedFromRoom(data); break;
@@ -1221,6 +1221,7 @@ function initAdmin() {
 
   $('#owner-btn').on('click', function(e) {
     e.preventDefault();
+    loadAdminNumera();
     const el = document.getElementById('ownerModal');
     if (el) bootstrap.Modal.getOrCreateInstance(el).show();
   });
@@ -1231,12 +1232,12 @@ function initAdmin() {
     if (tab === '#adminDash')     loadAdminDash();
     if (tab === '#adminUsers')    loadAdminUsers();
     if (tab === '#adminRooms')    loadAdminRooms();
-    if (tab === '#adminNumera')   loadAdminNumera();
     if (tab === '#adminBans')     loadAdminBans();
   });
 
   $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');
+    if (tab === '#ownerNumera')   loadAdminNumera();
     if (tab === '#ownerWhispers') loadAdminWhispers();
     if (tab === '#ownerSettings') loadAdminSettings();
   });

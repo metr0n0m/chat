@@ -436,7 +436,6 @@ if (!$isLoggedIn) {
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#adminDash">Обзор</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminUsers">Пользователи</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminRooms">Комнаты</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminNumera">Нумера</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminBans">Баны</a></li>
       </ul>
       <div class="tab-content">
@@ -455,9 +454,6 @@ if (!$isLoggedIn) {
         </div>
         <div class="tab-pane fade" id="adminRooms">
           <div id="admin-rooms-table"></div>
-        </div>
-        <div class="tab-pane fade" id="adminNumera">
-          <div id="admin-numera-table"></div>
         </div>
         <div class="tab-pane fade" id="adminBans">
           <div id="admin-bans-table"></div>
@@ -480,7 +476,7 @@ if (!$isLoggedIn) {
       </ul>
       <div class="tab-content">
         <div class="tab-pane fade show active" id="ownerNumera">
-          <div class="text-muted">Раздел переносится...</div>
+          <div id="admin-numera-table"></div>
         </div>
         <div class="tab-pane fade" id="ownerWhispers">
           <div class="mb-2 d-flex gap-2">
