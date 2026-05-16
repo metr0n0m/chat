@@ -1238,12 +1238,12 @@ function initAdmin() {
   $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
     const tab = $(this).attr('href');
     if (tab === '#ownerNumera')   loadAdminNumera();
-    if (tab === '#ownerWhispers') loadAdminWhispers();
+    if (tab === '#ownerWhispers') loadOwnerWhisperSessions();
     if (tab === '#ownerSettings') loadAdminSettings();
   });
 
   $('#admin-user-search-btn').on('click', loadAdminUsers);
-  $('#whisper-search-btn').on('click', loadAdminWhispers);
+  $('#whisper-search-btn').on('click', function() { loadOwnerWhisperSessions(); });
 
   $('#admin-create-user-btn').on('click', function() {
     $('#createUserForm')[0].reset();
@@ -1651,6 +1651,99 @@ function loadAdminWhispers() {
     $('#admin-whispers-table').html(html);
   });
 }
+
+function loadOwnerWhisperSessions(page) {
+  page = page || 1;
+  const params = {page};
+  const df = $('#session-filter-date-from').val();
+  const dt = $('#session-filter-date-to').val();
+  if (df) params.date_from = df;
+  if (dt) params.date_to   = dt;
+
+  $.get('/api/admin/whispers/sessions', params, function(resp) {
+    if (!resp.success) return;
+    let html = '';
+    if (!resp.sessions.length) {
+      html = '<div class="text-muted p-2">Сессий не найдено.</div>';
+    } else {
+      html = '<table class="table table-sm table-hover"><thead><tr>'
+           + '<th>Участники</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th>Превью</th><th></th>'
+           + '</tr></thead><tbody>';
+      resp.sessions.forEach(function(s) {
+        const label = s.user1.username + ' ↔ ' + s.user2.username;
+        html += '<tr>'
+          + '<td><strong>' + esc(s.user1.username) + '</strong> ↔ <strong>' + esc(s.user2.username) + '</strong></td>'
+          + '<td class="text-nowrap">' + formatChatDateTime(s.started_at) + '</td>'
+          + '<td class="text-nowrap">' + formatChatDateTime(s.ended_at) + '</td>'
+          + '<td>' + s.count + '</td>'
+          + '<td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.preview) + '</td>'
+          + '<td><button class="btn btn-sm btn-outline-primary owner-session-open-btn"'
+          + ' data-token="' + esc(s.session_token) + '"'
+          + ' data-label="' + esc(label) + '"'
+          + ' data-started="' + esc(s.started_at) + '"'
+          + ' data-ended="' + esc(s.ended_at) + '"'
+          + ' data-count="' + s.count + '"'
+          + '>Открыть</button></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+      if (resp.pages > 1) {
+        html += '<div class="d-flex gap-1 mt-2 flex-wrap">';
+        for (let p = 1; p <= resp.pages; p++) {
+          html += '<button class="btn btn-sm owner-sessions-page-btn '
+               + (p === resp.page ? 'btn-primary' : 'btn-outline-secondary')
+               + '" data-page="' + p + '">' + p + '</button>';
+        }
+        html += '</div>';
+      }
+    }
+    $('#owner-sessions-list').html(html).show();
+    $('#owner-session-detail').addClass('d-none').empty();
+  }, 'json');
+}
+
+function loadOwnerSessionDetail(token, label, startedAt, endedAt, count) {
+  $.get('/api/admin/whispers/sessions/' + token, function(resp) {
+    if (!resp.success) return;
+    let html = '<div class="mb-2 d-flex align-items-center gap-2">'
+      + '<button class="btn btn-sm btn-outline-secondary" id="owner-session-back-btn">'
+      + '<i class="fa fa-arrow-left me-1"></i>Назад</button>'
+      + '<span><strong>' + esc(label) + '</strong>'
+      + ' <span class="text-muted">'
+      + formatChatDateTime(startedAt) + ' – ' + formatChatDateTime(endedAt)
+      + ' · ' + count + ' сообщений</span></span></div>';
+    html += '<div style="overflow-x:auto"><table class="table table-sm"><tbody>';
+    resp.messages.forEach(function(msg) {
+      html += '<tr>'
+        + '<td class="text-muted text-nowrap" style="width:90px">' + formatChatDateTime(msg.created_at) + '</td>'
+        + '<td class="text-nowrap" style="width:120px"><strong>' + esc(msg.sender_username) + '</strong></td>'
+        + '<td>' + msg.content + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    $('#owner-sessions-list').hide();
+    $('#owner-session-detail').html(html).removeClass('d-none');
+  }, 'json');
+}
+
+$(document).on('click', '#owner-session-back-btn', function() {
+  $('#owner-session-detail').addClass('d-none').empty();
+  $('#owner-sessions-list').show();
+});
+
+$(document).on('click', '.owner-session-open-btn', function() {
+  loadOwnerSessionDetail(
+    $(this).data('token'),
+    $(this).data('label'),
+    $(this).data('started'),
+    $(this).data('ended'),
+    $(this).data('count')
+  );
+});
+
+$(document).on('click', '.owner-sessions-page-btn', function() {
+  loadOwnerWhisperSessions($(this).data('page'));
+});
 
 function loadAdminBans() {
   $.get('/api/admin/bans', function(resp) {

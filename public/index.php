@@ -479,12 +479,13 @@ if (!$isLoggedIn) {
           <div id="admin-numera-table"></div>
         </div>
         <div class="tab-pane fade" id="ownerWhispers">
-          <div class="mb-2 d-flex gap-2">
-            <input type="text" class="form-control form-control-sm" id="whisper-filter-from" placeholder="От пользователя">
-            <input type="text" class="form-control form-control-sm" id="whisper-filter-to" placeholder="Кому">
+          <div class="mb-2 d-flex gap-2 flex-wrap">
+            <input type="date" class="form-control form-control-sm" id="session-filter-date-from" style="max-width:160px">
+            <input type="date" class="form-control form-control-sm" id="session-filter-date-to" style="max-width:160px">
             <button class="btn btn-sm btn-outline-primary" id="whisper-search-btn">Найти</button>
           </div>
-          <div id="admin-whispers-table"></div>
+          <div id="owner-sessions-list"></div>
+          <div id="owner-session-detail" class="d-none"></div>
         </div>
         <div class="tab-pane fade" id="ownerSettings">
           <form id="adminSettingsForm" class="row g-3">
