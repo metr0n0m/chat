@@ -1667,11 +1667,12 @@ function loadOwnerWhisperSessions(page) {
       html = '<div class="text-muted p-2">Сессий не найдено.</div>';
     } else {
       html = '<table class="table table-sm table-hover"><thead><tr>'
-           + '<th>Участники</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th>Превью</th><th></th>'
+           + '<th>Инициатор</th><th>Участники</th><th>Начало</th><th>Конец</th><th>Сообщ.</th><th>Превью</th><th></th>'
            + '</tr></thead><tbody>';
       resp.sessions.forEach(function(s) {
         const label = s.user1.username + ' ↔ ' + s.user2.username;
         html += '<tr>'
+          + '<td>' + esc(s.initiator.username) + '</td>'
           + '<td><strong>' + esc(s.user1.username) + '</strong> ↔ <strong>' + esc(s.user2.username) + '</strong></td>'
           + '<td class="text-nowrap">' + formatChatDateTime(s.started_at) + '</td>'
           + '<td class="text-nowrap">' + formatChatDateTime(s.ended_at) + '</td>'
@@ -1717,7 +1718,7 @@ function loadOwnerSessionDetail(token, label, startedAt, endedAt, count) {
       html += '<tr>'
         + '<td class="text-muted text-nowrap" style="width:90px">' + formatChatDateTime(msg.created_at) + '</td>'
         + '<td class="text-nowrap" style="width:120px"><strong>' + esc(msg.sender_username) + '</strong></td>'
-        + '<td>' + msg.content + '</td>'
+        + '<td>' + esc(msg.content) + '</td>'
         + '</tr>';
     });
     html += '</tbody></table></div>';

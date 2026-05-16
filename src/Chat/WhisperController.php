@@ -225,7 +225,9 @@ class WhisperController
             $params[] = $filters['date_to'];
         }
 
-        // Только метаданные (без content), упорядочено по паре и времени
+        // Production-допустимо для реалистичного объёма whisper в этом приложении:
+        // один запрос лёгкой метадаты (без content), один PHP-проход.
+        // Граница масштаба: свыше ~200k строк потребует cursor-based batching по (pair_key, id).
         $rows = $db->fetchAll(
             'SELECT m.id, m.user_id AS sender_id, m.whisper_to AS receiver_id, m.created_at
              FROM messages m
@@ -246,6 +248,7 @@ class WhisperController
                 $state = [
                     'min_uid'      => $minUid,
                     'max_uid'      => $maxUid,
+                    'initiator_id' => (int) $row['sender_id'],
                     'first_msg_id' => (int) $row['id'],
                     'started_at'   => (string) $row['created_at'],
                     'last_at'      => (string) $row['created_at'],
@@ -263,6 +266,7 @@ class WhisperController
                 $state = [
                     'min_uid'      => $minUid,
                     'max_uid'      => $maxUid,
+                    'initiator_id' => (int) $row['sender_id'],
                     'first_msg_id' => (int) $row['id'],
                     'started_at'   => (string) $row['created_at'],
                     'last_at'      => (string) $row['created_at'],
@@ -290,7 +294,7 @@ class WhisperController
             exit;
         }
 
-        // Имена пользователей для пар текущей страницы
+        // Имена пользователей для пар текущей страницы (initiator_id ⊆ {min_uid, max_uid})
         $allUids = array_values(array_unique(array_merge(
             array_column($slice, 'min_uid'),
             array_column($slice, 'max_uid')
@@ -313,6 +317,7 @@ class WhisperController
         foreach ($slice as $s) {
             $result[] = [
                 'session_token' => (string) $s['first_msg_id'],
+                'initiator'     => ['id' => $s['initiator_id'], 'username' => $userMap[$s['initiator_id']] ?? '?'],
                 'user1'         => ['id' => $s['min_uid'], 'username' => $userMap[$s['min_uid']] ?? '?'],
                 'user2'         => ['id' => $s['max_uid'], 'username' => $userMap[$s['max_uid']] ?? '?'],
                 'started_at'    => Timestamp::isoUtc($s['started_at']),
