@@ -559,11 +559,12 @@ class UserManager
         );
 
         $global = $db->fetchAll(
-            "SELECT u.id, u.username, u.email, u.global_role,
+            "SELECT u.id AS user_id, u.username, u.email, u.global_role,
                     u.banned_at, u.banned_until, u.ban_reason,
                     a.username AS banned_by_name,
                     NULL AS room_id, NULL AS room_name,
-                    'global' AS ban_type
+                    NULL AS room_role, NULL AS muted_until,
+                    'global' AS ban_scope
              FROM users u
              LEFT JOIN users a ON a.id = u.banned_by
              WHERE u.is_banned = 1
@@ -576,7 +577,7 @@ class UserManager
                     NULL AS muted_until,
                     a.username AS banned_by_name,
                     r.id AS room_id, r.name AS room_name,
-                    'room' AS ban_type
+                    'room' AS ban_scope
              FROM room_members rm
              JOIN users u ON u.id = rm.user_id
              JOIN rooms r ON r.id = rm.room_id
@@ -591,7 +592,7 @@ class UserManager
                     rm.muted_until,
                     NULL AS banned_by_name,
                     r.id AS room_id, r.name AS room_name,
-                    'mute' AS ban_type
+                    'mute' AS ban_scope
              FROM room_members rm
              JOIN users u ON u.id = rm.user_id
              JOIN rooms r ON r.id = rm.room_id
@@ -601,10 +602,16 @@ class UserManager
         $global = Timestamp::normalizeRows($global, ['banned_at', 'banned_until']);
         $room   = Timestamp::normalizeRows($room,   ['banned_at', 'banned_until', 'muted_until']);
         $mutes  = Timestamp::normalizeRows($mutes,  ['muted_until']);
-        $bans   = array_merge($room, $mutes);
+        $bans   = array_merge($global, $room, $mutes);
 
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'bans' => $bans, 'global' => $global], JSON_UNESCAPED_UNICODE);
+        echo json_encode([
+            'success' => true,
+            'bans'    => $bans,    // unified contract: all scopes
+            'global'  => $global,  // deprecated — backward compat
+            'room'    => $room,    // deprecated — backward compat
+            'mutes'   => $mutes,   // deprecated — backward compat
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

@@ -1825,22 +1825,49 @@ function loadAdminBans() {
       $('#admin-bans-table').html('<div class="text-muted p-2">Заблокированных нет.</div>');
       return;
     }
-    let html = '<table class="table table-sm"><thead><tr><th>Пользователь</th><th>Комната</th><th>Роль</th><th>Кляп до</th><th></th></tr></thead><tbody>';
+    let html = '<table class="table table-sm"><thead><tr>'
+             + '<th>Пользователь</th><th>Тип</th><th>Комната</th><th>До / кляп</th><th></th>'
+             + '</tr></thead><tbody>';
     resp.bans.forEach(b => {
-      const mutedUntil = b.muted_until && dayjs(b.muted_until).isValid() ? formatChatDateTime(b.muted_until) : '—';
-      const unbanBtn = b.room_role === 'banned'
-        ? `<button class="btn btn-xs btn-sm btn-outline-success admin-unban-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Разбанить"><i class="fa fa-unlock"></i></button>`
-        : '';
-      const unmuteBtn = b.muted_until
-        ? `<button class="btn btn-xs btn-sm btn-outline-warning admin-unmute-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Снять кляп"><i class="fa fa-comment"></i></button>`
-        : '';
-      html += `<tr><td>${esc(b.username)}</td><td>${esc(b.room_name||'—')}</td><td>${esc(b.room_role||'—')}</td><td>${mutedUntil}</td><td class="d-flex gap-1">${unbanBtn}${unmuteBtn}</td></tr>`;
+      const scope = b.ban_scope || '';
+      let typeLabel, roomLabel, untilLabel, actionBtn;
+
+      if (scope === 'global') {
+        typeLabel  = '<span class="badge bg-danger">global ban</span>';
+        roomLabel  = '—';
+        untilLabel = b.banned_until && dayjs(b.banned_until).isValid()
+                     ? formatChatDateTime(b.banned_until) : 'навсегда';
+        actionBtn  = `<button class="btn btn-xs btn-sm btn-outline-success admin-global-unban-btn" data-user="${b.user_id}" title="Снять global ban"><i class="fa fa-unlock"></i></button>`;
+
+      } else if (scope === 'room') {
+        typeLabel  = '<span class="badge bg-warning text-dark">room ban</span>';
+        roomLabel  = esc(b.room_name || '—');
+        untilLabel = '—';
+        actionBtn  = `<button class="btn btn-xs btn-sm btn-outline-success admin-unban-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Разбанить"><i class="fa fa-unlock"></i></button>`;
+
+      } else if (scope === 'mute') {
+        typeLabel  = '<span class="badge bg-secondary">кляп</span>';
+        roomLabel  = esc(b.room_name || '—');
+        untilLabel = b.muted_until && dayjs(b.muted_until).isValid()
+                     ? formatChatDateTime(b.muted_until) : '—';
+        actionBtn  = `<button class="btn btn-xs btn-sm btn-outline-warning admin-unmute-btn" data-room="${b.room_id}" data-user="${b.user_id}" title="Снять кляп"><i class="fa fa-comment"></i></button>`;
+
+      } else {
+        console.warn('[admin bans] unknown ban_scope', b);
+        typeLabel  = '<span class="badge bg-secondary">unknown</span>';
+        roomLabel  = esc(b.room_name || '—');
+        untilLabel = '—';
+        actionBtn  = '';
+      }
+
+      html += `<tr><td>${esc(b.username)}</td><td>${typeLabel}</td><td>${roomLabel}</td><td>${untilLabel}</td><td>${actionBtn}</td></tr>`;
     });
     html += '</tbody></table>';
     $('#admin-bans-table').html(html);
   });
 }
 
+// Room ban → /api/admin/rooms/{roomId}/unban/{userId}
 $('#admin-bans-table').on('click', '.admin-unban-btn', function() {
   const roomId = $(this).data('room'), userId = $(this).data('user');
   $.post(`/api/admin/rooms/${roomId}/unban/${userId}`, {csrf_token: CSRF_TOKEN}, function(resp) {
@@ -1849,6 +1876,16 @@ $('#admin-bans-table').on('click', '.admin-unban-btn', function() {
   }, 'json');
 });
 
+// Global ban → /api/admin/users/{userId} + is_banned:0
+$('#admin-bans-table').on('click', '.admin-global-unban-btn', function() {
+  const userId = $(this).data('user');
+  $.post(`/api/admin/users/${userId}`, {csrf_token: CSRF_TOKEN, is_banned: 0}, function(resp) {
+    if (resp.success) { showToast('Глобальный бан снят.', 'success'); loadAdminBans(); loadAdminUsers(); }
+    else showToast(resp.error || 'Ошибка.', 'danger');
+  }, 'json');
+});
+
+// Mute → /api/admin/rooms/{roomId}/unmute/{userId}
 $('#admin-bans-table').on('click', '.admin-unmute-btn', function() {
   const roomId = $(this).data('room'), userId = $(this).data('user');
   $.post(`/api/admin/rooms/${roomId}/unmute/${userId}`, {csrf_token: CSRF_TOKEN}, function(resp) {
