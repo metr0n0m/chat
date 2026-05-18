@@ -32,6 +32,7 @@ $('#themeToggle').on('click', function() {
 // ════════════════════════════════════════════════
 // SECTION: STATE
 let ws = null;
+let forcedLogout = false;       // set to true on force_logout to suppress reconnect
 let currentRoomId = null;       // currently VIEWED room (public or numer)
 let currentPublicRoomId = null; // public room you're WS-subscribed to
 let currentRoomRole = null;
@@ -105,6 +106,10 @@ function connectWS() {
   };
 
   ws.onclose = () => {
+    if (forcedLogout) {
+      console.log('[WS] Connection closed by server (force_logout), no reconnect.');
+      return;
+    }
     console.log('[WS] Disconnected, reconnecting in 3s...');
     setTimeout(connectWS, 3000);
   };
@@ -150,12 +155,23 @@ function handleWS(data) {
       if ($('#ownerModal').hasClass('show') && $('#ownerNumera').hasClass('active')) loadAdminNumera();
       break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
-    case 'banned_from_room': onKickedFromRoom(data); break;
+    case 'banned_from_room': onBannedFromRoom(data); break;
     case 'muted_in_room':    onMutedInRoom(data); break;
     case 'room_deleted':     onRoomDeleted(data); break;
     case 'room_updated':     loadRooms(); break;
     case 'friend_online':
     case 'friend_offline':  loadFriends(); break;
+    case 'force_logout': {
+      forcedLogout = true;
+      localStorage.removeItem('lastRoomId');
+      const reason = data.reason || '';
+      const msg = reason === 'kicked'  ? 'Вы были удалены модератором.' :
+                  reason === 'banned'  ? 'Доступ ограничён.' :
+                                        'Сессия завершена.';
+      showToast(msg, 'danger');
+      setTimeout(() => { location.href = '/'; }, 2000);
+      break;
+    }
     case 'error':           showToast(data.message, 'danger'); break;
     case 'pong':            break;
   }
@@ -179,7 +195,7 @@ function updateRoomBadge(roomId) {
   }
 }
 
-function loadRooms() {
+function loadRooms(skipAutoJoin = false) {
   $.get('/api/rooms', function(resp) {
     if (!resp.success) return;
     rooms = resp.rooms;
@@ -191,7 +207,7 @@ function loadRooms() {
       $list.append($item);
     });
     onlineCountsByRoom.forEach((_, roomId) => updateRoomBadge(roomId));
-    if (!currentPublicRoomId && rooms.length > 0) {
+    if (!skipAutoJoin && !currentPublicRoomId && rooms.length > 0) {
       const saved = localStorage.getItem('lastRoomId');
       const target = saved ? rooms.find(r => Number(r.id) === Number(saved)) : null;
       joinPublicRoom(target ? Number(target.id) : rooms[0].id);
@@ -980,9 +996,26 @@ function onKickedFromRoom(data) {
       currentRoomId = null;
       $('#room-title').text('Выберите комнату');
       $('#messages-list').empty();
+      $('#load-more-btn-wrap').addClass('d-none');
       $('#online-users-list').empty();
     }
-    loadRooms();
+    loadRooms(true);
+  }
+}
+
+function onBannedFromRoom(data) {
+  if (Number(data.room_id) === Number(currentPublicRoomId)) {
+    showToast('Вы забанены в комнате.', 'danger');
+    currentPublicRoomId = null;
+    localStorage.removeItem('lastRoomId');
+    if (Number(currentRoomId) === Number(data.room_id)) {
+      currentRoomId = null;
+      $('#room-title').text('Выберите комнату');
+      $('#messages-list').empty();
+      $('#load-more-btn-wrap').addClass('d-none');
+      $('#online-users-list').empty();
+    }
+    loadRooms(true);
   }
 }
 
@@ -1003,7 +1036,7 @@ function onRoomDeleted(data) {
       $('#messages-list').empty();
     }
   }
-  loadRooms();
+  loadRooms(true);
 }
 
 // ════════════════════════════════════════════════
