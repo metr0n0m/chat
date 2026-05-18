@@ -6,6 +6,7 @@ namespace Chat\WebSocket;
 use Ratchet\ConnectionInterface;
 use Chat\DB\Connection;
 use Chat\Chat\{MessageController, WhisperController, RoomController, NumerController, SystemMessageService};
+use Chat\Security\Session;
 use Chat\Support\Lang;
 use Chat\Support\Timestamp;
 
@@ -494,9 +495,15 @@ class EventRouter
         }
         if ($result['kicked'] ?? false) {
             $targetId = (int) $result['target_user_id'];
-            $this->cm->sendToUser($targetId, ['event' => 'kicked_from_room', 'room_id' => $roomId]);
+            Session::destroyAllForUser($targetId);
             $this->cm->leaveRoom($targetId, $roomId);
             $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $targetId]);
+            $this->cm->closeUser($targetId, ['event' => 'force_logout', 'reason' => 'kicked']);
+            SystemMessageService::emitRoomLifecycle(
+                $this->cm, $roomId, $userId,
+                ($result['target_username'] ?? 'Пользователь') . ' удалён(а) из комнаты',
+                'room_kick'
+            );
             $this->broadcastRoomCount($roomId);
         }
         if ($result['banned'] ?? false) {
@@ -504,6 +511,11 @@ class EventRouter
             $this->cm->sendToUser($targetId, ['event' => 'banned_from_room', 'room_id' => $roomId]);
             $this->cm->leaveRoom($targetId, $roomId);
             $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $targetId]);
+            SystemMessageService::emitRoomLifecycle(
+                $this->cm, $roomId, $userId,
+                ($result['target_username'] ?? 'Пользователь') . ' забанен(а) в комнате',
+                'room_ban'
+            );
             $this->broadcastRoomCount($roomId);
         }
         if ($result['muted'] ?? false) {
