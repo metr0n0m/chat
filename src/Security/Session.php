@@ -79,6 +79,14 @@ class Session
         );
     }
 
+    public static function destroyAllForUser(int $userId): void
+    {
+        Connection::getInstance()->execute(
+            'DELETE FROM sessions WHERE user_id = ?',
+            [$userId]
+        );
+    }
+
     public static function setCookie(string $token): void
     {
         setcookie('chat_session', $token, [
