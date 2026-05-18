@@ -1,0 +1,273 @@
+# AUDIT.md — Системный аудит проекта Chat
+Last updated: 2026-05-17
+Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MESSAGE_FLOW.md)
+
+---
+
+## 1. Инвентаризация файлов
+
+### Backend PHP (30 файлов, ~6 371 строка)
+
+| Файл | Строк | Назначение |
+|------|-------|-----------|
+| src/Admin/Access.php | 163 | Права доступа, resolveLevel |
+| src/Admin/AdminPanel.php | ~350 | Dashboard, создание пользователей, настройки |
+| src/Admin/RoomManager.php | ~500 | Список/удаление/rename комнат, нумера, архив |
+| src/Admin/UserManager.php | 637 | Пользователи, настройки, аватары, баны/мьюты |
+| src/Auth/EmailVerification.php | ~130 | Верификация email, resend |
+| src/Auth/GoogleOAuth.php | ~200 | Google OAuth flow |
+| src/Auth/LoginHandler.php | ~70 | Email/username вход |
+| src/Auth/RegisterHandler.php | 109 | Регистрация + email verification |
+| src/Auth/VKOAuth.php | ~190 | VK OAuth (disabled at router level) |
+| src/Chat/EmbedProcessor.php | 208 | Embed-превью ссылок |
+| src/Chat/MessageController.php | ~320 | История, отправка, удаление сообщений |
+| src/Chat/NumerController.php | ~280 | Invite/respond/leave/cleanup нумеров |
+| src/Chat/NumerPage.php | ~600 | Standalone страница нумера |
+| src/Chat/RoomController.php | 400 | Список/создание/join/manage комнат |
+| src/Chat/SystemMessageService.php | 174 | Системные сообщения, visibility chain |
+| src/Chat/WhisperController.php | ~550 | Whisper send/archive/delete/clear |
+| src/DB/Connection.php | ~90 | PDO-обёртка singleton |
+| src/Http/Router.php | ~200 | HTTP-маршрутизация |
+| src/Mail/Mailer.php | ~45 | PHPMailer SMTP wrapper |
+| src/Security/CSRF.php | ~45 | CSRF токен double-submit |
+| src/Security/ColorContrast.php | ~70 | Проверка контрастности цветов |
+| src/Security/HMAC.php | ~15 | HMAC подпись сообщений |
+| src/Security/OriginGuard.php | ~55 | WS origin whitelist |
+| src/Security/Session.php | ~110 | DB-backed сессии |
+| src/Support/Lang.php | ~45 | Локализация |
+| src/Support/Timestamp.php | ~100 | UTC ISO-8601 нормализация |
+| src/Validation/UsernameRules.php | ~25 | Правила username |
+| src/WebSocket/ConnectionManager.php | 207 | In-memory presence, рассылка |
+| src/WebSocket/EventRouter.php | ~650 | WS-маршрутизация событий |
+| src/WebSocket/Server.php | ~180 | WS-сервер, сессия, reconnect grace |
+
+### Frontend JS (7 файлов, ~2 378 строк)
+
+| Файл | Строк | Назначение |
+|------|-------|-----------|
+| public/assets/js/chat.js | 2024 | Главный: WS, комнаты, сообщения, UI |
+| public/assets/js/chat-shell.js | 171 | Responsive shell, mobile rail |
+| public/assets/js/chat-auth.js | 62 | Login/register AJAX, email verification UI |
+| public/assets/js/chat-utils.js | 67 | Shared утилиты, systemAlert |
+| public/assets/js/chat-display.js | 22 | User/role/status display helpers |
+| public/assets/js/chat-input.js | 25 | Composer/input helpers |
+| public/assets/js/chat-time.js | 7 | Frontend date/time formatting |
+
+### Entry points
+
+| Файл | Роль |
+|------|------|
+| public/index.php | Главный HTTP entry point (615 строк HTML+PHP) |
+| ws-server.php | WebSocket process entry point (~31 строка) |
+| index.php | Dev Docker diagnostic (47 строк, НЕ production) |
+
+### Database
+
+| Файл | Содержимое |
+|------|-----------|
+| src/DB/migrations.sql | Полная схема: 11 таблиц + ALTER + seed |
+| database/migrations/001-004 | Базовые миграции |
+| database/migrations/006-010 | Функциональные миграции |
+
+---
+
+## 2. Сравнение с аудитом 2026-04-18
+
+### Что исправлено
+
+| Проблема (аудит 2026-04-18) | Статус 2026-05-17 |
+|---|---|
+| #4 joinRoom() не определена | ЗАКРЫТА — вызовов joinRoom() в chat.js нет, проблемы не было |
+| #5 room_count_changed без клиента | ЗАКРЫТА — onRoomCountChanged() есть в chat.js стр. 925 |
+| #7 монолитный JS в index.php | ЧАСТИЧНО — JS вынесен в 7 отдельных модулей |
+| UserManager без SSRF защиты | ЧАСТИЧНО — IPv4 private range filter добавлен |
+| Системные сообщения дублировались | ЗАКРЫТА — SystemMessageService создан |
+
+### Что было ошибочно помечено как проблема в аудите 2026-04-18
+
+| Ошибочная проблема | Факт |
+|---|---|
+| friend_online/offline dead code | НЕ dead: client вызывает loadFriends() (HTTP refresh), это намеренное поведение |
+| room_count_changed без обработчика | НЕ проблема: onRoomCountChanged() существует в chat.js стр. 925 |
+| joinRoom() вызывается без определения | НЕ проблема: вызовов joinRoom() в chat.js нет — только joinPublicRoom() |
+
+### Что остаётся нерешённым
+
+| Проблема | Приоритет |
+|---|---|
+| EmbedProcessor без SSRF защиты | ВЫСОКИЙ |
+| reactor_raw plaintext password | КРИТИЧНО (бизнес-решение) |
+| Дубль deleteRoomWithDependencies | СРЕДНИЙ |
+| Дубль joinDefaultRooms (3 копии) | СРЕДНИЙ |
+| Дубль resolvePermission/resolveLevel | НИЗКИЙ |
+| SHOW COLUMNS runtime checks | НИЗКИЙ |
+| Нет пагинации /api/rooms | СРЕДНИЙ |
+
+---
+
+## 3. Проблемы безопасности
+
+### SSRF-1: EmbedProcessor без IP-фильтрации [ВЫСОКИЙ]
+
+Файл: `src/Chat/EmbedProcessor.php`, функции `headRequest()` (стр. 170–190) и `fetchHtml()` (стр. 192–206).
+
+Уязвимый код в headRequest():
+```
+$ctx = stream_context_create(['http' => ['method' => 'HEAD', 'timeout' => 3]]);
+@file_get_contents($url, false, $ctx);  // Нет IP-проверки
+```
+
+Уязвимый код в fetchHtml():
+```
+$html = @file_get_contents($url, false, $ctx);  // Нет IP-проверки
+```
+
+Вектор: Пользователь вставляет в сообщение URL:
+- `http://192.168.1.1/admin` — доступ к роутеру
+- `http://169.254.169.254/latest/meta-data/` — AWS metadata endpoint
+- `http://10.0.0.1/internal` — внутренние сервисы
+
+Отличие от UserManager: UserManager::headRequest() добавляет фильтр через
+`FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE`, EmbedProcessor — нет.
+
+### SSRF-2: UserManager частичная защита [СРЕДНИЙ]
+
+Файл: `src/Admin/UserManager.php`, headRequest() стр. 476–514.
+
+Покрыто: IPv4 RFC1918 (10.x, 172.16.x, 192.168.x) + reserved via FILTER_FLAG_NO_PRIV_RANGE.
+Не покрыто: IPv6 loopback (::1), IPv6 ULA (fc00::/7), DNS rebinding, 0.0.0.0.
+
+### reactor_raw: Plaintext password [КРИТИЧНО — бизнес-решение]
+
+Файл: `src/Auth/RegisterHandler.php`, строка 43:
+```
+$db->execute(
+    'INSERT INTO users (username, email, password_hash, reactor_raw) VALUES (?, ?, ?, ?)',
+    [$username, $email, $hash, $password]  // $password — открытый текст
+);
+```
+
+Статус: Зафиксировано в CLAUDE.md как "explicit product decision".
+Требует решения владельца. Варианты описаны в DIFF_PLAN.md, шаг 1.2.
+
+---
+
+## 4. Архитектурные дубли
+
+### Дубль A: deleteRoomWithDependencies
+
+Одинаковый транзакционный блок DELETE в двух местах:
+
+- `src/Chat/RoomController.php::deleteRoomWithDependencies()` — строки 385–398
+- `src/Admin/RoomManager.php::delete()` — строки 121–132
+
+Содержание идентично: DELETE messages, room_members, invitations, rooms — в транзакции.
+
+### Дубль Б: joinDefaultRooms
+
+Одинаковая SQL-логика в трёх местах:
+
+- `src/Auth/RegisterHandler.php::joinDefaultRooms()` — строки 82–93
+- `src/Auth/GoogleOAuth.php::joinDefaultRooms()` — строки 188–197
+- `src/Auth/VKOAuth.php::joinDefaultRooms()` — строки 168–177
+
+Содержание идентично: SELECT 5 public rooms + INSERT IGNORE в room_members.
+
+### Дубль В: resolvePermission / resolveLevel
+
+Параллельные реализации одной иерархии прав:
+
+- `src/Admin/Access.php::resolveLevel()` — строки 141–161, возвращает int
+- `src/Chat/RoomController.php::resolvePermission()` — строки 300–325, возвращает ?array
+
+Уровни совпадают: owner=3, local_admin=2, local_moderator=1, member=0 (global: platform_owner=6, admin=5, moderator=4).
+Синхронизируются вручную.
+
+### Дубль Г: GLOBAL_ROLE_LEVELS
+
+- `src/Admin/UserManager.php` — const GLOBAL_ROLE_LEVELS = [...] (стр. 14)
+- `src/Admin/Access.php` — hardcoded числа в resolveLevel()
+- `src/Chat/RoomController.php` — hardcoded числа в resolvePermission()
+
+---
+
+## 5. WS события — верифицированная карта (2026-05-17)
+
+| Событие | Сервер | Клиент | Статус |
+|---------|--------|--------|--------|
+| connected | Server.php onOpen | chat.js | OK |
+| room_joined | EventRouter | chat.js | OK |
+| user_joined | EventRouter | chat.js | OK |
+| user_left | EventRouter + Server onClose | chat.js | OK |
+| new_message | EventRouter | chat.js | OK |
+| system_message | SystemMessageService | chat.js | OK |
+| message_deleted | EventRouter | chat.js | OK |
+| whisper_sent | EventRouter | chat.js | OK |
+| whisper_received | EventRouter | chat.js | OK |
+| invite_sent/received/accepted/declined/expired | EventRouter | chat.js | OK |
+| numer_joined | EventRouter | chat.js | OK |
+| numer_participant_joined/left | EventRouter | chat.js | OK |
+| numer_closed | EventRouter | chat.js | OK |
+| kicked_from_room | EventRouter | chat.js | OK |
+| banned_from_room | EventRouter | chat.js (uncommitted) | OK pending commit |
+| muted_in_room | EventRouter | chat.js | OK |
+| room_deleted | EventRouter | chat.js | OK |
+| room_updated | EventRouter | chat.js | OK |
+| room_count_changed | EventRouter::broadcastRoomCount | chat.js::onRoomCountChanged | OK |
+| online_users | EventRouter | chat.js | OK |
+| pong | EventRouter | chat.js | OK |
+| error | EventRouter/Server | chat.js | OK |
+| friend_online | НЕ отправляется | chat.js -> loadFriends() | Намеренный HTTP-refresh |
+| friend_offline | НЕ отправляется | chat.js -> loadFriends() | Намеренный HTTP-refresh |
+
+Вывод: Dead WS события отсутствуют. friend_online/offline — намеренный паттерн HTTP-refresh.
+
+---
+
+## 6. Незакоммиченные изменения (рабочее дерево на 2026-05-17)
+
+5 файлов modified. Тема: kick/ban flow improvements + унификация admin bans API.
+
+Все изменения связаны, должны быть в одном коммите. Подробные diff в DIFF_PLAN.md шаг 0.1.
+
+Краткое содержание:
+- chat.js: onBannedFromRoom() выделен из onKickedFromRoom(), loadRooms(skipAutoJoin)
+- UserManager.php: listBanned() → единый массив bans вместо room+mutes отдельно
+- RoomController.php: kick/ban JOIN users, возвращают target_username
+- SystemMessageService.php: добавлены scopes room_kick, room_ban
+- EventRouter.php: emitRoomLifecycle() при kick и ban
+
+---
+
+## 7. Технический долг
+
+| Проблема | Файл | Приоритет | Рекомендация |
+|----------|------|-----------|--------------|
+| In-memory presence, нет multi-instance WS | ConnectionManager.php | Низкий | Acceptable для одного инстанса |
+| Нет пагинации /api/rooms | RoomController.php | Средний | Добавить LIMIT/OFFSET |
+| SHOW COLUMNS runtime | UserManager, RoomController, RoomManager | Низкий | Убрать после стабилизации схемы |
+| Монолитный chat.js (2024 строки) | chat.js | Низкий | Продолжать разбивку по модулям |
+| Friendships flow частичный | Router.php, chat.js | Низкий | HTTP-refresh acceptable |
+| Нет unit-тестов | — | Средний | Добавить PHPUnit |
+| composer.json PHP ^8.4 vs prod 8.2? | composer.json | Средний | Верифицировать на production |
+| WS supervisord вместо systemd | supervisord.docker.conf | Низкий | Production: добавить systemd unit |
+| Глобальный бан не отключает WS | Server.php | Средний | Требует отдельного дизайна |
+| Сессионные данные не обновляются без reconnect | Server.php | Средний | Известное ограничение |
+
+---
+
+## 8. Статус миграций
+
+| Файл | Локально | Production |
+|------|----------|------------|
+| 001_fix_foreign_keys.sql | Applied | Not verified |
+| 002_email_verification.sql | Applied | Not verified |
+| 003_reactor_raw.sql | Applied | Not verified |
+| 004_ban_metadata.sql | Applied | Not verified |
+| 006_username_max_25.sql | Applied | Not verified |
+| 007_messages_deleted_at.sql | Applied | Not verified |
+| 008_rooms_close_reason.sql | Applied | Not verified |
+| 009_system_messages.sql | Applied | Not verified |
+| 010_show_system_messages.sql | Applied | Not verified |
+
+Примечание: 005_*.sql отсутствует — пропуск номера, нормально.

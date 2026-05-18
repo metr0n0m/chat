@@ -437,6 +437,57 @@ Risks/notes:
 
 ## 16. Current Checkpoint
 
+### 2026-05-17 - Full re-audit and diff-plan prepared
+
+Commit/deploy:
+
+- Local commit at audit: `6ac80b9`.
+- Working tree: **5 modified files** — not committed yet.
+- Production revision: not verified in this session.
+- DB migration: not applied in this session.
+- WS restart: not done.
+
+Modified files (uncommitted):
+- `public/assets/js/chat.js` — `onBannedFromRoom()` split from `onKickedFromRoom()`; `loadRooms(skipAutoJoin)` flag.
+- `src/Admin/UserManager.php` — `listBanned()` returns unified `bans` array (room bans + mutes merged).
+- `src/Chat/RoomController.php` — `kick()` and `ban()` JOIN `users` to return `target_username`.
+- `src/Chat/SystemMessageService.php` — minor scope additions.
+- `src/WebSocket/EventRouter.php` — `emitRoomLifecycle()` calls added for kick and ban.
+
+Verified in this audit (2026-05-17):
+
+- `UserManager::headRequest()` already has IPv4 SSRF protection via `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE`. **Partial — IPv6 and DNS rebinding not covered.**
+- `EmbedProcessor::headRequest()` and `fetchHtml()` have **no IP validation** — confirmed SSRF surface.
+- `VKOAuth::httpGet()` and `GoogleOAuth::fetchToken/fetchProfile` call **fixed Google/VK URLs only** — not SSRF, those are trusted endpoints.
+- `friend_online` and `friend_offline` are **not dead code** — client routes them to `loadFriends()` (lazy HTTP refresh, not WS push). No server push needed unless realtime friend presence is added.
+- `room_count_changed` is **live** — server sends it in `EventRouter::broadcastRoomCount()`, client handles it in `onRoomCountChanged()`.
+- `joinRoom()` function is **not called** in `public/assets/js/chat.js`. Only `joinPublicRoom()` is used. No missing function.
+- Duplicate `joinDefaultRooms()` confirmed in: `RegisterHandler`, `GoogleOAuth`, `VKOAuth` — identical SQL.
+- Duplicate `deleteRoomWithDependencies()` confirmed in: `RoomController` and `RoomManager` — identical transaction block.
+- `Access::resolveLevel()` and `RoomController::resolvePermission()` are **parallel implementations** of the same permission hierarchy. Both must be kept in sync manually.
+- `reactor_raw` column confirmed written in `RegisterHandler::handle()`.
+- `SHOW COLUMNS` runtime checks in `UserManager`, `RoomController`, `RoomManager` — confirmed still present.
+
+Left for later:
+
+- Commit 5 pending files (Step 0.1).
+- Fix SSRF in `EmbedProcessor` — add IP validation matching `UserManager` pattern (Step 1.1).
+- Decide `reactor_raw` policy (owner decision required, Step 1.2).
+- Extract `joinDefaultRooms` to `DefaultRoomService` (Step 2.1).
+- Extract `deleteRoomWithDependencies` to `RoomDeletionService` (Step 2.2).
+- Unify `resolvePermission`/`resolveLevel` (Step 2.3) — long-term.
+- Replace `SHOW COLUMNS` runtime checks with schema version tracking (Step 3.1) — long-term.
+- Verify production revision and PHP version before any deploy.
+
+Risks/notes:
+
+- Production deploy requires DB migration before PHP code using new columns.
+- WebSocket process must be restarted after any WS/Chat PHP changes.
+- `UserManager::headRequest()` only partially protected — IPv6 loopback and DNS rebinding still possible. Full fix in Step 1.1.
+
+Full diff-plan: see `DIFF_PLAN.md`.
+Full audit: see `AUDIT.md`.
+
 ### 2026-05-14 - Handoff document updated after clean-tree audit
 
 Commit/deploy:
