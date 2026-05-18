@@ -127,6 +127,31 @@ class ConnectionManager
         }
     }
 
+    /**
+     * Send a force_logout event and close all WS connections for a user.
+     * Used as foundation for moderation kick/ban flow.
+     * The optional $payload overrides the default force_logout event.
+     *
+     * NOTE: conn->close() triggers onClose() → remove(), which mutates
+     * $this->userConnections. ConnIds are collected before the loop to avoid
+     * iterating over a modified array.
+     */
+    public function closeUser(int $userId, array $payload = []): void
+    {
+        $event = !empty($payload)
+            ? $payload
+            : ['event' => 'force_logout', 'reason' => 'moderation'];
+
+        $this->sendToUser($userId, $event);
+
+        $connIds = array_keys($this->userConnections[$userId] ?? []);
+        foreach ($connIds as $connId) {
+            if (isset($this->connections[$connId])) {
+                $this->connections[$connId]->close();
+            }
+        }
+    }
+
     public function sendToRoom(int $roomId, array $event, ?int $excludeUserId = null): void
     {
         $payload = $this->encodeEvent($event);
