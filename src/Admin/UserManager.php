@@ -571,8 +571,9 @@ class UserManager
         );
 
         $room = $db->fetchAll(
-            "SELECT u.id, u.username, u.email, u.global_role,
-                    rm.banned_at, NULL AS banned_until, rm.ban_reason,
+            "SELECT u.id AS user_id, u.username, u.email, u.global_role,
+                    rm.room_role, rm.banned_at, NULL AS banned_until, rm.ban_reason,
+                    NULL AS muted_until,
                     a.username AS banned_by_name,
                     r.id AS room_id, r.name AS room_name,
                     'room' AS ban_type
@@ -585,9 +586,10 @@ class UserManager
         );
 
         $mutes = $db->fetchAll(
-            "SELECT u.id, u.username, u.email, u.global_role,
-                    rm.muted_until AS banned_until, rm.mute_reason AS ban_reason,
-                    NULL AS banned_at, NULL AS banned_by_name,
+            "SELECT u.id AS user_id, u.username, u.email, u.global_role,
+                    rm.room_role, NULL AS banned_at, NULL AS banned_until, rm.mute_reason AS ban_reason,
+                    rm.muted_until,
+                    NULL AS banned_by_name,
                     r.id AS room_id, r.name AS room_name,
                     'mute' AS ban_type
              FROM room_members rm
@@ -597,11 +599,12 @@ class UserManager
              ORDER BY rm.muted_until DESC"
         );
         $global = Timestamp::normalizeRows($global, ['banned_at', 'banned_until']);
-        $room = Timestamp::normalizeRows($room, ['banned_at', 'banned_until']);
-        $mutes = Timestamp::normalizeRows($mutes, ['banned_at', 'banned_until']);
+        $room   = Timestamp::normalizeRows($room,   ['banned_at', 'banned_until', 'muted_until']);
+        $mutes  = Timestamp::normalizeRows($mutes,  ['muted_until']);
+        $bans   = array_merge($room, $mutes);
 
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'global' => $global, 'room' => $room, 'mutes' => $mutes], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => true, 'bans' => $bans, 'global' => $global], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

@@ -151,8 +151,9 @@ class SystemMessageService
     private static function visibilityForScope(string $scope): array
     {
         return match ($scope) {
-            'moderation_call' => ['global_moderators', 'global_admins', 'platform_owners'],
-            default           => ['all'],
+            'moderation_call'    => ['global_moderators', 'global_admins', 'platform_owners'],
+            'room_kick', 'room_ban' => ['all'],
+            default              => ['all'],
         };
     }
 

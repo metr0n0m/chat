@@ -202,7 +202,9 @@ class RoomController
         }
 
         $target = $db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            'SELECT rm.room_role, u.username
+             FROM room_members rm JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ? AND rm.user_id = ?',
             [$roomId, $targetId]
         );
         if (!$target || $target['room_role'] === 'owner') {
@@ -210,7 +212,7 @@ class RoomController
         }
 
         $db->execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', [$roomId, $targetId]);
-        return ['kicked' => true, 'target_user_id' => $targetId, 'room_id' => $roomId];
+        return ['kicked' => true, 'target_user_id' => $targetId, 'room_id' => $roomId, 'target_username' => $target['username']];
     }
 
     private static function ban(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db): array
@@ -220,7 +222,9 @@ class RoomController
         }
 
         $target = $db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            'SELECT rm.room_role, u.username
+             FROM room_members rm JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ? AND rm.user_id = ?',
             [$roomId, $targetId]
         );
         if (!$target || $target['room_role'] === 'owner') {
@@ -232,7 +236,7 @@ class RoomController
             ['banned', $actorId, $roomId, $targetId]
         );
 
-        return ['banned' => true, 'target_user_id' => $targetId, 'room_id' => $roomId];
+        return ['banned' => true, 'target_user_id' => $targetId, 'room_id' => $roomId, 'target_username' => $target['username']];
     }
 
     private static function mute(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db, array $data): array
