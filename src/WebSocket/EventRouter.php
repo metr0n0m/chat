@@ -36,6 +36,19 @@ class EventRouter
             return;
         }
 
+        // Temporary synchronization point between HTTP moderation actions
+        // and existing WS connections.
+        // Full immediate moderation cleanup would require explicit IPC
+        // between PHP-FPM and WS process.
+        if (Session::isUserBlocked((int) $session['id'])) {
+            Session::destroyAllForUser((int) $session['id']);
+            $this->cm->closeUser(
+                (int) $session['id'],
+                ['event' => 'force_logout', 'reason' => 'banned_global']
+            );
+            return;
+        }
+
         $event = $data['event'] ?? '';
 
         match ($event) {
