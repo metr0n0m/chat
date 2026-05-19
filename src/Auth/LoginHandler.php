@@ -35,7 +35,7 @@ class LoginHandler
             self::jsonError('Неверный логин или пароль.');
         }
 
-        if ((int) ($user['is_banned'] ?? 0) === 1) {
+        if (Session::isUserBlocked((int) $user['id'])) {
             self::jsonError('Ваш аккаунт заблокирован.');
         }
 

@@ -42,8 +42,8 @@ class EmailVerification
             [(int) $row['user_id']]
         );
 
-        $user = $db->fetchOne('SELECT id, is_banned FROM users WHERE id = ?', [(int) $row['user_id']]);
-        if (!$user || (int) $user['is_banned'] === 1) {
+        $user = $db->fetchOne('SELECT id FROM users WHERE id = ?', [(int) $row['user_id']]);
+        if (!$user || Session::isUserBlocked((int) $user['id'])) {
             self::failRedirect('Аккаунт заблокирован.');
         }
 

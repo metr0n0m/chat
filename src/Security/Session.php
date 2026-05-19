@@ -62,7 +62,7 @@ class Session
             [$tokenHash]
         );
 
-        if (!$session || $session['is_banned']) {
+        if (!$session || self::isUserBlocked((int) $session['id'])) {
             return null;
         }
 
@@ -85,6 +85,30 @@ class Session
             'DELETE FROM sessions WHERE user_id = ?',
             [$userId]
         );
+    }
+
+    /**
+     * Check if user is currently blocked.
+     * Automatically clears expired timed global bans before checking.
+     * Permanent bans (banned_until = NULL) are never cleared automatically.
+     */
+    public static function isUserBlocked(int $userId): bool
+    {
+        $db = Connection::getInstance();
+
+        $db->execute(
+            'UPDATE users
+             SET is_banned = 0, banned_at = NULL, banned_until = NULL,
+                 ban_reason = NULL, banned_by = NULL
+             WHERE id = ? AND is_banned = 1
+               AND banned_until IS NOT NULL
+               AND banned_until <= NOW()',
+            [$userId]
+        );
+
+        $row = $db->fetchOne('SELECT is_banned FROM users WHERE id = ?', [$userId]);
+
+        return isset($row['is_banned']) && (int) $row['is_banned'] === 1;
     }
 
     public static function setCookie(string $token): void

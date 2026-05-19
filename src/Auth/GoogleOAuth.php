@@ -73,7 +73,7 @@ class GoogleOAuth
         );
 
         if ($user) {
-            if ($user['is_banned']) {
+            if (Session::isUserBlocked((int) $user['id'])) {
                 self::fail('Ваш аккаунт заблокирован.');
             }
             $userId = (int) $user['id'];
