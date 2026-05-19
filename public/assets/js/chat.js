@@ -814,9 +814,7 @@ $('#user-info-actions').on('click', '.user-info-action-btn', function() {
       break;
     }
     case 'ban-global':
-      if (confirm('Забанить пользователя глобально?')) {
-        $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Пользователь заблокирован.'));
-      }
+      executeGlobalBan(uid);
       break;
   }
 });
@@ -860,9 +858,7 @@ $(document).on('click', '#ctx-menu a', function(e) {
       executeRoomAction('set_role', uid, null, {role: 'member'});
       break;
     case 'ban-global':
-      if (confirm('Забанить пользователя глобально?')) {
-        $.post(`/api/admin/users/${uid}`, {csrf_token: CSRF_TOKEN, is_banned: 1}, () => showToast('Пользователь заблокирован.'));
-      }
+      executeGlobalBan(uid);
       break;
     case 'open-settings':
       new bootstrap.Modal(document.getElementById('settingsModal')).show();
@@ -905,6 +901,35 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
   if (!currentRoomId) return;
   if (confirmText && !confirm(confirmText)) return;
   wsSend('room_action', {room_id: currentRoomId, action, target_user_id: targetUserId, ...extra});
+}
+
+function executeGlobalBan(userId) {
+  const choice = prompt(
+    'Срок бана:\n 1 — 1 час\n 2 — 24 часа\n 3 — 7 дней\n 0 — Навсегда',
+    '0'
+  );
+  if (choice === null) return;
+  const hoursMap = {'0': 0, '1': 1, '2': 24, '3': 168};
+  const labelMap = {'0': 'навсегда', '1': '1 час', '2': '24 часа', '3': '7 дней'};
+  if (!(choice in hoursMap)) {
+    showToast('Неверный срок бана.', 'danger');
+    return;
+  }
+  const hours = hoursMap[choice];
+  const label = labelMap[choice];
+  $.post(`/api/admin/users/${userId}`,
+    {csrf_token: CSRF_TOKEN, is_banned: 1, ban_hours: hours},
+    function(resp) {
+      if (resp.success) {
+        showToast(`Пользователь заблокирован (${label}).`, 'warning');
+        if (typeof loadAdminBans === 'function') loadAdminBans();
+        if (typeof loadAdminUsers === 'function') loadAdminUsers();
+      } else {
+        showToast(resp.error || 'Ошибка.', 'danger');
+      }
+    },
+    'json'
+  ).fail(() => showToast('Ошибка запроса.', 'danger'));
 }
 
 
