@@ -61,15 +61,28 @@ class AccessContext
 
         $db = Connection::getInstance();
 
-        $globalRole = (string) ($db->fetchOne(
-            'SELECT global_role FROM users WHERE id = ?',
-            [$userId]
-        )['global_role'] ?? 'user');
+        // Single JOIN query: global_role + room_role in one round-trip.
+        // room_members join is LEFT so we always get the user row even if not in room.
+        $row = $db->fetchOne(
+            'SELECT u.global_role,
+                    rm.room_role
+             FROM users u
+             LEFT JOIN room_members rm
+               ON rm.user_id = u.id AND rm.room_id = ?
+             WHERE u.id = ?',
+            [$roomId, $userId]
+        );
+
+        $globalRole = (string) ($row['global_role'] ?? 'user');
+        $roomRole   = (string) ($row['room_role']   ?? '');
 
         $result = match ($globalRole) {
+            // root_owner: reserved, not in DB.
+            // Handled here so future implementation works correctly without code changes.
+            'root_owner'     => ['level' => 7, 'source' => 'global', 'role' => 'root_owner',     'room_id' => null],
             'platform_owner' => ['level' => 6, 'source' => 'global', 'role' => 'platform_owner', 'room_id' => null],
-            'admin'          => ['level' => 5, 'source' => 'global', 'role' => 'admin',          'room_id' => null],
-            'moderator'      => ['level' => 4, 'source' => 'global', 'role' => 'moderator',      'room_id' => null],
+            'admin'          => ['level' => 5, 'source' => 'global', 'role' => 'admin',           'room_id' => null],
+            'moderator'      => ['level' => 4, 'source' => 'global', 'role' => 'moderator',       'room_id' => null],
             default          => null,
         };
 
@@ -77,15 +90,10 @@ class AccessContext
             return $this->cache[$key] = $result;
         }
 
-        // Not a global role — resolve room role
+        // Not a global role — use room_role from the JOIN result.
         if ($roomId === null) {
             return $this->cache[$key] = ['level' => -1, 'source' => 'room', 'role' => 'none', 'room_id' => null];
         }
-
-        $roomRole = (string) ($db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
-            [$roomId, $userId]
-        )['room_role'] ?? '');
 
         $level = match ($roomRole) {
             'owner'           => 3,
