@@ -508,10 +508,12 @@ class EventRouter
         }
         if ($result['kicked'] ?? false) {
             $targetId = (int) $result['target_user_id'];
-            Session::destroyAllForUser($targetId);
             $this->cm->leaveRoom($targetId, $roomId);
+            $this->cm->sendToUser($targetId, [
+                'event'   => 'kicked_from_room',
+                'room_id' => $roomId,
+            ]);
             $this->cm->sendToRoom($roomId, ['event' => 'user_left', 'room_id' => $roomId, 'user_id' => $targetId]);
-            $this->cm->closeUser($targetId, ['event' => 'force_logout', 'reason' => 'kicked']);
             SystemMessageService::emitRoomLifecycle(
                 $this->cm, $roomId, $userId,
                 ($result['target_username'] ?? 'Пользователь') . ' удалён(а) из комнаты',
