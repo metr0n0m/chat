@@ -628,4 +628,42 @@ class EventRouter
         ]);
     }
 
+    /**
+     * Remove a user from all rooms they are currently in.
+     * Sends user_left to each room and updates room counts.
+     * Does NOT close the WS connection or destroy DB sessions.
+     * Use executeForceLogout() when both presence and connection cleanup are needed.
+     */
+    private function executePresenceCleanup(int $userId): void
+    {
+        foreach ($this->cm->getUserRooms($userId) as $roomId) {
+            $this->cm->leaveRoom($userId, $roomId);
+            $this->cm->sendToRoom($roomId, [
+                'event'   => 'user_left',
+                'room_id' => $roomId,
+                'user_id' => $userId,
+            ]);
+            $this->broadcastRoomCount($roomId);
+        }
+    }
+
+    /**
+     * Full forced logout: destroy DB sessions, clean presence, close WS connection.
+     *
+     * Order:
+     *   1. destroyAllForUser  — invalidate DB sessions before closing WS,
+     *      so any reconnect attempt is rejected immediately.
+     *   2. executePresenceCleanup — broadcast user_left to all rooms.
+     *   3. closeUser — send force_logout event then close conn.
+     *      onClose → remove → reconnect grace timer → handleRoomLeave (no-op: already left).
+     *
+     * reason is passed to the force_logout event payload on the client side.
+     */
+    private function executeForceLogout(int $userId, string $reason): void
+    {
+        Session::destroyAllForUser($userId);
+        $this->executePresenceCleanup($userId);
+        $this->cm->closeUser($userId, ['event' => 'force_logout', 'reason' => $reason]);
+    }
+
 }
