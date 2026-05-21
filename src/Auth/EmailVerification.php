@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Auth;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\{CSRF, Session};
 use Chat\Mail\Mailer;
 
@@ -59,12 +60,12 @@ class EmailVerification
     public static function resend(): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('Неверный CSRF токен.', 403);
+            JsonResponse::error('Неверный CSRF токен.', 403);
         }
 
         $email = trim((string) ($_POST['email'] ?? ''));
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            self::jsonError('Некорректный email.');
+            JsonResponse::error('Некорректный email.');
         }
 
         $db   = Connection::getInstance();
@@ -75,7 +76,7 @@ class EmailVerification
 
         // Always return success to avoid email enumeration
         if (!$user || (int) $user['email_verified'] === 1) {
-            self::jsonSuccess();
+            JsonResponse::success();
         }
 
         // Cooldown: block resend if last token created less than 60 seconds ago
@@ -86,7 +87,7 @@ class EmailVerification
             [(int) $user['id']]
         );
         if ($last && (time() - strtotime($last['created_at'])) < 60) {
-            self::jsonError('Подождите минуту перед повторной отправкой.');
+            JsonResponse::error('Подождите минуту перед повторной отправкой.');
         }
 
         $rawToken  = bin2hex(random_bytes(32));
@@ -101,7 +102,7 @@ class EmailVerification
         } catch (\Throwable $e) {
             error_log('Mailer::sendVerification (resend) failed: ' . $e->getMessage());
         }
-        self::jsonSuccess();
+        JsonResponse::success();
     }
 
     private static function failRedirect(string $message): never
@@ -110,18 +111,5 @@ class EmailVerification
         exit;
     }
 
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 
-    private static function jsonSuccess(): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Auth;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 
@@ -12,14 +13,14 @@ class LoginHandler
     public static function handle(): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('Неверный CSRF токен.', 403);
+            JsonResponse::error('Неверный CSRF токен.', 403);
         }
 
         $login = trim((string) ($_POST['email'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');
 
         if ($login === '' || $password === '') {
-            self::jsonError('Введите email или имя пользователя и пароль.');
+            JsonResponse::error('Введите email или имя пользователя и пароль.');
         }
 
         $db = Connection::getInstance();
@@ -32,15 +33,15 @@ class LoginHandler
         );
 
         if (!$user || !password_verify($password, $user['password_hash'] ?? '')) {
-            self::jsonError('Неверный логин или пароль.');
+            JsonResponse::error('Неверный логин или пароль.');
         }
 
         if (Session::isUserBlocked((int) $user['id'])) {
-            self::jsonError('Ваш аккаунт заблокирован.');
+            JsonResponse::error('Ваш аккаунт заблокирован.');
         }
 
         if ((int) ($user['email_verified'] ?? 0) === 0) {
-            self::jsonError('Подтвердите email. Проверьте почту или запросите новое письмо.', 403);
+            JsonResponse::error('Подтвердите email. Проверьте почту или запросите новое письмо.', 403);
         }
 
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -48,21 +49,8 @@ class LoginHandler
         $token = Session::create((int) $user['id'], $ip, $ua);
         Session::setCookie($token);
 
-        self::jsonSuccess(['redirect' => '/']);
+        JsonResponse::success(['redirect' => '/']);
     }
 
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 
-    private static function jsonSuccess(array $data = []): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }

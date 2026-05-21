@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Chat;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Support\Timestamp;
 
@@ -35,18 +36,18 @@ class RoomController
     public static function create(int $userId, array $actor): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         if (!$actor['can_create_room'] && !in_array($actor['global_role'], ['platform_owner', 'admin'], true)) {
-            self::jsonError('Нет прав на создание комнат.', 403);
+            JsonResponse::error('Нет прав на создание комнат.', 403);
         }
 
         $name = trim((string) ($_POST['name'] ?? ''));
         $description = trim((string) ($_POST['description'] ?? ''));
 
         if (mb_strlen($name) < 2 || mb_strlen($name) > 100) {
-            self::jsonError('Название должно быть от 2 до 100 символов.');
+            JsonResponse::error('Название должно быть от 2 до 100 символов.');
         }
 
         $isPrivileged = in_array($actor['global_role'], ['platform_owner', 'admin'], true);
@@ -66,7 +67,7 @@ class RoomController
             [$roomId, $userId, 'owner']
         );
 
-        self::jsonSuccess(['room_id' => $roomId, 'name' => $name]);
+        JsonResponse::success(['room_id' => $roomId, 'name' => $name]);
     }
 
     public static function join(int $roomId, int $userId): array
@@ -364,21 +365,6 @@ class RoomController
         );
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => true, 'members' => $members], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    private static function jsonSuccess(array $data = []): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
         exit;
     }
 

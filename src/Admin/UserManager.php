@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Admin;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 use Chat\Support\Timestamp;
@@ -52,7 +53,7 @@ class UserManager
     public static function update(int $targetId, array $data): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         $db = Connection::getInstance();
@@ -60,7 +61,7 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('Пользователь не найден.', 404);
+            JsonResponse::error('Пользователь не найден.', 404);
         }
 
         $allowed = ['global_role', 'is_banned', 'can_create_room', 'custom_status'];
@@ -80,7 +81,7 @@ class UserManager
         }
 
         if (array_key_exists('custom_status', $data) && !self::canEditCustomStatus($actor)) {
-            self::jsonError('Недостаточно прав для изменения отображаемого статуса.', 403);
+            JsonResponse::error('Недостаточно прав для изменения отображаемого статуса.', 403);
         }
 
         foreach ($allowed as $field) {
@@ -92,7 +93,7 @@ class UserManager
 
             if ($field === 'global_role') {
                 if (!in_array($value, ['platform_owner', 'admin', 'moderator', 'user'], true)) {
-                    self::jsonError('Недопустимая роль.');
+                    JsonResponse::error('Недопустимая роль.');
                 }
             } elseif ($field === 'custom_status') {
                 $value = trim(strip_tags((string) $value));
@@ -128,19 +129,19 @@ class UserManager
         }
 
         if ($set === []) {
-            self::jsonError('Нет данных для обновления.');
+            JsonResponse::error('Нет данных для обновления.');
         }
 
         $params[] = $targetId;
         $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
 
-        self::jsonSuccess(['updated' => true]);
+        JsonResponse::success(['updated' => true]);
     }
 
     public static function delete(int $targetId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         $db = Connection::getInstance();
@@ -148,7 +149,7 @@ class UserManager
         $target = $db->fetchOne('SELECT id, global_role FROM users WHERE id = ?', [$targetId]);
 
         if (!$target) {
-            self::jsonError('Пользователь не найден.', 404);
+            JsonResponse::error('Пользователь не найден.', 404);
         }
 
         self::assertHigherRole($actor, $target, $targetId);
@@ -157,9 +158,9 @@ class UserManager
             $db->execute('DELETE FROM users WHERE id = ?', [$targetId]);
         } catch (\PDOException $e) {
             error_log('User delete id=' . $targetId . ': ' . $e->getMessage());
-            self::jsonError('Ошибка при удалении пользователя.', 500);
+            JsonResponse::error('Ошибка при удалении пользователя.', 500);
         }
-        self::jsonSuccess(['deleted' => true]);
+        JsonResponse::success(['deleted' => true]);
     }
 
     public static function profile(int $userId): void
@@ -182,7 +183,7 @@ class UserManager
         );
 
         if (!$user) {
-            self::jsonError('Пользователь не найден.', 404);
+            JsonResponse::error('Пользователь не найден.', 404);
         }
 
         $user['friend_count'] = (int) $db->fetchOne(
@@ -207,7 +208,7 @@ class UserManager
     public static function updateSettings(int $userId, array $post, array $files): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         $db = Connection::getInstance();
@@ -219,7 +220,7 @@ class UserManager
         );
 
         if (!$currentUser) {
-            self::jsonError('Пользователь не найден.', 404);
+            JsonResponse::error('Пользователь не найден.', 404);
         }
 
         $set = [];
@@ -229,11 +230,11 @@ class UserManager
             $username = trim((string) $post['username']);
             $usernameError = UsernameRules::validate($username);
             if ($usernameError !== null) {
-                self::jsonError($usernameError);
+                JsonResponse::error($usernameError);
             }
             $exists = $db->fetchOne('SELECT id FROM users WHERE username = ? AND id != ?', [$username, $userId]);
             if ($exists) {
-                self::jsonError('Имя уже занято.');
+                JsonResponse::error('Имя уже занято.');
             }
             $set[] = 'username = ?';
             $params[] = $username;
@@ -284,7 +285,7 @@ class UserManager
         if (isset($post['nick_color'])) {
             $nickColor = strtolower(trim((string) $post['nick_color']));
             if (!preg_match('/^#[0-9a-fA-F]{6}$/', $nickColor)) {
-                self::jsonError('Недопустимый формат цвета.');
+                JsonResponse::error('Недопустимый формат цвета.');
             }
             $set[] = 'nick_color = ?';
             $params[] = $nickColor;
@@ -293,7 +294,7 @@ class UserManager
         if (isset($post['text_color'])) {
             $textColor = strtolower(trim((string) $post['text_color']));
             if (!preg_match('/^#[0-9a-fA-F]{6}$/', $textColor)) {
-                self::jsonError('Недопустимый формат цвета.');
+                JsonResponse::error('Недопустимый формат цвета.');
             }
             $set[] = 'text_color = ?';
             $params[] = $textColor;
@@ -302,7 +303,7 @@ class UserManager
         if (isset($post['password']) && $post['password'] !== '') {
             $password = (string) $post['password'];
             if (strlen($password) < 8) {
-                self::jsonError('Пароль должен быть не короче 8 символов.');
+                JsonResponse::error('Пароль должен быть не короче 8 символов.');
             }
             $set[] = 'password_hash = ?';
             $params[] = password_hash($password, PASSWORD_ARGON2ID);
@@ -311,7 +312,7 @@ class UserManager
         if (!empty($post['avatar_url'])) {
             $url = trim((string) $post['avatar_url']);
             if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                self::jsonError('Некорректный URL аватара.');
+                JsonResponse::error('Некорректный URL аватара.');
             }
 
             $headers = self::headRequest($url);
@@ -319,10 +320,10 @@ class UserManager
             $size = (int) ($headers['content-length'] ?? 0);
 
             if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
-                self::jsonError('URL не указывает на изображение.');
+                JsonResponse::error('URL не указывает на изображение.');
             }
             if ($size > 5 * 1024 * 1024) {
-                self::jsonError('Изображение слишком большое (>5MB).');
+                JsonResponse::error('Изображение слишком большое (>5MB).');
             }
 
             $set[] = 'avatar_url = ?';
@@ -336,7 +337,7 @@ class UserManager
         }
 
         if ($set === []) {
-            self::jsonError('Нет данных для обновления.');
+            JsonResponse::error('Нет данных для обновления.');
         }
 
         $params[] = $userId;
@@ -358,16 +359,16 @@ class UserManager
         );
         $updated = Timestamp::normalizeFields($updated, ['created_at', 'last_seen_at']);
 
-        self::jsonSuccess(['updated' => true, 'user' => $updated]);
+        JsonResponse::success(['updated' => true, 'user' => $updated]);
     }
 
     private static function uploadAvatar(int $userId, array $file): string
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            self::jsonError('Ошибка загрузки файла.');
+            JsonResponse::error('Ошибка загрузки файла.');
         }
         if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
-            self::jsonError('Файл слишком большой (>2MB).');
+            JsonResponse::error('Файл слишком большой (>2MB).');
         }
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
@@ -375,7 +376,7 @@ class UserManager
         $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
         if (!in_array($mime, $allowed, true)) {
-            self::jsonError('Недопустимый тип файла. Разрешены JPEG, PNG, GIF, WEBP.');
+            JsonResponse::error('Недопустимый тип файла. Разрешены JPEG, PNG, GIF, WEBP.');
         }
 
         $image = match ($mime) {
@@ -386,7 +387,7 @@ class UserManager
         };
 
         if (!$image) {
-            self::jsonError('Не удалось обработать изображение.');
+            JsonResponse::error('Не удалось обработать изображение.');
         }
 
         $width = imagesx($image);
@@ -424,11 +425,11 @@ class UserManager
         $targetRole = (string) ($target['global_role'] ?? 'user');
 
         if ($actorId === $targetId) {
-            self::jsonError('Нельзя менять собственные административные права через админку.', 403);
+            JsonResponse::error('Нельзя менять собственные административные права через админку.', 403);
         }
 
         if (self::roleLevel($actorRole) <= self::roleLevel($targetRole)) {
-            self::jsonError('Можно изменять только пользователей с более низкой ролью.', 403);
+            JsonResponse::error('Можно изменять только пользователей с более низкой ролью.', 403);
         }
 
         if (!array_key_exists('global_role', $data)) {
@@ -437,7 +438,7 @@ class UserManager
 
         $newRole = (string) $data['global_role'];
         if (self::roleLevel($newRole) >= self::roleLevel($actorRole)) {
-            self::jsonError('Нельзя назначать роль не ниже собственной.', 403);
+            JsonResponse::error('Нельзя назначать роль не ниже собственной.', 403);
         }
     }
 
@@ -448,11 +449,11 @@ class UserManager
         $targetRole = (string) ($target['global_role'] ?? 'user');
 
         if ($actorId === $targetId) {
-            self::jsonError('Нельзя удалять или изменять собственную административную запись.', 403);
+            JsonResponse::error('Нельзя удалять или изменять собственную административную запись.', 403);
         }
 
         if (self::roleLevel($actorRole) <= self::roleLevel($targetRole)) {
-            self::jsonError('Можно управлять только пользователями с более низкой ролью.', 403);
+            JsonResponse::error('Можно управлять только пользователями с более низкой ролью.', 403);
         }
     }
 
@@ -526,21 +527,6 @@ class UserManager
             }
         }
         return isset(self::$usersColumnCache[$column]);
-    }
-
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    private static function jsonSuccess(array $data = []): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
-        exit;
     }
 
     public static function listBanned(): void
@@ -618,26 +604,26 @@ class UserManager
     public static function roomUnban(int $roomId, int $userId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $db = Connection::getInstance();
         $db->execute(
             "DELETE FROM room_members WHERE room_id = ? AND user_id = ? AND room_role = 'banned'",
             [$roomId, $userId]
         );
-        self::jsonSuccess();
+        JsonResponse::success();
     }
 
     public static function roomUnmute(int $roomId, int $userId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $db = Connection::getInstance();
         $db->execute(
             'UPDATE room_members SET muted_until = NULL, mute_reason = NULL WHERE room_id = ? AND user_id = ?',
             [$roomId, $userId]
         );
-        self::jsonSuccess();
+        JsonResponse::success();
     }
 }

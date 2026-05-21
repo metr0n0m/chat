@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Admin;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 use Chat\Support\Timestamp;
@@ -54,17 +55,17 @@ class RoomManager
     public static function setCategory(int $roomId, string $category): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         if (!in_array($category, self::roomCategoryOptions(), true)) {
-            self::jsonError('Недопустимая категория.');
+            JsonResponse::error('Недопустимая категория.');
         }
         $db = Connection::getInstance();
         if (!$db->fetchOne('SELECT id FROM rooms WHERE id = ?', [$roomId])) {
-            self::jsonError('Комната не найдена.', 404);
+            JsonResponse::error('Комната не найдена.', 404);
         }
         $db->execute('UPDATE rooms SET room_category = ? WHERE id = ?', [$category, $roomId]);
-        self::jsonSuccess(['updated' => true, 'room_category' => $category]);
+        JsonResponse::success(['updated' => true, 'room_category' => $category]);
     }
 
     private static function roomCategoryOptions(): array
@@ -89,16 +90,16 @@ class RoomManager
     public static function rename(int $roomId, string $name): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         $name = trim($name);
         if (mb_strlen($name) < 2 || mb_strlen($name) > 100) {
-            self::jsonError('Некорректное название.');
+            JsonResponse::error('Некорректное название.');
         }
 
         Connection::getInstance()->execute('UPDATE rooms SET name = ? WHERE id = ?', [$name, $roomId]);
-        self::jsonSuccess(['updated' => true, 'name' => $name]);
+        JsonResponse::success(['updated' => true, 'name' => $name]);
     }
 
     /**
@@ -108,15 +109,15 @@ class RoomManager
     public static function delete(int $roomId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $db   = Connection::getInstance();
         $room = $db->fetchOne('SELECT room_category FROM rooms WHERE id = ?', [$roomId]);
         if (!$room) {
-            self::jsonError('Комната не найдена.', 404);
+            JsonResponse::error('Комната не найдена.', 404);
         }
         if (($room['room_category'] ?? 'user') === 'permanent') {
-            self::jsonError('Постоянные комнаты нельзя удалить.', 403);
+            JsonResponse::error('Постоянные комнаты нельзя удалить.', 403);
         }
         $db->beginTransaction();
         try {
@@ -127,9 +128,9 @@ class RoomManager
             $db->commit();
         } catch (\Throwable) {
             $db->rollBack();
-            self::jsonError('Не удалось удалить комнату.');
+            JsonResponse::error('Не удалось удалить комнату.');
         }
-        self::jsonSuccess(['deleted' => true]);
+        JsonResponse::success(['deleted' => true]);
     }
 
     /**
@@ -192,17 +193,17 @@ class RoomManager
     public static function setMemberRole(int $roomId, int $targetId, string $role): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $allowed = ['owner', 'local_admin', 'local_moderator', 'member', 'banned'];
         if (!in_array($role, $allowed, true)) {
-            self::jsonError('Недопустимая роль.');
+            JsonResponse::error('Недопустимая роль.');
         }
         Connection::getInstance()->execute(
             'UPDATE room_members SET room_role = ? WHERE room_id = ? AND user_id = ?',
             [$role, $roomId, $targetId]
         );
-        self::jsonSuccess(['updated' => true]);
+        JsonResponse::success(['updated' => true]);
     }
 
     /**
@@ -212,7 +213,7 @@ class RoomManager
     public static function changeOwner(int $roomId, int $newOwnerId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
 
         $db = Connection::getInstance();
@@ -231,10 +232,10 @@ class RoomManager
             $db->commit();
         } catch (\Throwable) {
             $db->rollBack();
-            self::jsonError('Ошибка смены владельца.');
+            JsonResponse::error('Ошибка смены владельца.');
         }
 
-        self::jsonSuccess(['updated' => true]);
+        JsonResponse::success(['updated' => true]);
     }
 
     /**
@@ -244,15 +245,15 @@ class RoomManager
     {
         Access::requireOwnerPrivateArchive(Session::current());
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $db   = Connection::getInstance();
         $room = $db->fetchOne("SELECT id FROM rooms WHERE id = ? AND type = 'numer' AND is_closed = 0", [$roomId]);
         if (!$room) {
-            self::jsonError('Нумер не найден или уже закрыт.', 404);
+            JsonResponse::error('Нумер не найден или уже закрыт.', 404);
         }
         $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'admin' WHERE id = ?", [$roomId]);
-        self::jsonSuccess(['closed' => true, 'room_id' => $roomId]);
+        JsonResponse::success(['closed' => true, 'room_id' => $roomId]);
     }
 
     /**
@@ -315,7 +316,7 @@ class RoomManager
         $db = Connection::getInstance();
         $room = $db->fetchOne("SELECT id, type FROM rooms WHERE id = ? AND type = 'numer'", [$roomId]);
         if (!$room) {
-            self::jsonError('Нумер не найден.', 404);
+            JsonResponse::error('Нумер не найден.', 404);
         }
 
         $messages = $db->fetchAll(
@@ -339,7 +340,7 @@ class RoomManager
         $db   = Connection::getInstance();
         $room = $db->fetchOne('SELECT id, name FROM rooms WHERE id = ?', [$roomId]);
         if (!$room) {
-            self::jsonError('Комната не найдена.', 404);
+            JsonResponse::error('Комната не найдена.', 404);
         }
 
         $offset = max(0, ($page - 1) * 50);
@@ -383,24 +384,24 @@ class RoomManager
     public static function clearMessages(int $roomId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $actor = \Chat\Security\Session::current();
         $db    = Connection::getInstance();
         if (!$db->fetchOne('SELECT id FROM rooms WHERE id = ?', [$roomId])) {
-            self::jsonError('Комната не найдена.', 404);
+            JsonResponse::error('Комната не найдена.', 404);
         }
         $db->execute(
             "UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND type != 'whisper' AND is_deleted = 0",
             [(int) ($actor['id'] ?? 0), $roomId]
         );
-        self::jsonSuccess(['cleared' => true]);
+        JsonResponse::success(['cleared' => true]);
     }
 
     public static function clearUserMessages(int $roomId, int $userId): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $actor = \Chat\Security\Session::current();
         $db    = Connection::getInstance();
@@ -408,7 +409,7 @@ class RoomManager
             "UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND user_id = ? AND type != 'whisper' AND is_deleted = 0",
             [(int) ($actor['id'] ?? 0), $roomId, $userId]
         );
-        self::jsonSuccess(['cleared' => true]);
+        JsonResponse::success(['cleared' => true]);
     }
 
     /**
@@ -418,42 +419,18 @@ class RoomManager
     {
         $actor = Access::requireOwnerPrivateArchive(Session::current());
         if (!CSRF::verifyRequest()) {
-            self::jsonError('CSRF.', 403);
+            JsonResponse::error('CSRF.', 403);
         }
         $db   = Connection::getInstance();
         $room = $db->fetchOne("SELECT id FROM rooms WHERE id = ? AND type = 'numer' AND is_closed = 1", [$roomId]);
         if (!$room) {
-            self::jsonError('Нумер не найден или не закрыт.', 404);
+            JsonResponse::error('Нумер не найден или не закрыт.', 404);
         }
         $db->execute(
             'UPDATE messages SET is_deleted = 1, deleted_by = ?, deleted_at = NOW() WHERE room_id = ? AND is_deleted = 0',
             [(int) ($actor['id'] ?? 0), $roomId]
         );
-        self::jsonSuccess(['cleared' => true]);
+        JsonResponse::success(['cleared' => true]);
     }
 
-    /**
-     * Единая ошибка API.
-     * Last updated: 2026-04-17.
-     */
-    private static function jsonError(string $msg, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $msg], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    /**
-     * Единый успешный ответ API.
-     * Last updated: 2026-04-17.
-     *
-     * @param array<string, mixed> $data
-     */
-    private static function jsonSuccess(array $data = []): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Auth;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\{Session, CSRF};
 use Chat\Mail\Mailer;
 use Chat\Validation\UsernameRules;
@@ -13,13 +14,13 @@ class RegisterHandler
     public static function handle(): void
     {
         if (!CSRF::verifyRequest()) {
-            self::jsonError('Неверный CSRF токен.', 403);
+            JsonResponse::error('Неверный CSRF токен.', 403);
         }
 
         $db = Connection::getInstance();
         $regEnabled = $db->fetchOne('SELECT value FROM app_settings WHERE name = ?', ['registration_enabled']);
         if (($regEnabled['value'] ?? '1') === '0') {
-            self::jsonError('Регистрация временно закрыта.', 403);
+            JsonResponse::error('Регистрация временно закрыта.', 403);
         }
 
         $username = trim((string) ($_POST['username'] ?? ''));
@@ -28,14 +29,14 @@ class RegisterHandler
 
         $error = self::validate($username, $email, $password);
         if ($error !== null) {
-            self::jsonError($error);
+            JsonResponse::error($error);
         }
 
         if ($db->fetchOne('SELECT id FROM users WHERE username = ?', [$username])) {
-            self::jsonError('Это имя пользователя уже занято.');
+            JsonResponse::error('Это имя пользователя уже занято.');
         }
         if ($db->fetchOne('SELECT id FROM users WHERE email = ?', [$email])) {
-            self::jsonError('Этот email уже зарегистрирован.');
+            JsonResponse::error('Этот email уже зарегистрирован.');
         }
 
         $hash = password_hash($password, PASSWORD_ARGON2ID);
@@ -58,7 +59,7 @@ class RegisterHandler
             error_log('Mailer::sendVerification failed for ' . $email . ': ' . $e->getMessage());
         }
         self::joinDefaultRooms($db, $userId);
-        self::jsonSuccess(['pending_verification' => true, 'email' => $email]);
+        JsonResponse::success(['pending_verification' => true, 'email' => $email]);
     }
 
     private static function validate(string $username, string $email, string $password): ?string
@@ -92,18 +93,5 @@ class RegisterHandler
         }
     }
 
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 
-    private static function jsonSuccess(array $data = []): never
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true] + $data, JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }
