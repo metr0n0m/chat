@@ -96,16 +96,6 @@
     }
   }
 
-  function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, function(ch) {
-      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[ch];
-    });
-  }
-
-  function displayName(user) {
-    return user?.nickname || user?.username || '';
-  }
-
   function renderMobileUsersRail(users) {
     const list = Array.isArray(users) ? users : [];
     const $count = $('#mobile-users-rail-count');

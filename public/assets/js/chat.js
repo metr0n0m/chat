@@ -1735,20 +1735,6 @@ function loadAdminNumera() {
   });
 }
 
-function loadAdminWhispers() {
-  const from = $('#whisper-filter-from').val();
-  const to   = $('#whisper-filter-to').val();
-  $.get('/api/admin/whispers', {from_username:from, to_username:to}, function(resp) {
-    if (!resp.success) return;
-    let html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Комната</th><th>От</th><th>Кому</th><th>Время</th><th>Текст</th></tr></thead><tbody>';
-    resp.whispers.forEach(w => {
-      html += `<tr><td>${w.id}</td><td>${esc(w.room_name)}</td><td>${esc(w.from_username)}</td><td>${esc(w.to_username)}</td><td>${formatChatDateTime(w.created_at)}</td><td>${w.content}</td></tr>`;
-    });
-    html += '</tbody></table>';
-    $('#admin-whispers-table').html(html);
-  });
-}
-
 function loadOwnerWhisperSessions(page) {
   page = page || 1;
   const params = {page};
