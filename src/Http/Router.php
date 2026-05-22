@@ -42,9 +42,7 @@ class Router
         }
 
         if ($this->path === '/api/csrf') {
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['token' => CSRF::token()]);
-            exit;
+            JsonResponse::success(['token' => CSRF::token()]);
         }
 
         if (!$this->user) {
@@ -214,9 +212,7 @@ class Router
                 [$username]
             );
         }
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['user' => $found ?: null]);
-        exit;
+        JsonResponse::success(['user' => $found ?: null]);
     }
 
     private function handleUsernameCheck(): never
@@ -230,9 +226,7 @@ class Router
             );
             $available = $row === null;
         }
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['available' => $available]);
-        exit;
+        JsonResponse::success(['available' => $available]);
     }
 
 }
