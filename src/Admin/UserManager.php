@@ -43,9 +43,7 @@ class UserManager
         );
         $users = Timestamp::normalizeRows($users, ['created_at', 'last_seen_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'users' => $users, 'total' => $total, 'page' => $page], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['users' => $users, 'total' => $total, 'page' => $page]);
     }
 
     public static function update(int $targetId, array $data): void
@@ -196,9 +194,7 @@ class UserManager
         $user['hide_last_seen'] = (int)($user['hide_last_seen'] ?? 0);
         $user = Timestamp::normalizeFields($user, ['created_at', 'last_seen_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'user' => $user], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['user' => $user]);
     }
 
     public static function updateSettings(int $userId, array $post, array $files): void
@@ -569,15 +565,12 @@ class UserManager
         $mutes  = Timestamp::normalizeRows($mutes,  ['muted_until']);
         $bans   = array_merge($global, $room, $mutes);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'success' => true,
-            'bans'    => $bans,    // unified contract: all scopes
-            'global'  => $global,  // deprecated — backward compat
-            'room'    => $room,    // deprecated — backward compat
-            'mutes'   => $mutes,   // deprecated — backward compat
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success([
+            'bans'   => $bans,    // unified contract: all scopes
+            'global' => $global,  // deprecated — backward compat
+            'room'   => $room,    // deprecated — backward compat
+            'mutes'  => $mutes,   // deprecated — backward compat
+        ]);
     }
 
     public static function roomUnban(int $roomId, int $userId): void
