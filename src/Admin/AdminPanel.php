@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Chat\Admin;
 
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\{Session, CSRF};
 use Chat\Support\Timestamp;
 use Chat\Validation\UsernameRules;
@@ -33,10 +34,7 @@ class AdminPanel
     {
         $user = Session::current();
         if (!$user || !Access::canOpenAdminPanel($user)) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Доступ запрещён.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Доступ запрещён.', 403);
         }
         return $user;
     }
@@ -55,9 +53,7 @@ class AdminPanel
             'numera_active' => (int) $db->fetchOne("SELECT COUNT(*) AS c FROM rooms WHERE type = 'numer' AND is_closed = 0")['c'],
         ];
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'stats' => $stats], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['stats' => $stats]);
     }
 
     /**
@@ -81,9 +77,7 @@ class AdminPanel
             'active_bans'     => (int) $db->fetchOne('SELECT COUNT(*) AS c FROM users WHERE is_banned = 1')['c'],
         ];
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'stats' => $stats], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['stats' => $stats]);
     }
 
     /**
@@ -97,9 +91,7 @@ class AdminPanel
             "SELECT id, username, email, created_at FROM users WHERE global_role = 'moderator' ORDER BY username"
         );
         $mods = Timestamp::normalizeRows($mods, ['created_at']);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'moderators' => $mods], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['moderators' => $mods]);
     }
 
     /**
@@ -112,9 +104,7 @@ class AdminPanel
         $users = $db->fetchAll(
             'SELECT id, username, email, can_create_room FROM users WHERE can_create_room = 1 ORDER BY username'
         );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'users' => $users], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['users' => $users]);
     }
 
     /**
@@ -123,12 +113,7 @@ class AdminPanel
      */
     public static function statusOverrideSettings(): void
     {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'success' => true,
-            'allow_admin_status_override' => self::isAdminStatusOverrideEnabled(),
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['allow_admin_status_override' => self::isAdminStatusOverrideEnabled()]);
     }
 
     /**
@@ -141,17 +126,11 @@ class AdminPanel
     public static function createUser(array $actor, array $post): never
     {
         if (($actor['global_role'] ?? '') !== 'platform_owner') {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Только владелец платформы может создавать пользователей.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Только владелец платформы может создавать пользователей.', 403);
         }
 
         if (!\Chat\Security\CSRF::verifyRequest()) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('CSRF.', 403);
         }
 
         $username = trim((string) ($post['username'] ?? ''));
@@ -161,17 +140,11 @@ class AdminPanel
 
         $usernameError = UsernameRules::validate($username);
         if ($usernameError !== null) {
-            http_response_code(400);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => $usernameError], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error($usernameError, 400);
         }
 
         if (strlen($password) < 8) {
-            http_response_code(400);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Пароль должен быть не менее 8 символов.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Пароль должен быть не менее 8 символов.', 400);
         }
 
         if (!in_array($role, ['user', 'moderator', 'admin'], true)) {
@@ -182,19 +155,13 @@ class AdminPanel
 
         $exists = $db->fetchOne('SELECT id FROM users WHERE username = ?', [$username]);
         if ($exists) {
-            http_response_code(409);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Имя уже занято.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Имя уже занято.', 409);
         }
 
         if ($email !== '') {
             $emailExists = $db->fetchOne('SELECT id FROM users WHERE email = ?', [$email]);
             if ($emailExists) {
-                http_response_code(409);
-                header('Content-Type: application/json; charset=UTF-8');
-                echo json_encode(['success' => false, 'error' => 'Email уже используется.'], JSON_UNESCAPED_UNICODE);
-                exit;
+                JsonResponse::error('Email уже используется.', 409);
             }
         }
 
@@ -204,19 +171,14 @@ class AdminPanel
             [$username, $email !== '' ? $email : null, $hash, $role]
         );
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'user_id' => (int) $db->lastInsertId()], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['user_id' => (int) $db->lastInsertId()]);
     }
 
     private static function requireOwner(): array
     {
         $actor = Session::current();
         if (!$actor || !Access::canOpenOwnerPanel($actor)) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Только владелец платформы.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Только владелец платформы.', 403);
         }
         return $actor;
     }
@@ -249,24 +211,16 @@ class AdminPanel
                 $s[$k] = $v;
             }
         }
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'settings' => $s], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['settings' => $s]);
     }
 
     public static function updateSystemSettings(array $actor, array $post): void
     {
         if (($actor['global_role'] ?? '') !== 'platform_owner') {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Только владелец платформы.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Только владелец платформы.', 403);
         }
         if (!CSRF::verifyRequest()) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('CSRF.', 403);
         }
         $allowed = [
             'datetime_format', 'time_format', 'registration_enabled', 'maintenance_mode',
@@ -290,18 +244,13 @@ class AdminPanel
                 [$key, $value]
             );
         }
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success();
     }
 
     public static function updateStatusOverrideSettings(array $actor, array $post): void
     {
         if (($actor['global_role'] ?? 'user') !== 'platform_owner') {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'Недостаточно прав.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Недостаточно прав.', 403);
         }
 
         $enabled = (int) (!empty($post['allow_admin_status_override']));
@@ -312,11 +261,6 @@ class AdminPanel
             ['allow_admin_status_override', (string) $enabled]
         );
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'success' => true,
-            'allow_admin_status_override' => $enabled === 1,
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['allow_admin_status_override' => $enabled === 1]);
     }
 }
