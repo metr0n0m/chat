@@ -19,8 +19,6 @@ class UserManager
         'platform_owner' => 4,
     ];
 
-    /** @var array<string,true>|null */
-    private static ?array $usersColumnCache = null;
     public static function list(int $page = 1, string $search = ''): void
     {
         $db = Connection::getInstance();
@@ -171,10 +169,8 @@ class UserManager
             'id', 'username', 'nickname', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
-        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $optional) {
-            if (self::hasUsersColumn($db, $optional)) {
-                $select[] = $optional;
-            }
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $col) {
+            $select[] = $col;
         }
 
         $user = $db->fetchOne(
@@ -241,36 +237,36 @@ class UserManager
         }
 
 
-        if (self::hasUsersColumn($db, 'bio') && array_key_exists('bio', $post)) {
+        if (array_key_exists('bio', $post)) {
             $bio = mb_substr(trim((string)$post['bio']), 0, 500);
             $set[] = 'bio = ?';
             $params[] = $bio === '' ? null : $bio;
         }
 
-        if (self::hasUsersColumn($db, 'social_telegram') && array_key_exists('social_telegram', $post)) {
+        if (array_key_exists('social_telegram', $post)) {
             $value = mb_substr(trim((string)$post['social_telegram']), 0, 255);
             $set[] = 'social_telegram = ?';
             $params[] = $value === '' ? null : $value;
         }
 
-        if (self::hasUsersColumn($db, 'social_whatsapp') && array_key_exists('social_whatsapp', $post)) {
+        if (array_key_exists('social_whatsapp', $post)) {
             $value = mb_substr(trim((string)$post['social_whatsapp']), 0, 255);
             $set[] = 'social_whatsapp = ?';
             $params[] = $value === '' ? null : $value;
         }
 
-        if (self::hasUsersColumn($db, 'social_vk') && array_key_exists('social_vk', $post)) {
+        if (array_key_exists('social_vk', $post)) {
             $value = mb_substr(trim((string)$post['social_vk']), 0, 255);
             $set[] = 'social_vk = ?';
             $params[] = $value === '' ? null : $value;
         }
 
-        if (self::hasUsersColumn($db, 'hide_last_seen') && array_key_exists('hide_last_seen', $post)) {
+        if (array_key_exists('hide_last_seen', $post)) {
             $set[] = 'hide_last_seen = ?';
             $params[] = (int)(bool)$post['hide_last_seen'];
         }
 
-        if (self::hasUsersColumn($db, 'show_system_messages') && array_key_exists('show_system_messages', $post)) {
+        if (array_key_exists('show_system_messages', $post)) {
             $set[] = 'show_system_messages = ?';
             $params[] = (int)(bool)$post['show_system_messages'];
         }
@@ -347,10 +343,8 @@ class UserManager
             'id', 'username', 'email', 'avatar_url', 'custom_status', 'nick_color', 'text_color',
             'global_role', 'can_create_room', 'is_banned', 'created_at', 'last_seen_at',
         ];
-        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $optional) {
-            if (self::hasUsersColumn($db, $optional)) {
-                $select[] = $optional;
-            }
+        foreach (['bio', 'social_telegram', 'social_whatsapp', 'social_vk', 'hide_last_seen', 'show_system_messages'] as $col) {
+            $select[] = $col;
         }
 
         $updated = $db->fetchOne(
@@ -512,21 +506,6 @@ class UserManager
         }
 
         return $headers;
-    }
-
-    private static function hasUsersColumn(Connection $db, string $column): bool
-    {
-        if (self::$usersColumnCache === null) {
-            self::$usersColumnCache = [];
-            $rows = $db->fetchAll('SHOW COLUMNS FROM users');
-            foreach ($rows as $row) {
-                $name = (string)($row['Field'] ?? '');
-                if ($name !== '') {
-                    self::$usersColumnCache[$name] = true;
-                }
-            }
-        }
-        return isset(self::$usersColumnCache[$column]);
     }
 
     public static function listBanned(): void

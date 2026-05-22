@@ -12,37 +12,6 @@ class MessageController
 {
     private const PAGE_SIZE = 50;
 
-    private static ?bool  $hasColorCols         = null;
-    private static ?bool  $hasSystemMessageCols = null;
-    private static ?array $messageColumns       = null;
-
-    private static function messageColumnNames(): array
-    {
-        if (self::$messageColumns === null) {
-            $rows = Connection::getInstance()->fetchAll('SHOW COLUMNS FROM messages');
-            self::$messageColumns = array_column($rows, 'Field');
-        }
-        return self::$messageColumns;
-    }
-
-    private static function hasMessageColorColumns(): bool
-    {
-        if (self::$hasColorCols === null) {
-            self::$hasColorCols = in_array('nick_color', self::messageColumnNames(), true);
-        }
-        return self::$hasColorCols;
-    }
-
-    private static function hasSystemMessageColumns(): bool
-    {
-        if (self::$hasSystemMessageCols === null) {
-            $cols = self::messageColumnNames();
-            self::$hasSystemMessageCols = in_array('system_importance', $cols, true)
-                && in_array('system_scope', $cols, true);
-        }
-        return self::$hasSystemMessageCols;
-    }
-
     public static function format(string $raw): string
     {
         $text = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
@@ -70,12 +39,8 @@ class MessageController
             $params[] = $beforeId;
         }
 
-        $colorSelect = self::hasMessageColorColumns()
-            ? 'COALESCE(m.nick_color, u.nick_color) AS nick_color, COALESCE(m.text_color, u.text_color) AS text_color'
-            : 'u.nick_color, u.text_color';
-        $systemSelect = self::hasSystemMessageColumns()
-            ? 'm.system_importance, m.system_scope'
-            : 'NULL AS system_importance, NULL AS system_scope';
+        $colorSelect  = 'COALESCE(m.nick_color, u.nick_color) AS nick_color, COALESCE(m.text_color, u.text_color) AS text_color';
+        $systemSelect = 'm.system_importance, m.system_scope';
 
         $messages = $db->fetchAll(
             'SELECT m.id, m.user_id, m.content, m.type, m.embed_data, m.created_at, m.room_id,
@@ -143,17 +108,10 @@ class MessageController
             ? (int) $actor['session_id']
             : null;
 
-        if (self::hasMessageColorColumns()) {
-            $db->execute(
-                'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, embed_data, nick_color, text_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [$roomId, $actorId, $senderSessionId, $content, '', 'text', $embedData, $actor['nick_color'], $actor['text_color']]
-            );
-        } else {
-            $db->execute(
-                'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, embed_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [$roomId, $actorId, $senderSessionId, $content, '', 'text', $embedData]
-            );
-        }
+        $db->execute(
+            'INSERT INTO messages (room_id, user_id, sender_session_id, content, content_hmac, type, embed_data, nick_color, text_color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$roomId, $actorId, $senderSessionId, $content, '', 'text', $embedData, $actor['nick_color'], $actor['text_color']]
+        );
 
         $msgId = (int) $db->lastInsertId();
         $createdAt = $db->fetchOne('SELECT created_at FROM messages WHERE id = ?', [$msgId])['created_at'] ?? null;
