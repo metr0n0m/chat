@@ -151,14 +151,21 @@ function handleWS(data) {
       break;
     case 'room_count_changed':       onRoomCountChanged(data); break;
     case 'numer_destroyed':
-      loadRooms();
+      numera = numera.filter(r => Number(r.id) !== Number(data.room_id));
+      $(`#numera-list .room-item[data-id="${data.room_id}"]`).remove();
       if ($('#ownerModal').hasClass('show') && $('#ownerNumera').hasClass('active')) loadAdminNumera();
       break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onBannedFromRoom(data); break;
     case 'muted_in_room':    onMutedInRoom(data); break;
     case 'room_deleted':     onRoomDeleted(data); break;
-    case 'room_updated':     loadRooms(); break;
+    case 'room_updated':
+      if (data.data && data.data.name !== undefined) {
+        $(`.room-item[data-id="${data.room_id}"] .room-name`).text(esc(data.data.name));
+        const r = rooms.find(r => Number(r.id) === Number(data.room_id));
+        if (r) r.name = data.data.name;
+      }
+      break;
     case 'friend_online':
     case 'friend_offline':  loadFriends(); break;
     case 'force_logout': {
@@ -1057,7 +1064,8 @@ function onRoomDeleted(data) {
       $('#messages-list').empty();
     }
   }
-  loadRooms(true);
+  rooms = rooms.filter(r => Number(r.id) !== Number(data.room_id));
+  $(`#rooms-list .room-item[data-id="${data.room_id}"]`).remove();
 }
 
 // ════════════════════════════════════════════════
