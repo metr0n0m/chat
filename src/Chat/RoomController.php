@@ -11,8 +11,6 @@ use Chat\Chat\RoomDeletionService;
 
 class RoomController
 {
-    /** @var array<string,true>|null */
-    private static ?array $roomMembersColumns = null;
     public static function list(int $userId, string $globalRole): void
     {
         $db = Connection::getInstance();
@@ -241,10 +239,6 @@ class RoomController
 
     private static function mute(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db, array $data): array
     {
-        if (!self::hasRoomMembersColumn($db, 'muted_until') || !self::hasRoomMembersColumn($db, 'mute_reason')) {
-            return ['error' => 'Функция кляпа недоступна: примените миграции БД.'];
-        }
-
         if ($permission['level'] < 2 && !in_array($actor['global_role'], ['platform_owner', 'admin', 'moderator'], true)) {
             return ['error' => 'Нет прав.'];
         }
@@ -280,21 +274,6 @@ class RoomController
             'muted_until' => Timestamp::isoUtc(isset($row['muted_until']) ? (string) $row['muted_until'] : null),
             'reason' => $row['mute_reason'] ?? null,
         ];
-    }
-
-    private static function hasRoomMembersColumn(Connection $db, string $column): bool
-    {
-        if (self::$roomMembersColumns === null) {
-            self::$roomMembersColumns = [];
-            $rows = $db->fetchAll('SHOW COLUMNS FROM room_members');
-            foreach ($rows as $row) {
-                $name = (string)($row['Field'] ?? '');
-                if ($name !== '') {
-                    self::$roomMembersColumns[$name] = true;
-                }
-            }
-        }
-        return isset(self::$roomMembersColumns[$column]);
     }
 
     private static function resolvePermission(int $roomId, int $userId, array $actor): ?array
