@@ -1,5 +1,5 @@
 # AUDIT.md — Системный аудит проекта Chat
-Last updated: 2026-05-17
+Last updated: 2026-05-22
 Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MESSAGE_FLOW.md)
 
 ---
@@ -91,17 +91,27 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | room_count_changed без обработчика | НЕ проблема: onRoomCountChanged() существует в chat.js стр. 925 |
 | joinRoom() вызывается без определения | НЕ проблема: вызовов joinRoom() в chat.js нет — только joinPublicRoom() |
 
+### Закрыто после аудита 2026-05-17
+
+| Проблема | Статус | Коммит |
+|---|---|---|
+| Дубль deleteRoomWithDependencies | ✅ CLOSED | `00b2a53` |
+| Дубль joinDefaultRooms (2 копии) | ✅ CLOSED | `00b2a53` |
+| JsonResponse inline — Auth, Chat, AdminPanel | ✅ CLOSED | `d3ebda5`, `b1e1cfe`, `c037c5b` |
+| SHOW COLUMNS runtime — MessageController | ✅ CLOSED | `145edf6` |
+| SHOW COLUMNS runtime — UserManager | ✅ CLOSED | `145edf6` |
+| SHOW COLUMNS runtime — RoomController mute guard | ✅ CLOSED | `4be390b` |
+
 ### Что остаётся нерешённым
 
-| Проблема | Приоритет |
-|---|---|
-| EmbedProcessor без SSRF защиты | ВЫСОКИЙ |
-| reactor_raw plaintext password | КРИТИЧНО (бизнес-решение) |
-| Дубль deleteRoomWithDependencies | СРЕДНИЙ |
-| Дубль joinDefaultRooms (3 копии) | СРЕДНИЙ |
-| Дубль resolvePermission/resolveLevel | НИЗКИЙ |
-| SHOW COLUMNS runtime checks | НИЗКИЙ |
-| Нет пагинации /api/rooms | СРЕДНИЙ |
+| Проблема | Приоритет | Статус |
+|---|---|---|
+| EmbedProcessor без SSRF защиты | ВЫСОКИЙ | OPEN |
+| reactor_raw plaintext password | КРИТИЧНО | Ждёт решения владельца |
+| Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN |
+| SHOW COLUMNS — roomCategoryOptions() | НИЗКИЙ | ⏸ DEFERRED BY DESIGN |
+| Нет пагинации /api/rooms | СРЕДНИЙ | OPEN |
+| JsonResponse inline — RoomManager, UserManager (часть), Router.php | НИЗКИЙ | OPEN |
 
 ---
 
@@ -154,24 +164,20 @@ $db->execute(
 
 ## 4. Архитектурные дубли
 
-### Дубль A: deleteRoomWithDependencies
+### Дубль A: deleteRoomWithDependencies — ✅ CLOSED `00b2a53`
 
-Одинаковый транзакционный блок DELETE в двух местах:
+~~Одинаковый транзакционный блок DELETE в двух местах~~
 
-- `src/Chat/RoomController.php::deleteRoomWithDependencies()` — строки 385–398
-- `src/Admin/RoomManager.php::delete()` — строки 121–132
+Создан `src/Chat/RoomDeletionService::deleteWithDependencies()`.
+`RoomController` и `RoomManager` используют сервис. Inline транзакции удалены.
 
-Содержание идентично: DELETE messages, room_members, invitations, rooms — в транзакции.
+### Дубль Б: joinDefaultRooms — ✅ CLOSED `00b2a53`
 
-### Дубль Б: joinDefaultRooms
+~~Одинаковая SQL-логика в трёх местах~~
 
-Одинаковая SQL-логика в трёх местах:
-
-- `src/Auth/RegisterHandler.php::joinDefaultRooms()` — строки 82–93
-- `src/Auth/GoogleOAuth.php::joinDefaultRooms()` — строки 188–197
-- `src/Auth/VKOAuth.php::joinDefaultRooms()` — строки 168–177
-
-Содержание идентично: SELECT 5 public rooms + INSERT IGNORE в room_members.
+Создан `src/Chat/DefaultRoomMembership::joinDefaultRooms()`.
+`RegisterHandler` и `GoogleOAuth` используют сервис. Private копии удалены.
+(VKOAuth.php отключён на уровне роутера, дублей не содержал.)
 
 ### Дубль В: resolvePermission / resolveLevel
 
@@ -245,7 +251,8 @@ $db->execute(
 |----------|------|-----------|--------------|
 | In-memory presence, нет multi-instance WS | ConnectionManager.php | Низкий | Acceptable для одного инстанса |
 | Нет пагинации /api/rooms | RoomController.php | Средний | Добавить LIMIT/OFFSET |
-| SHOW COLUMNS runtime | UserManager, RoomController, RoomManager | Низкий | Убрать после стабилизации схемы |
+| SHOW COLUMNS runtime — UserManager, MessageController, RoomController mute | ✅ CLOSED `145edf6`, `4be390b` | — |
+| SHOW COLUMNS runtime — RoomManager::roomCategoryOptions() | ⏸ DEFERRED BY DESIGN | ENUM introspection для frontend |
 | Монолитный chat.js (2024 строки) | chat.js | Низкий | Продолжать разбивку по модулям |
 | Friendships flow частичный | Router.php, chat.js | Низкий | HTTP-refresh acceptable |
 | Нет unit-тестов | — | Средний | Добавить PHPUnit |

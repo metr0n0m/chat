@@ -1,5 +1,5 @@
 # DIFF_PLAN.md — Поэтапный план реализации
-Last updated: 2026-05-17
+Last updated: 2026-05-22
 
 Принципы: малые шаги, каждый обратим, без изменений UI/UX и текущей логики,
 только системные решения, diff-план для каждого изменения.
@@ -10,7 +10,7 @@ Last updated: 2026-05-17
 
 ## ФАЗА 0: Стабилизация (30 минут)
 
-### Шаг 0.1: Коммит незакоммиченных изменений [ ]
+### Шаг 0.1: Коммит незакоммиченных изменений [x] CLOSED
 
 **Что:** Привести рабочее дерево в чистое состояние.
 
@@ -53,11 +53,13 @@ git push origin main
 
 **После:** Обновить CLAUDE.md раздел 16 (checkpoint).
 
+**СТАТУС:** CLOSED. Коммит: `fbfc0f7` (fix(admin): unify bans API), `e0877c7` (cleanup: remove dead JS helpers).
+
 ---
 
 ## ФАЗА 1: Безопасность (4–6 часов)
 
-### Шаг 1.1: SSRF-защита в EmbedProcessor [ ]
+### Шаг 1.1: SSRF-защита в EmbedProcessor [ ] OPEN
 
 **Что:** Добавить IP-фильтрацию в EmbedProcessor, аналогичную UserManager::headRequest().
 
@@ -183,7 +185,7 @@ Diff `src/Auth/RegisterHandler.php`:
 
 ---
 
-### Шаг 1.3: Переименование index.php [ ]
+### Шаг 1.3: Переименование index.php [ ] OPEN
 
 **Что:** Устранить путаницу между dev-файлом и production entry point.
 
@@ -229,7 +231,18 @@ git push origin main
 
 ## ФАЗА 2: Устранение дублей (4–6 часов)
 
-### Шаг 2.1: RoomDeletionService [ ]
+### Шаг 2.1: RoomDeletionService [x] CLOSED
+
+**Коммит:** `00b2a53` refactor(chat): extract room membership and deletion services
+
+**Закрыто:**
+- Создан `src/Chat/RoomDeletionService.php` — `deleteWithDependencies(Connection, int): void`
+- Удалён `RoomController::deleteRoomWithDependencies()` (inline транзакция)
+- Удалена inline транзакция в `RoomManager::delete()`
+- Оба caller сохраняют свою стратегию ошибок (throw / JsonResponse::error)
+
+**Примечание:** Фактически создан `RoomDeletionService`, не `RoomDeletionService` с `bool` return —
+интерфейс скорректирован по решению пользователя (throw semantics, no existence check).
 
 **Что:** Вынести дублирующийся транзакционный блок удаления комнаты в общий сервис.
 
@@ -342,7 +355,19 @@ git push origin main
 
 ---
 
-### Шаг 2.2: DefaultRoomService [ ]
+### Шаг 2.2: DefaultRoomService [x] CLOSED
+
+**Коммит:** `00b2a53` refactor(chat): extract room membership and deletion services
+
+**Закрыто:**
+- Создан `src/Chat/DefaultRoomMembership.php` — `joinDefaultRooms(Connection, int): void`
+- Удалён `RegisterHandler::joinDefaultRooms()` (private копия)
+- Удалён `GoogleOAuth::joinDefaultRooms()` (private копия)
+- Унифицирован SQL и `(int)` cast
+
+**Примечание:** Класс назван `DefaultRoomMembership` (не `DefaultRoomService`) по решению пользователя
+(разделение ответственностей: только назначение дефолтных комнат). VKOAuth.php не содержал дублей
+на момент выполнения (VK OAuth отключён на уровне роутера, файл не изменялся).
 
 **Что:** Вынести тройной дубль joinDefaultRooms в общий сервис.
 
@@ -434,7 +459,7 @@ git push origin main
 
 ## ФАЗА 3: Производительность (1–2 часа)
 
-### Шаг 3.1: Пагинация /api/rooms [ ]
+### Шаг 3.1: Пагинация /api/rooms [ ] OPEN
 
 **Что:** Добавить LIMIT/OFFSET в /api/rooms для масштабирования.
 
@@ -511,7 +536,7 @@ git push origin main
 **ПРИМЕЧАНИЕ:** Это рефакторинг со средним риском регрессий.
 Выполнять только после полного smoke-test Фаз 0–3.
 
-### Шаг 4.1: Унификация resolvePermission/resolveLevel [ ]
+### Шаг 4.1: Унификация resolvePermission/resolveLevel [ ] OPEN
 
 **Что:** Устранить дублирование иерархии прав между Access::resolveLevel() и RoomController::resolvePermission().
 
@@ -582,7 +607,17 @@ git push origin main
 
 ## ФАЗА 5: Schema guard (2–4 часа, долгосрочно)
 
-### Шаг 5.1: Замена SHOW COLUMNS на schema version [ ]
+### Шаг 5.1: Замена SHOW COLUMNS на schema version [~] PARTIALLY CLOSED
+
+**Закрыто (runtime schema cleanup):**
+- `145edf6` — удалены guards из `MessageController` и `UserManager`
+- `4be390b` — удалён `hasRoomMembersColumn()` guard из `RoomController` (`muted_until`, `mute_reason`)
+
+**Остаётся открытым (DEFERRED BY DESIGN):**
+- `RoomManager::roomCategoryOptions()` — `SHOW COLUMNS FROM rooms LIKE 'room_category'`
+  Причина: ENUM introspection для возврата `room_category_options` во frontend.
+  Изменение требует явного решения владельца (hardcode vs introspection).
+  Статус: **DEFERRED BY DESIGN**
 
 **Что:** Убрать runtime `SHOW COLUMNS` проверки, заменить на конфигурационную проверку версии схемы.
 
@@ -619,18 +654,29 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 
 | Шаг | Файлы | Время | Риск | Статус |
 |-----|-------|-------|------|--------|
-| 0.1 Commit pending | 5 файлов | 15 мин | Нет | [ ] |
-| 1.1 EmbedProcessor SSRF | 1 файл | 30 мин | Низкий | [ ] |
-| 1.2 reactor_raw | 1-2 файла | 1 час | Средний | Ждёт решения |
-| 1.3 index.php warning | 1 файл | 10 мин | Нет | [ ] |
-| 2.1 RoomDeletionService | 3 файла | 1 час | Низкий | [ ] |
-| 2.2 DefaultRoomService | 4 файла | 1 час | Низкий | [ ] |
-| 3.1 Pagination /api/rooms | 2 файла | 1 час | Низкий | [ ] |
-| 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] |
-| 5.1 Schema guard | 3-4 файла | 3 часа | Средний | Отложено |
+| 0.1 Commit pending | 5 файлов | 15 мин | Нет | [x] CLOSED `fbfc0f7`, `e0877c7` |
+| 1.1 EmbedProcessor SSRF | 1 файл | 30 мин | Низкий | [ ] OPEN |
+| 1.2 reactor_raw | 1-2 файла | 1 час | Средний | Ждёт решения владельца |
+| 1.3 index.php warning | 1 файл | 10 мин | Нет | [ ] OPEN |
+| 2.1 RoomDeletionService | 2 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
+| 2.2 DefaultRoomMembership | 3 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
+| 2.x JsonResponse phase 1–3 | 6 файлов | — | Низкий | [x] CLOSED `d3ebda5`, `b1e1cfe`, `c037c5b` |
+| 2.x Schema cleanup phase 1–2 | 3 файла | — | Низкий | [x] CLOSED `145edf6`, `4be390b` |
+| 2.x JsonResponse phase4 | src/Admin/RoomManager.php | — | Низкий | [ ] OPEN |
+| 2.x JsonResponse phase5 | src/Admin/UserManager.php | — | Низкий | [ ] OPEN |
+| 2.x JsonResponse phase6 | src/Http/Router.php | — | Средний | [ ] OPEN |
+| 3.1 Pagination /api/rooms | 2 файла | 1 час | Низкий | [ ] OPEN |
+| 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] OPEN |
+| 5.1 Schema guard (roomCategoryOptions) | 1 файл | — | Низкий | ⏸ DEFERRED BY DESIGN |
 
-**Итого Фазы 0–3 (приоритет):** ~5–6 часов работы
-**Итого Фазы 4–5:** ~5–8 часов, требуют отдельного решения и smoke-testing
+**Итого закрыто:**
+- Фаза 0 полностью
+- Фаза 2: шаги 2.1–2.2 закрыты
+- JsonResponse phase1–3 закрыты
+- Runtime schema cleanup phase1–2 закрыты
+- Фаза 5 частично
+
+**Итого открыто:** Фаза 1 (1.1, 1.3), JsonResponse phase4–6, Фаза 3, Фаза 4
 
 ---
 
