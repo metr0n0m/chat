@@ -947,7 +947,12 @@ function executeGlobalBan(userId) {
 // SECTION: NUMER FLOW
 function onNumerJoined(data) {
   if (data.room_id) openNumerWindow(data.room_id);
-  loadRooms();
+  if (data.room_id && !numera.some(r => Number(r.id) === Number(data.room_id))) {
+    numera.push({id: data.room_id, name: data.room_name});
+    const $item = $(`<div class="room-item" data-id="${data.room_id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(data.room_name)}</span></div>`);
+    $item.on('click', () => openNumerWindow(data.room_id));
+    $('#numera-list').append($item);
+  }
 }
 
 function onInviteSent(invitation) {
@@ -956,7 +961,12 @@ function onInviteSent(invitation) {
 
 function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + displayName(data.user));
-  loadRooms();
+  if (data.room_id && !numera.some(r => Number(r.id) === Number(data.room_id))) {
+    numera.push({id: data.room_id, name: data.room_name});
+    const $item = $(`<div class="room-item" data-id="${data.room_id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(data.room_name)}</span></div>`);
+    $item.on('click', () => openNumerWindow(data.room_id));
+    $('#numera-list').append($item);
+  }
   if (data.room_id) openNumerWindow(data.room_id);
 }
 
