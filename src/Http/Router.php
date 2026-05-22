@@ -152,7 +152,7 @@ class Router
         if ($this->method === 'GET'    && $this->path === '/api/admin/room-creators')                           AdminPanel::roomCreators();
         if ($this->method === 'GET'    && $this->path === '/api/admin/status-override-settings')                AdminPanel::statusOverrideSettings();
         if ($this->method === 'POST'   && $this->path === '/api/admin/status-override-settings') {
-            if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
+            if (!CSRF::verifyRequest()) { JsonResponse::error('CSRF.', 403); }
             AdminPanel::updateStatusOverrideSettings($admin, $_POST);
         }
         if ($this->method === 'GET'    && $this->path === '/api/admin/system-settings')   AdminPanel::getSystemSettings();
@@ -176,40 +176,32 @@ class Router
             [$userId, $userId, $userId]
         );
         $friends = Timestamp::normalizeRows($friends, ['last_seen_at']);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'friends' => $friends]);
-        exit;
+        JsonResponse::success(['friends' => $friends]);
     }
 
     private function handleAddFriend(): never
     {
-        if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
+        if (!CSRF::verifyRequest()) { JsonResponse::error('CSRF.', 403); }
         $toId = (int) ($_POST['to_user_id'] ?? 0);
         if ($toId <= 0 || $toId === (int) $this->user['id']) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Некорректный пользователь.']);
-            exit;
+            JsonResponse::error('Некорректный пользователь.', 400);
         }
         Connection::getInstance()->execute(
             'INSERT IGNORE INTO friendships (requester_id, addressee_id) VALUES (?, ?)',
             [(int) $this->user['id'], $toId]
         );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true]);
-        exit;
+        JsonResponse::success();
     }
 
     private function handleRespondFriend(int $friendshipId): never
     {
-        if (!CSRF::verifyRequest()) { http_response_code(403); echo json_encode(['error' => 'CSRF']); exit; }
+        if (!CSRF::verifyRequest()) { JsonResponse::error('CSRF.', 403); }
         $status = ($_POST['response'] ?? '') === 'accept' ? 'accepted' : 'declined';
         Connection::getInstance()->execute(
             'UPDATE friendships SET status = ?, updated_at = NOW() WHERE id = ? AND addressee_id = ?',
             [$status, $friendshipId, (int) $this->user['id']]
         );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true]);
-        exit;
+        JsonResponse::success();
     }
 
     private function handleFindUser(): never
