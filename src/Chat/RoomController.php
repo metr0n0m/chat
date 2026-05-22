@@ -28,9 +28,7 @@ class RoomController
             [$userId]
         );
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'rooms' => $rooms], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['rooms' => $rooms]);
     }
 
     public static function create(int $userId, array $actor): void
@@ -338,9 +336,7 @@ class RoomController
         );
         $rooms = Timestamp::normalizeRows($rooms, ['created_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'numera' => $rooms], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['numera' => $rooms]);
     }
 
     public static function members(int $roomId, int $userId): never
@@ -363,9 +359,7 @@ class RoomController
              ORDER BY rm.joined_at ASC",
             [$roomId]
         );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'members' => $members], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['members' => $members]);
     }
 
     private static function deleteRoomWithDependencies(Connection $db, int $roomId): void

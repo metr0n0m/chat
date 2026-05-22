@@ -5,6 +5,7 @@ namespace Chat\Chat;
 
 use Chat\Admin\Access;
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Security\HMAC;
 use Chat\Security\Session;
 use Chat\Support\Lang;
@@ -138,37 +139,27 @@ class WhisperController
 
         $items = $db->fetchAll($sql, $params);
         $items = Timestamp::normalizeRows($items, ['created_at']);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'whispers' => $items, 'total' => $total, 'page' => $page], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['whispers' => $items, 'total' => $total, 'page' => $page]);
     }
 
     public static function deleteWhisper(int $id): void
     {
         Access::requireOwnerPrivateArchive(Session::current());
         if (!\Chat\Security\CSRF::verifyRequest()) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('CSRF.', 403);
         }
         Connection::getInstance()->execute(
             "UPDATE messages SET is_deleted = 1, deleted_at = NOW() WHERE id = ? AND type = 'whisper'",
             [$id]
         );
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success();
     }
 
     public static function clearWhispers(array $post): void
     {
         Access::requireOwnerPrivateArchive(Session::current());
         if (!\Chat\Security\CSRF::verifyRequest()) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'error' => 'CSRF.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('CSRF.', 403);
         }
         $db     = Connection::getInstance();
         $where  = ["type = 'whisper'", 'is_deleted = 0'];
@@ -197,9 +188,7 @@ class WhisperController
             }
         }
         $db->execute('UPDATE messages SET is_deleted = 1, deleted_at = NOW() WHERE ' . implode(' AND ', $where), $params);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success();
     }
 
     /**
@@ -288,10 +277,8 @@ class WhisperController
         $slice = array_slice($sessions, ($page - 1) * $perPage, $perPage);
         unset($sessions);
 
-        header('Content-Type: application/json; charset=UTF-8');
         if (empty($slice)) {
-            echo json_encode(['success' => true, 'sessions' => [], 'total' => $total, 'page' => $page, 'pages' => $pages], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::success(['sessions' => [], 'total' => $total, 'page' => $page, 'pages' => $pages]);
         }
 
         // Имена пользователей для пар текущей страницы (initiator_id ⊆ {min_uid, max_uid})
@@ -327,8 +314,7 @@ class WhisperController
             ];
         }
 
-        echo json_encode(['success' => true, 'sessions' => $result, 'total' => $total, 'page' => $page, 'pages' => $pages], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['sessions' => $result, 'total' => $total, 'page' => $page, 'pages' => $pages]);
     }
 
     /**
@@ -346,9 +332,7 @@ class WhisperController
             [$firstMsgId]
         );
         if (!$first) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Not found'], JSON_UNESCAPED_UNICODE);
-            exit;
+            JsonResponse::error('Not found', 404);
         }
 
         $minUid = min((int) $first['sender_id'], (int) $first['receiver_id']);
@@ -394,9 +378,7 @@ class WhisperController
         }
         unset($msg);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['messages' => $messages]);
     }
 
     /**

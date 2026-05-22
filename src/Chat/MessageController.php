@@ -5,6 +5,7 @@ namespace Chat\Chat;
 
 use Chat\Admin\Access;
 use Chat\DB\Connection;
+use Chat\Http\JsonResponse;
 use Chat\Support\Timestamp;
 
 class MessageController
@@ -55,7 +56,7 @@ class MessageController
     public static function history(int $roomId, int $actorId, string $actorRole, ?int $beforeId = null): void
     {
         if (!self::canAccess($roomId, $actorId, $actorRole)) {
-            self::jsonError('Нет доступа.', 403);
+            JsonResponse::error('Нет доступа.', 403);
         }
 
         $db = Connection::getInstance();
@@ -112,9 +113,7 @@ class MessageController
         }
         unset($message);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'messages' => array_reverse($messages)], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['messages' => array_reverse($messages)]);
     }
 
     public static function send(int $roomId, int $actorId, array $actor, array $data): array
@@ -240,11 +239,4 @@ class MessageController
         return Access::canAccessRoom(['id' => $userId, 'global_role' => $globalRole], $roomId);
     }
 
-    private static function jsonError(string $message, int $code = 400): never
-    {
-        http_response_code($code);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }
