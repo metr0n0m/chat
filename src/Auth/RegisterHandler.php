@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Chat\Auth;
 
+use Chat\Chat\DefaultRoomMembership;
 use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
 use Chat\Security\{Session, CSRF};
@@ -58,7 +59,7 @@ class RegisterHandler
         } catch (\Throwable $e) {
             error_log('Mailer::sendVerification failed for ' . $email . ': ' . $e->getMessage());
         }
-        self::joinDefaultRooms($db, $userId);
+        DefaultRoomMembership::joinDefaultRooms($db, $userId);
         JsonResponse::success(['pending_verification' => true, 'email' => $email]);
     }
 
@@ -79,19 +80,5 @@ class RegisterHandler
         }
         return null;
     }
-
-    private static function joinDefaultRooms(Connection $db, int $userId): void
-    {
-        $rooms = $db->fetchAll(
-            "SELECT id FROM rooms WHERE type = 'public' AND is_closed = 0 ORDER BY id LIMIT 5"
-        );
-        foreach ($rooms as $room) {
-            $db->execute(
-                'INSERT IGNORE INTO room_members (room_id, user_id, room_role) VALUES (?, ?, ?)',
-                [(int) $room['id'], $userId, 'member']
-            );
-        }
-    }
-
 
 }

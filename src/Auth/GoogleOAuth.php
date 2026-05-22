@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Chat\Auth;
 
+use Chat\Chat\DefaultRoomMembership;
 use Chat\DB\Connection;
 use Chat\Security\Session;
 
@@ -118,7 +119,7 @@ class GoogleOAuth
             [$username, $email, 'google', $googleId, $avatar, $emailVerified]
         );
         $userId = (int) $db->lastInsertId();
-        self::joinDefaultRooms($db, $userId);
+        DefaultRoomMembership::joinDefaultRooms($db, $userId);
         return $userId;
     }
 
@@ -183,17 +184,6 @@ class GoogleOAuth
                refresh_token_encrypted = VALUES(refresh_token_encrypted)',
             [$userId, $provider, $encAccess, $encRefresh]
         );
-    }
-
-    private static function joinDefaultRooms(Connection $db, int $userId): void
-    {
-        $rooms = $db->fetchAll("SELECT id FROM rooms WHERE type='public' AND is_closed=0 ORDER BY id LIMIT 5");
-        foreach ($rooms as $room) {
-            $db->execute(
-                'INSERT IGNORE INTO room_members (room_id, user_id, room_role) VALUES (?, ?, ?)',
-                [$room['id'], $userId, 'member']
-            );
-        }
     }
 
     private static function fail(string $message): never

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Chat\Admin;
 
+use Chat\Chat\RoomDeletionService;
 use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
@@ -119,15 +120,9 @@ class RoomManager
         if (($room['room_category'] ?? 'user') === 'permanent') {
             JsonResponse::error('Постоянные комнаты нельзя удалить.', 403);
         }
-        $db->beginTransaction();
         try {
-            $db->execute('DELETE FROM messages WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM room_members WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM invitations WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
-            $db->commit();
+            RoomDeletionService::deleteWithDependencies($db, $roomId);
         } catch (\Throwable) {
-            $db->rollBack();
             JsonResponse::error('Не удалось удалить комнату.');
         }
         JsonResponse::success(['deleted' => true]);

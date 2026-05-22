@@ -7,6 +7,7 @@ use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Support\Timestamp;
+use Chat\Chat\RoomDeletionService;
 
 class RoomController
 {
@@ -136,7 +137,7 @@ class RoomController
                     return ['error' => 'Постоянные комнаты нельзя удалить.'];
                 }
                 try {
-                    self::deleteRoomWithDependencies($db, $roomId);
+                    RoomDeletionService::deleteWithDependencies($db, $roomId);
                 } catch (\Throwable) {
                     return ['error' => 'Не удалось удалить комнату.'];
                 }
@@ -362,18 +363,4 @@ class RoomController
         JsonResponse::success(['members' => $members]);
     }
 
-    private static function deleteRoomWithDependencies(Connection $db, int $roomId): void
-    {
-        $db->beginTransaction();
-        try {
-            $db->execute('DELETE FROM messages WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM room_members WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM invitations WHERE room_id = ?', [$roomId]);
-            $db->execute('DELETE FROM rooms WHERE id = ?', [$roomId]);
-            $db->commit();
-        } catch (\Throwable $e) {
-            $db->rollBack();
-            throw $e;
-        }
-    }
 }
