@@ -43,14 +43,11 @@ class RoomManager
         );
         $rooms = Timestamp::normalizeRows($rooms, ['created_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'success' => true,
-            'rooms' => $rooms,
-            'page' => $page,
+        JsonResponse::success([
+            'rooms'                 => $rooms,
+            'page'                  => $page,
             'room_category_options' => self::roomCategoryOptions(),
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        ]);
     }
 
     public static function setCategory(int $roomId, string $category): void
@@ -155,9 +152,7 @@ class RoomManager
         );
         $numera = Timestamp::normalizeRows($numera, ['created_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'numera' => $numera, 'page' => $page], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['numera' => $numera, 'page' => $page]);
     }
 
     /**
@@ -176,9 +171,7 @@ class RoomManager
             [$roomId]
         );
         $members = Timestamp::normalizeRows($members, ['joined_at', 'banned_at']);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'members' => $members], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['members' => $members]);
     }
 
     /**
@@ -296,9 +289,7 @@ class RoomManager
         );
         $rooms = Timestamp::normalizeRows($rooms, ['created_at', 'closed_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'numera' => $rooms, 'page' => $page], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['numera' => $rooms, 'page' => $page]);
     }
 
     /**
@@ -325,9 +316,7 @@ class RoomManager
         );
         $messages = Timestamp::normalizeRows($messages, ['created_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => true, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
-        exit;
+        JsonResponse::success(['messages' => $messages]);
     }
 
     public static function roomMessages(int $roomId, int $page = 1, string $filterUser = ''): void
@@ -365,15 +354,12 @@ class RoomManager
         );
         $messages = Timestamp::normalizeRows($messages, ['created_at']);
 
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode([
-            'success'  => true,
+        JsonResponse::success([
             'messages' => $messages,
             'total'    => $total,
             'page'     => $page,
             'room'     => $room,
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        ]);
     }
 
     public static function clearMessages(int $roomId): void
