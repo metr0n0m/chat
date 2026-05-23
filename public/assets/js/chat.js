@@ -166,12 +166,7 @@ function handleWS(data) {
         if (r) r.name = data.data.name;
       }
       if (data.data && data.data.role !== undefined && data.data.target_user_id !== undefined) {
-        const uid = Number(data.data.target_user_id);
-        const u = currentOnlineUsers.find(u => Number(u.id) === uid);
-        if (u) {
-          u.room_role = data.data.role;
-          $(`#online-user-${uid}`).replaceWith(buildOnlineUser(u));
-        }
+        updateOnlineUser(data.data.target_user_id, {room_role: data.data.role});
       }
       break;
     case 'friend_online':
@@ -594,6 +589,13 @@ function removeFromOnlineList(userId) {
   const cnt = Math.max(0, currentOnlineUsers.length);
   $('#panel-online-count').text(cnt);
   $('#room-online-count').text(`${cnt} онлайн`);
+}
+
+function updateOnlineUser(userId, patch) {
+  const u = currentOnlineUsers.find(u => Number(u.id) === Number(userId));
+  if (!u) return;
+  Object.assign(u, patch);
+  $(`#online-user-${Number(userId)}`).replaceWith(buildOnlineUser(u));
 }
 
 // SECTION: ONLINE USER ACTIONS
