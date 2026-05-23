@@ -1,5 +1,5 @@
 # DIFF_PLAN.md — Поэтапный план реализации
-Last updated: 2026-05-22
+Last updated: 2026-05-22 (rev2)
 
 Принципы: малые шаги, каждый обратим, без изменений UI/UX и текущей логики,
 только системные решения, diff-план для каждого изменения.
@@ -655,28 +655,43 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | Шаг | Файлы | Время | Риск | Статус |
 |-----|-------|-------|------|--------|
 | 0.1 Commit pending | 5 файлов | 15 мин | Нет | [x] CLOSED `fbfc0f7`, `e0877c7` |
-| 1.1 EmbedProcessor SSRF | 1 файл | 30 мин | Низкий | [ ] OPEN |
+| 1.1 EmbedProcessor SSRF | 1 файл | 30 мин | Низкий | [x] CLOSED `1d1eb91` |
 | 1.2 reactor_raw | 1-2 файла | 1 час | Средний | Ждёт решения владельца |
 | 1.3 index.php warning | 1 файл | 10 мин | Нет | [ ] OPEN |
 | 2.1 RoomDeletionService | 2 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
 | 2.2 DefaultRoomMembership | 3 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
 | 2.x JsonResponse phase 1–3 | 6 файлов | — | Низкий | [x] CLOSED `d3ebda5`, `b1e1cfe`, `c037c5b` |
 | 2.x Schema cleanup phase 1–2 | 3 файла | — | Низкий | [x] CLOSED `145edf6`, `4be390b` |
-| 2.x JsonResponse phase4 | src/Admin/RoomManager.php | — | Низкий | [ ] OPEN |
-| 2.x JsonResponse phase5 | src/Admin/UserManager.php | — | Низкий | [ ] OPEN |
-| 2.x JsonResponse phase6 | src/Http/Router.php | — | Средний | [ ] OPEN |
+| 2.x JsonResponse phase4 | src/Admin/RoomManager.php | — | Низкий | [x] CLOSED `26ceb9d` |
+| 2.x JsonResponse phase5 | src/Admin/UserManager.php | — | Низкий | [x] CLOSED `c002872` |
+| 2.x JsonResponse phase6 | src/Http/Router.php | — | Средний | [x] CLOSED `c5a05c9`, `fa3105e` |
+| 2.x WS reload cleanup | chat.js | — | Низкий | [x] CLOSED `017482e`, `ae4c82b`, `18c3018` |
+| 2.x Room role realtime update | 3 файла | — | Низкий | [x] CLOSED `14a993b` — проверено вручную |
 | 3.1 Pagination /api/rooms | 2 файла | 1 час | Низкий | [ ] OPEN |
 | 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] OPEN |
+| 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — требует IPC или WS-команды |
 | 5.1 Schema guard (roomCategoryOptions) | 1 файл | — | Низкий | ⏸ DEFERRED BY DESIGN |
+
+**Прогресс (☑/☐):**
+- ☑ JSON cleanup (phase 1–6)
+- ☑ Runtime schema cleanup (phase 1–2)
+- ☑ Service extraction (RoomDeletion, DefaultRoomMembership)
+- ☑ WS reload cleanup (phase 1, 2a, 2b)
+- ☑ SSRF protection
+- ☑ Room role realtime update + system messages
+- ☐ Global role realtime update
+- ☐ Pagination /api/rooms
+- ☐ Permission unification
+- ☐ index.php cleanup
+- ☐ reactor_raw (ждёт решения владельца)
 
 **Итого закрыто:**
 - Фаза 0 полностью
-- Фаза 2: шаги 2.1–2.2 закрыты
-- JsonResponse phase1–3 закрыты
-- Runtime schema cleanup phase1–2 закрыты
+- Фаза 1: шаг 1.1 (SSRF) закрыт
+- Фаза 2 полностью (сервисы, JsonResponse, schema, WS, room role)
 - Фаза 5 частично
 
-**Итого открыто:** Фаза 1 (1.1, 1.3), JsonResponse phase4–6, Фаза 3, Фаза 4
+**Итого открыто:** Шаг 1.3, Фаза 3, Фаза 4 (global role, permission unification)
 
 ---
 

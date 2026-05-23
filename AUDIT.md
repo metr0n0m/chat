@@ -1,5 +1,5 @@
 # AUDIT.md — Системный аудит проекта Chat
-Last updated: 2026-05-22
+Last updated: 2026-05-22 (rev2)
 Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MESSAGE_FLOW.md)
 
 ---
@@ -98,47 +98,37 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | Дубль deleteRoomWithDependencies | ✅ CLOSED | `00b2a53` |
 | Дубль joinDefaultRooms (2 копии) | ✅ CLOSED | `00b2a53` |
 | JsonResponse inline — Auth, Chat, AdminPanel | ✅ CLOSED | `d3ebda5`, `b1e1cfe`, `c037c5b` |
+| JsonResponse inline — RoomManager | ✅ CLOSED | `26ceb9d` |
+| JsonResponse inline — UserManager | ✅ CLOSED | `c002872` |
+| JsonResponse inline — Router.php | ✅ CLOSED | `c5a05c9`, `fa3105e` |
 | SHOW COLUMNS runtime — MessageController | ✅ CLOSED | `145edf6` |
 | SHOW COLUMNS runtime — UserManager | ✅ CLOSED | `145edf6` |
 | SHOW COLUMNS runtime — RoomController mute guard | ✅ CLOSED | `4be390b` |
+| EmbedProcessor без SSRF защиты | ✅ CLOSED | `1d1eb91` |
+| GET /api/rooms fan-out при WS событиях | ✅ CLOSED | `017482e`, `ae4c82b`, `18c3018` |
+| Room role не обновляется в online-списке без refresh | ✅ CLOSED | `14a993b` |
+| Нет system message при изменении room_role | ✅ CLOSED | `14a993b` |
 
 ### Что остаётся нерешённым
 
 | Проблема | Приоритет | Статус |
 |---|---|---|
-| EmbedProcessor без SSRF защиты | ВЫСОКИЙ | OPEN |
 | reactor_raw plaintext password | КРИТИЧНО | Ждёт решения владельца |
 | Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN |
 | SHOW COLUMNS — roomCategoryOptions() | НИЗКИЙ | ⏸ DEFERRED BY DESIGN |
 | Нет пагинации /api/rooms | СРЕДНИЙ | OPEN |
-| JsonResponse inline — RoomManager, UserManager (часть), Router.php | НИЗКИЙ | OPEN |
+| Global role не обновляется в online-списке без refresh | НИЗКИЙ | OPEN |
+| index.php dev warning | НИЗКИЙ | OPEN |
 
 ---
 
 ## 3. Проблемы безопасности
 
-### SSRF-1: EmbedProcessor без IP-фильтрации [ВЫСОКИЙ]
+### SSRF-1: EmbedProcessor без IP-фильтрации — ✅ CLOSED `1d1eb91`
 
-Файл: `src/Chat/EmbedProcessor.php`, функции `headRequest()` (стр. 170–190) и `fetchHtml()` (стр. 192–206).
+~~Уязвимость: отсутствие IP-фильтрации в headRequest() и fetchHtml()~~
 
-Уязвимый код в headRequest():
-```
-$ctx = stream_context_create(['http' => ['method' => 'HEAD', 'timeout' => 3]]);
-@file_get_contents($url, false, $ctx);  // Нет IP-проверки
-```
-
-Уязвимый код в fetchHtml():
-```
-$html = @file_get_contents($url, false, $ctx);  // Нет IP-проверки
-```
-
-Вектор: Пользователь вставляет в сообщение URL:
-- `http://192.168.1.1/admin` — доступ к роутеру
-- `http://169.254.169.254/latest/meta-data/` — AWS metadata endpoint
-- `http://10.0.0.1/internal` — внутренние сервисы
-
-Отличие от UserManager: UserManager::headRequest() добавляет фильтр через
-`FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE`, EmbedProcessor — нет.
+Закрыто: добавлена scheme whitelist, DNS resolve + `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE`, `follow_location: false`. Проверено локально: `127.0.0.1`, `localhost`, `169.254.169.254` — BLOCK; `github.com`, `youtube.com` — PASS.
 
 ### SSRF-2: UserManager частичная защита [СРЕДНИЙ]
 
@@ -247,19 +237,23 @@ $db->execute(
 
 ## 7. Технический долг
 
-| Проблема | Файл | Приоритет | Рекомендация |
-|----------|------|-----------|--------------|
+| Проблема | Файл | Приоритет | Статус |
+|----------|------|-----------|--------|
 | In-memory presence, нет multi-instance WS | ConnectionManager.php | Низкий | Acceptable для одного инстанса |
-| Нет пагинации /api/rooms | RoomController.php | Средний | Добавить LIMIT/OFFSET |
-| SHOW COLUMNS runtime — UserManager, MessageController, RoomController mute | ✅ CLOSED `145edf6`, `4be390b` | — |
-| SHOW COLUMNS runtime — RoomManager::roomCategoryOptions() | ⏸ DEFERRED BY DESIGN | ENUM introspection для frontend |
-| Монолитный chat.js (2024 строки) | chat.js | Низкий | Продолжать разбивку по модулям |
+| Нет пагинации /api/rooms | RoomController.php | Средний | OPEN |
+| SHOW COLUMNS runtime — UserManager, MessageController, RoomController mute | — | — | ✅ CLOSED `145edf6`, `4be390b` |
+| SHOW COLUMNS runtime — RoomManager::roomCategoryOptions() | RoomManager.php | Низкий | ⏸ DEFERRED BY DESIGN |
+| Монолитный chat.js (~2000 строк) | chat.js | Низкий | OPEN — продолжать разбивку |
 | Friendships flow частичный | Router.php, chat.js | Низкий | HTTP-refresh acceptable |
-| Нет unit-тестов | — | Средний | Добавить PHPUnit |
+| Нет unit-тестов | — | Средний | OPEN |
 | composer.json PHP ^8.4 vs prod 8.2? | composer.json | Средний | Верифицировать на production |
 | WS supervisord вместо systemd | supervisord.docker.conf | Низкий | Production: добавить systemd unit |
-| Глобальный бан не отключает WS | Server.php | Средний | Требует отдельного дизайна |
+| Глобальный бан не отключает WS | Server.php | Средний | Временный fix: route guard в EventRouter |
 | Сессионные данные не обновляются без reconnect | Server.php | Средний | Известное ограничение |
+| Global role не обновляется в online-списке без refresh | chat.js + WS | Низкий | OPEN — HTTP/WS split, нет IPC |
+| Room role realtime update + system messages | — | — | ✅ CLOSED `14a993b` |
+| GET /api/rooms fan-out при WS событиях | chat.js | — | ✅ CLOSED `017482e`, `ae4c82b`, `18c3018` |
+| SSRF EmbedProcessor | EmbedProcessor.php | — | ✅ CLOSED `1d1eb91` |
 
 ---
 
