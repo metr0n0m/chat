@@ -169,11 +169,24 @@ class EmbedProcessor
 
     private static function headRequest(string $url): ?array
     {
+        $parsed = parse_url($url);
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
+            return null;
+        }
+        $host = strtolower((string) ($parsed['host'] ?? ''));
+        if ($host === '') {
+            return null;
+        }
+        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : (gethostbyname($host) ?: '');
+        if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return null;
+        }
+
         $ctx = stream_context_create(['http' => [
             'method'          => 'HEAD',
             'timeout'         => self::TIMEOUT,
-            'follow_location' => true,
-            'max_redirects'   => 3,
+            'follow_location' => false,
         ]]);
         @file_get_contents($url, false, $ctx);
         if (empty($http_response_header)) {
@@ -191,11 +204,24 @@ class EmbedProcessor
 
     private static function fetchHtml(string $url): ?string
     {
+        $parsed = parse_url($url);
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
+            return null;
+        }
+        $host = strtolower((string) ($parsed['host'] ?? ''));
+        if ($host === '') {
+            return null;
+        }
+        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : (gethostbyname($host) ?: '');
+        if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return null;
+        }
+
         $ctx = stream_context_create(['http' => [
             'method'          => 'GET',
             'timeout'         => self::TIMEOUT,
-            'follow_location' => true,
-            'max_redirects'   => 3,
+            'follow_location' => false,
             'header'          => 'Accept: text/html',
         ]]);
         $html = @file_get_contents($url, false, $ctx);
