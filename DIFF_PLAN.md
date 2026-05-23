@@ -669,7 +669,7 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 2.x Room role realtime update | 3 файла | — | Низкий | [x] CLOSED `14a993b` — проверено вручную |
 | 3.1 Pagination /api/rooms | 2 файла | 1 час | Низкий | [ ] OPEN |
 | 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] OPEN |
-| 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — требует IPC или WS-команды |
+| 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — HTTP/WS split, нет IPC; см. AUDIT.md §9 |
 | 5.1 Schema guard (roomCategoryOptions) | 1 файл | — | Низкий | ⏸ DEFERRED BY DESIGN |
 
 **Прогресс (☑/☐):**

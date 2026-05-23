@@ -117,7 +117,7 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN |
 | SHOW COLUMNS — roomCategoryOptions() | НИЗКИЙ | ⏸ DEFERRED BY DESIGN |
 | Нет пагинации /api/rooms | СРЕДНИЙ | OPEN |
-| Global role не обновляется в online-списке без refresh | НИЗКИЙ | OPEN |
+| Global role не обновляется в online-списке без refresh | НИЗКИЙ | OPEN — requires HTTP→WS bridge decision |
 | index.php dev warning | НИЗКИЙ | OPEN |
 
 ---
@@ -250,10 +250,42 @@ $db->execute(
 | WS supervisord вместо systemd | supervisord.docker.conf | Низкий | Production: добавить systemd unit |
 | Глобальный бан не отключает WS | Server.php | Средний | Временный fix: route guard в EventRouter |
 | Сессионные данные не обновляются без reconnect | Server.php | Средний | Известное ограничение |
-| Global role не обновляется в online-списке без refresh | chat.js + WS | Низкий | OPEN — HTTP/WS split, нет IPC |
+| Global role не обновляется в online-списке без refresh | chat.js + WS | Низкий | OPEN — см. §9 |
 | Room role realtime update + system messages | — | — | ✅ CLOSED `14a993b` |
 | GET /api/rooms fan-out при WS событиях | chat.js | — | ✅ CLOSED `017482e`, `ae4c82b`, `18c3018` |
 | SSRF EmbedProcessor | EmbedProcessor.php | — | ✅ CLOSED `1d1eb91` |
+
+---
+
+## 9. Global role realtime update — анализ ограничений
+
+### Контекст
+
+`room_role` realtime update закрыт в `14a993b`: изменение происходит через WS `room_action` → `EventRouter::onRoomAction()` → `sendToRoom('room_updated', ...)` → JS `updateOnlineUser()`.
+
+`global_role` realtime update для всех онлайн-клиентов **невозможен существующими механизмами**.
+
+### Причины (доказаны по коду)
+
+1. **HTTP/WS split**: `global_role` меняется через `POST /api/admin/users/{id}` → `UserManager::update()` в PHP-FPM процессе.
+2. **ConnectionManager недоступен из HTTP**: `ConnectionManager` живёт исключительно в ReactPHP (WS) процессе. Ни один HTTP-файл (`Admin/`, `Http/`, `Security/`) не импортирует и не использует `ConnectionManager` напрямую. Нет IPC: ни APCu, ни shmop, ни FIFO, ни socket.
+3. **`force_logout` — не bridge**: существующий механизм глобального бана работает как **lazy DB-poll** — `EventRouter::route()` вызывает `Session::isUserBlocked()` при каждом WS-сообщении от target. Это не realtime push, а обнаружение при следующем событии от target. Закомментировано самим кодом: *"Temporary synchronization point... Full immediate moderation cleanup would require explicit IPC"* (EventRouter.php L38–40).
+4. **`sendToAll` не вызывается из HTTP**: единственный `sendToAll` в проекте — `broadcastRoomCount()` внутри EventRouter.
+
+### Что возможно без новой инфраструктуры
+
+| Решение | Охват | Требует |
+|---|---|---|
+| JS `updateOnlineUser` в `resp.success` callback | Только actor | 1 строка JS |
+| Lazy update через DB-poll в `route()` | Target при следующем WS-сообщении | Новая DB-проверка в EventRouter |
+| Broadcast всем в комнате target | Все в комнате target | Новый WS admin action endpoint |
+| Broadcast всем онлайн | Все клиенты | Требует HTTP→WS IPC |
+
+### Статус
+
+**OPEN — requires explicit HTTP→WS bridge / IPC / WS admin action decision.**
+
+Реализация Phase 1 (только actor) возможна немедленно: `updateOnlineUser(Number(id), {global_role: next})` в JS callback после `resp.success`. Остальные обновятся при следующем `join_room` (актуальный `getOnlineList()` из DB).
 
 ---
 
