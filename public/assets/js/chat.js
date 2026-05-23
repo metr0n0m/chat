@@ -165,6 +165,14 @@ function handleWS(data) {
         const r = rooms.find(r => Number(r.id) === Number(data.room_id));
         if (r) r.name = data.data.name;
       }
+      if (data.data && data.data.role !== undefined && data.data.target_user_id !== undefined) {
+        const uid = Number(data.data.target_user_id);
+        const u = currentOnlineUsers.find(u => Number(u.id) === uid);
+        if (u) {
+          u.room_role = data.data.role;
+          $(`#online-user-${uid}`).replaceWith(buildOnlineUser(u));
+        }
+      }
       break;
     case 'friend_online':
     case 'friend_offline':  loadFriends(); break;

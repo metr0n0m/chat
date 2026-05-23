@@ -175,7 +175,10 @@ class RoomController
         }
 
         $target = $db->fetchOne(
-            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            'SELECT rm.room_role, u.username
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ? AND rm.user_id = ?',
             [$roomId, $targetId]
         );
         if (!$target) {
@@ -185,12 +188,19 @@ class RoomController
             return ['error' => 'Нельзя изменить роль владельца.'];
         }
 
+        if ($target['room_role'] === $role) {
+            return ['updated' => false, 'target_user_id' => $targetId, 'role' => $role,
+                    'old_role' => $role, 'target_username' => (string) $target['username'],
+                    'no_change' => true];
+        }
+
         $db->execute(
             'UPDATE room_members SET room_role = ? WHERE room_id = ? AND user_id = ?',
             [$role, $roomId, $targetId]
         );
 
-        return ['updated' => true, 'target_user_id' => $targetId, 'role' => $role];
+        return ['updated' => true, 'target_user_id' => $targetId, 'role' => $role,
+                'old_role' => (string) $target['room_role'], 'target_username' => (string) $target['username']];
     }
 
     private static function kick(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db): array

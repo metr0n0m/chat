@@ -542,6 +542,27 @@ class EventRouter
             ]);
         }
 
+        if ($result['no_change'] ?? false) {
+            return;
+        }
+
+        if (($result['updated'] ?? false) && isset($result['role'])) {
+            $roleLabels = [
+                'local_moderator' => 'модератором комнаты',
+                'local_admin'     => 'администратором комнаты',
+                'member'          => 'возвращён(а) к роли участника',
+            ];
+            $label = $roleLabels[$result['role']] ?? $result['role'];
+            $prefix = $result['role'] === 'member' ? '' : 'назначен(а) ';
+            SystemMessageService::emitRoomLifecycle(
+                $this->cm,
+                $roomId,
+                $userId,
+                ($result['target_username'] ?? 'Пользователь') . ' ' . $prefix . $label,
+                'room_role_changed'
+            );
+        }
+
         $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $result]);
     }
 
