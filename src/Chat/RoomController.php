@@ -16,10 +16,16 @@ class RoomController
         $db = Connection::getInstance();
         $rooms = $db->fetchAll(
             "SELECT r.id, r.name, r.description, r.type, r.is_closed,
-                    (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count,
+                    COALESCE(mc.member_count, 0) AS member_count,
                     rm2.room_role AS my_role
              FROM rooms r
              LEFT JOIN room_members rm2 ON rm2.room_id = r.id AND rm2.user_id = ?
+             LEFT JOIN (
+                 SELECT room_id, COUNT(*) AS member_count
+                 FROM room_members
+                 WHERE room_role != 'banned'
+                 GROUP BY room_id
+             ) mc ON mc.room_id = r.id
              WHERE r.type = 'public'
                AND r.is_closed = 0
                AND (rm2.room_role IS NULL OR rm2.room_role != 'banned')
@@ -318,9 +324,15 @@ class RoomController
         $db = Connection::getInstance();
         $rooms = $db->fetchAll(
             "SELECT r.id, r.name, r.created_at,
-                    (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id AND rm.room_role != 'banned') AS member_count
+                    COALESCE(mc.member_count, 0) AS member_count
              FROM rooms r
              JOIN room_members rm ON rm.room_id = r.id AND rm.user_id = ?
+             LEFT JOIN (
+                 SELECT room_id, COUNT(*) AS member_count
+                 FROM room_members
+                 WHERE room_role != 'banned'
+                 GROUP BY room_id
+             ) mc ON mc.room_id = r.id
              WHERE r.type = 'numer' AND r.is_closed = 0",
             [$userId]
         );
