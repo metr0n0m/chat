@@ -108,6 +108,8 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | GET /api/rooms fan-out при WS событиях | ✅ CLOSED | `017482e`, `ae4c82b`, `18c3018` |
 | Room role не обновляется в online-списке без refresh | ✅ CLOSED | `14a993b` |
 | Нет system message при изменении room_role | ✅ CLOSED | `14a993b` |
+| updateOnlineUser() разрозненный inline-код в chat.js | ✅ CLOSED | `afdab97` |
+| Correlated COUNT(*) в RoomController::list() и numera() | ✅ CLOSED | `fba6ac5` |
 
 ### Что остаётся нерешённым
 
@@ -116,9 +118,9 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | reactor_raw plaintext password | КРИТИЧНО | Ждёт решения владельца |
 | Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN |
 | SHOW COLUMNS — roomCategoryOptions() | НИЗКИЙ | ⏸ DEFERRED BY DESIGN |
-| Нет пагинации /api/rooms | СРЕДНИЙ | OPEN |
+| Нет пагинации /api/rooms | СРЕДНИЙ | OPEN — LIMIT/OFFSET не добавлен (Phase 3.1-B) |
 | Global role не обновляется в online-списке без refresh | НИЗКИЙ | OPEN — requires HTTP→WS bridge decision |
-| index.php dev warning | НИЗКИЙ | OPEN |
+| index.php dev warning | НИЗКИЙ | SKIPPED — gitignored, три слоя защиты уже есть |
 
 ---
 
@@ -254,6 +256,8 @@ $db->execute(
 | Room role realtime update + system messages | — | — | ✅ CLOSED `14a993b` |
 | GET /api/rooms fan-out при WS событиях | chat.js | — | ✅ CLOSED `017482e`, `ae4c82b`, `18c3018` |
 | SSRF EmbedProcessor | EmbedProcessor.php | — | ✅ CLOSED `1d1eb91` |
+| updateOnlineUser() inline-дубли в chat.js | chat.js | — | ✅ CLOSED `afdab97` |
+| Correlated COUNT(*) в list() и numera() | RoomController.php | — | ✅ CLOSED `fba6ac5` |
 
 ---
 

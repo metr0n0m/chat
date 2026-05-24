@@ -185,7 +185,7 @@ Diff `src/Auth/RegisterHandler.php`:
 
 ---
 
-### Шаг 1.3: Переименование index.php [ ] OPEN
+### Шаг 1.3: Переименование index.php [~] SKIPPED
 
 **Что:** Устранить путаницу между dev-файлом и production entry point.
 
@@ -459,7 +459,7 @@ git push origin main
 
 ## ФАЗА 3: Производительность (1–2 часа)
 
-### Шаг 3.1: Пагинация /api/rooms [ ] OPEN
+### Шаг 3.1: Пагинация /api/rooms [~] PARTIAL
 
 **Что:** Добавить LIMIT/OFFSET в /api/rooms для масштабирования.
 
@@ -657,7 +657,7 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 0.1 Commit pending | 5 файлов | 15 мин | Нет | [x] CLOSED `fbfc0f7`, `e0877c7` |
 | 1.1 EmbedProcessor SSRF | 1 файл | 30 мин | Низкий | [x] CLOSED `1d1eb91` |
 | 1.2 reactor_raw | 1-2 файла | 1 час | Средний | Ждёт решения владельца |
-| 1.3 index.php warning | 1 файл | 10 мин | Нет | [ ] OPEN |
+| 1.3 index.php warning | 1 файл | 10 мин | Нет | [~] SKIPPED — gitignored, три слоя защиты |
 | 2.1 RoomDeletionService | 2 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
 | 2.2 DefaultRoomMembership | 3 файла | 1 час | Низкий | [x] CLOSED `00b2a53` |
 | 2.x JsonResponse phase 1–3 | 6 файлов | — | Низкий | [x] CLOSED `d3ebda5`, `b1e1cfe`, `c037c5b` |
@@ -667,9 +667,10 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 2.x JsonResponse phase6 | src/Http/Router.php | — | Средний | [x] CLOSED `c5a05c9`, `fa3105e` |
 | 2.x WS reload cleanup | chat.js | — | Низкий | [x] CLOSED `017482e`, `ae4c82b`, `18c3018` |
 | 2.x Room role realtime update | 3 файла | — | Низкий | [x] CLOSED `14a993b` — проверено вручную |
-| 3.1 Pagination /api/rooms | 2 файла | 1 час | Низкий | [ ] OPEN |
+| 3.1-A SQL optimization (GROUP BY) | 1 файл | — | Нет | [x] CLOSED `fba6ac5` |
+| 3.1-B Pagination LIMIT/OFFSET | 2 файла | 1 час | Низкий | [ ] OPEN |
 | 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] OPEN |
-| 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — HTTP/WS split, нет IPC; см. AUDIT.md §9 |
+| 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — HTTP/WS split; updateOnlineUser() helper существует (`afdab97`); архитектурное решение ещё не принято |
 | 5.1 Schema guard (roomCategoryOptions) | 1 файл | — | Низкий | ⏸ DEFERRED BY DESIGN |
 
 **Прогресс (☑/☐):**
@@ -679,19 +680,22 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - ☑ WS reload cleanup (phase 1, 2a, 2b)
 - ☑ SSRF protection
 - ☑ Room role realtime update + system messages
+- ☑ SQL optimization — correlated COUNT → GROUP BY (`fba6ac5`)
+- ☑ updateOnlineUser() helper extracted (`afdab97`)
 - ☐ Global role realtime update
-- ☐ Pagination /api/rooms
+- ☐ Pagination LIMIT/OFFSET /api/rooms (Phase 3.1-B)
 - ☐ Permission unification
-- ☐ index.php cleanup
+- ☐ index.php cleanup — SKIPPED
 - ☐ reactor_raw (ждёт решения владельца)
 
 **Итого закрыто:**
 - Фаза 0 полностью
 - Фаза 1: шаг 1.1 (SSRF) закрыт
 - Фаза 2 полностью (сервисы, JsonResponse, schema, WS, room role)
+- Фаза 3: шаг 3.1-A (SQL optimization) закрыт
 - Фаза 5 частично
 
-**Итого открыто:** Шаг 1.3, Фаза 3, Фаза 4 (global role, permission unification)
+**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза 4 (global role + permission unification)
 
 ---
 
