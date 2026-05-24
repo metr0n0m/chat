@@ -531,12 +531,131 @@ git push origin main
 
 ---
 
+## ФАЗА M: Завершение системы модерации [⏸] DEFERRED
+
+**Статус:** ⏸ DEFERRED — незавершённая инфраструктура модерации, уже присутствует на production, но не является ближайшей активной задачей.
+
+**Причина DEFERRED:**
+- Текущий масштаб: 6 пользователей, 2 комнаты.
+- `moderation_events` и `active_restrictions` пустые — ни одной записи.
+- Старая модель kick/ban/mute через `RoomController` сейчас достаточна.
+- Частичная активация (например, только AccessContext без write в moderation_events) опаснее, чем оставить как есть: таблицы останутся рассинхронизированными с реальными событиями.
+
+**Триггер возврата:**
+- Рост аудитории и появление активных модераторов.
+- Необходимость audit log модерационных действий.
+- Жалобы на превышение полномочий, требующие разбора истории.
+- Явное решение владельца активировать Фазу M.
+
+**Контекст:**
+
+Целенаправленная серия коммитов 2026-05-20, остановившаяся на полпути:
+
+```
+docs/MODERATION_POLICY.md         — source of truth (2026-05-19, 6925a44)
+  ↓
+database/migrations/013           — moderation_events audit log (1a2b6d3)
+database/migrations/014           — active_restrictions hot-path table (26fea9a)
+database/migrations/015           — legacy_import backfill (8fbc018)
+  ↓
+src/Security/AccessContext.php    — resolver уровней прав, DB-first (e273342, d9c457e)
+src/WebSocket/EventRouter.php     — executeForceLogout / executePresenceCleanup (844539b)
+  ↓
+⛔ остановилось здесь — переключение на другие задачи
+```
+
+Все таблицы на production (пустые). Код не подключён ни к одной из них.
+Коммиты явно помечены: "unused yet — wiring is next step".
+
+**Принцип при активации:** Фазу M нельзя выполнять частично. Частичное подключение создаст рассинхронизацию между таблицами и реальными событиями модерации.
+
+---
+
+### Шаг M1: Подключение AccessContext [⏸] DEFERRED
+
+**Что:** Заменить `RoomController::resolvePermission()` и `Access::resolveLevel()` на `AccessContext::getModerationContext()` во всём manage/kick/ban/mute flow.
+
+**Ключевые отличия после перехода:**
+- DB-fresh роль вместо session snapshot
+- Scope guard: local_mod/local_admin не могут действовать вне своей комнаты
+- I-3: explicit guard — platform_owner не может быть модерирован
+- Шкала расширена до 7 (root_owner зарезервирован)
+
+**Файлы:** `src/Chat/RoomController.php`, `src/WebSocket/EventRouter.php`
+
+**Зависит от:** M4 (reason validation), M5 (self-action guard)
+
+---
+
+### Шаг M2: moderation_events write path [⏸] DEFERRED
+
+**Что:** При каждом kick/ban/mute/unban/unmute писать запись в `moderation_events`.
+
+**Поля:** `act`, `origin='realtime'`, `actor_id`, `actor_role`, `target_user_id`, `room_id`, `reason`, `expires_at`, `ban_issued_by_role`.
+
+**Файлы:** `src/Chat/RoomController.php`, `src/Admin/UserManager.php`
+
+**Зависит от:** M1 (нужен actor context для `actor_role` snapshot)
+
+---
+
+### Шаг M3: active_restrictions read path [⏸] DEFERRED
+
+**Что:** При join_room, send_message и session validate читать из `active_restrictions` вместо (или в дополнение к) прямых проверок `room_members.room_role='banned'` и `muted_until`.
+
+**Файлы:** `src/WebSocket/EventRouter.php`, `src/Chat/MessageController.php`
+
+**Зависит от:** M2 (таблица должна быть заполнена)
+
+---
+
+### Шаг M4: reason validation [⏸] DEFERRED
+
+**Что:** Реализовать инвариант I-5: причина обязательна для ban и mute.
+
+Текущее состояние: `ban` и `mute` в `RoomController` принимают пустую причину без ошибки.
+
+**Backend:** добавить проверку `reason !== ''` перед записью.
+**Frontend:** `chat.js` — UI модал ban/mute должен требовать reason (поле обязательное).
+
+**Файлы:** `src/Chat/RoomController.php`, `public/assets/js/chat.js`
+
+---
+
+### Шаг M5: self-action guards [⏸] DEFERRED
+
+**Что:** Реализовать инвариант I-1: нельзя применить действие к себе.
+
+Текущее состояние: нет проверки `actorId !== targetId` в kick/ban/mute.
+
+**Файлы:** `src/Chat/RoomController.php`
+
+---
+
+### Шаг M6: policy smoke tests [⏸] DEFERRED
+
+**Что:** Верифицировать матрицы из MODERATION_POLICY.md §3 вручную:
+
+| Тест | Актор | Цель | Ожидание |
+|---|---|---|---|
+| I-1 | owner | owner (self) | reject |
+| I-3 | admin | platform_owner | reject |
+| kick matrix | local_mod | member | allow |
+| kick matrix | local_mod | local_admin | reject |
+| kick matrix | global_mod | owner | allow |
+| ban matrix | local_mod | member | allow (24h max) |
+| mute I-5 | any | any | reject если reason пустой |
+| scope I-7 | local_admin чужой комнаты | member | reject |
+
+---
+
 ## ФАЗА 4: Унификация permission-логики (4–6 часов)
 
-**ПРИМЕЧАНИЕ:** Это рефакторинг со средним риском регрессий.
-Выполнять только после полного smoke-test Фаз 0–3.
+**ПРИМЕЧАНИЕ:** Приоритет понижен. Выполнять только после принятия решения по Фазе M.
+Если Фаза M будет реализована — Шаг 4.1 становится избыточным:
+`resolvePermission` будет заменён на `AccessContext` целиком, не на `Access::resolveLevel`.
 
-### Шаг 4.1: Унификация resolvePermission/resolveLevel [ ] OPEN
+### Шаг 4.1: Унификация resolvePermission/resolveLevel [ ] OPEN — BLOCKED by Phase M
 
 **Что:** Устранить дублирование иерархии прав между Access::resolveLevel() и RoomController::resolvePermission().
 
@@ -669,7 +788,13 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 2.x Room role realtime update | 3 файла | — | Низкий | [x] CLOSED `14a993b` — проверено вручную |
 | 3.1-A SQL optimization (GROUP BY) | 1 файл | — | Нет | [x] CLOSED `fba6ac5` |
 | 3.1-B Pagination LIMIT/OFFSET | 2 файла | 1 час | Низкий | [ ] OPEN |
-| 4.1 Permission unification | 2 файла | 2 часа | Средний | [ ] OPEN |
+| **M1** AccessContext подключение | RoomController, EventRouter | — | Высокий | ⏸ DEFERRED |
+| **M2** moderation_events write | RoomController, UserManager | — | Высокий | ⏸ DEFERRED — зависит от M1 |
+| **M3** active_restrictions read | EventRouter, MessageController | — | Высокий | ⏸ DEFERRED — зависит от M2 |
+| **M4** reason validation | RoomController, chat.js | — | Средний | ⏸ DEFERRED |
+| **M5** self-action guards | RoomController | — | Средний | ⏸ DEFERRED |
+| **M6** policy smoke tests | — | — | — | ⏸ DEFERRED — финальная верификация |
+| 4.1 Permission unification | 2 файла | 2 часа | Средний | ⏸ DEFERRED pending Phase M decision |
 | 4.x Global role realtime update | chat.js + WS/IPC | — | Средний | [ ] OPEN — HTTP/WS split; updateOnlineUser() helper существует (`afdab97`); архитектурное решение ещё не принято |
 | 5.1 Schema guard (roomCategoryOptions) | 1 файл | — | Низкий | ⏸ DEFERRED BY DESIGN |
 
@@ -684,7 +809,8 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - ☑ updateOnlineUser() helper extracted (`afdab97`)
 - ☐ Global role realtime update
 - ☐ Pagination LIMIT/OFFSET /api/rooms (Phase 3.1-B)
-- ☐ Permission unification
+- ⏸ Фаза M: завершение системы модерации (M1–M6) — DEFERRED, триггер: рост аудитории / модераторы
+- ⏸ Permission unification — DEFERRED pending Phase M decision
 - ☐ index.php cleanup — SKIPPED
 - ☐ reactor_raw (ждёт решения владельца)
 
@@ -695,7 +821,7 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - Фаза 3: шаг 3.1-A (SQL optimization) закрыт
 - Фаза 5 частично
 
-**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза 4 (global role + permission unification)
+**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза M (moderation), Фаза 4 (global role + permission unification — blocked)
 
 ---
 

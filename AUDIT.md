@@ -116,11 +116,12 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | Проблема | Приоритет | Статус |
 |---|---|---|
 | reactor_raw plaintext password | КРИТИЧНО | Ждёт решения владельца |
-| Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN |
+| Дубль resolvePermission/resolveLevel | НИЗКИЙ | OPEN — заблокирован Фазой M; см. DIFF_PLAN.md §4 |
 | SHOW COLUMNS — roomCategoryOptions() | НИЗКИЙ | ⏸ DEFERRED BY DESIGN |
 | Нет пагинации /api/rooms | СРЕДНИЙ | OPEN — LIMIT/OFFSET не добавлен (Phase 3.1-B) |
 | Global role не обновляется в online-списке без refresh | НИЗКИЙ | OPEN — requires HTTP→WS bridge decision |
 | index.php dev warning | НИЗКИЙ | SKIPPED — gitignored, три слоя защиты уже есть |
+| Фаза M: Незавершённая инфраструктура модерации | АРХИТЕКТУРНЫЙ | ⏸ DEFERRED — таблицы на production, старая модель достаточна при текущем масштабе; см. DIFF_PLAN.md §M |
 
 ---
 
