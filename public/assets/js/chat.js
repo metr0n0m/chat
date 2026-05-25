@@ -153,7 +153,13 @@ function handleWS(data) {
     case 'numer_destroyed':
       numera = numera.filter(r => Number(r.id) !== Number(data.room_id));
       $(`#numera-list .room-item[data-id="${data.room_id}"]`).remove();
-      if ($('#ownerModal').hasClass('show') && $('#ownerNumera').hasClass('active')) loadAdminNumera();
+      if (
+        $('#ownerModal').hasClass('show')
+        && $('#ownerNumera').hasClass('active')
+        && typeof loadAdminNumera === 'function'
+      ) {
+        loadAdminNumera();
+      }
       break;
     case 'kicked_from_room': onKickedFromRoom(data); break;
     case 'banned_from_room': onBannedFromRoom(data); break;
@@ -1942,7 +1948,7 @@ $('#admin-numera-table').on('click', '.numer-history-btn', function() {
 $('#admin-numera-table').on('click', '.numer-close-btn', function() {
   const id = $(this).data('id');
   if (!confirm('Принудительно закрыть нумер #' + id + '?')) return;
-  $.post(`/api/admin/numera/${id}/close`, {csrf_token: csrfToken}, function(resp) {
+  $.post(`/api/admin/numera/${id}/close`, {csrf_token: CSRF_TOKEN}, function(resp) {
     if (resp.success) { showToast('Нумер #' + id + ' закрыт.'); loadAdminNumera(); }
     else showToast(resp.error || 'Ошибка', 'danger');
   });
