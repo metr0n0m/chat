@@ -544,16 +544,35 @@ git push origin main
 - `chat.js`: 2112 → 1344 строк (−768)
 - Production deploy на `7c74476`, chat-ws restart не требовался (JS-only)
 
-### JS-2: Дальнейшее разбиение chat.js [ ] OPEN
+### JS-2A: FRIENDS extraction [x] CLOSED
 
-Следующие кандидаты на вынос (в порядке приоритета):
+**Коммиты:** `dcf4eaf`, `90c82be`
+
+**Результат:**
+- `dcf4eaf` — подготовка: typeof guard для `loadFriends` в WS handler (`friend_online`/`friend_offline`)
+- `90c82be` — extraction: FRIENDS секция (~25 строк) → `public/assets/js/chat-friends.js`, +1 строка `<script>` в `index.php`
+- `chat.js`: 1344 → 1325 строк (−19)
+- Логика не менялась. Browser smoke пройден: список друзей, поиск, WS события, admin panel.
+
+**Ограничение — Friendship flow PARTIAL:**
+- В UI реализовано только отображение и поиск (`#friends-list`, `#friend-search`, `loadFriends`, `renderFriends`, `/api/friends`)
+- Полноценный add/remove/accept flow (отправка заявок, подтверждение, удаление) требует отдельного аудита
+- Не утверждать что есть полная система друзей — её нет
+- Не трогать Friendship flow сейчас
+
+### JS-2B: NUMER FLOW [ ] OPEN
+
+### JS-2C: SETTINGS [ ] OPEN
+
+### JS-2D: ONLINE USER ACTIONS [ ] OPEN (средний риск — позже)
+
+Следующие кандидаты в порядке приоритета:
 
 | Секция | Строки | Зависимости | Риск |
 |---|---|---|---|
-| NUMER FLOW | ~81 | wsSend, rooms, numera, openNumerWindow | Низкий |
-| FRIENDS | ~25 | loadFriends, renderFriends | Низкий |
-| SETTINGS | ~98 | CSRF_TOKEN, showToast, effectiveColor | Низкий |
-| ONLINE USER ACTIONS | ~389 | openUserInfo, wsSend, currentRoomId | Средний |
+| NUMER FLOW (JS-2B) | ~81 | wsSend, rooms, numera, openNumerWindow | Низкий |
+| SETTINGS (JS-2C) | ~98 | CSRF_TOKEN, showToast, effectiveColor | Низкий |
+| ONLINE USER ACTIONS (JS-2D) | ~389 | openUserInfo, wsSend, currentRoomId | Средний — позже |
 
 Каждый вынос — отдельный plan → approve → implement → smoke → commit → deploy.
 
@@ -817,7 +836,10 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 3.1-A SQL optimization (GROUP BY) | 1 файл | — | Нет | [x] CLOSED `fba6ac5` |
 | 3.1-B Pagination LIMIT/OFFSET | 2 файла | 1 час | Низкий | [ ] OPEN |
 | **JS-1** ADMIN extraction | 4 файла | — | — | [x] CLOSED `943f49f`, `2c6b978`, `7c74476` |
-| **JS-2** Дальнейшее разбиение chat.js | chat.js | — | Низкий | [ ] OPEN |
+| **JS-2A** FRIENDS extraction | 3 файла | — | Нет | [x] CLOSED `dcf4eaf`, `90c82be` |
+| **JS-2B** NUMER FLOW extraction | chat.js | — | Низкий | [ ] OPEN |
+| **JS-2C** SETTINGS extraction | chat.js | — | Низкий | [ ] OPEN |
+| **JS-2D** ONLINE USER ACTIONS extraction | chat.js | — | Средний | [ ] OPEN — позже |
 | **M1** AccessContext подключение | RoomController, EventRouter | — | Высокий | ⏸ DEFERRED |
 | **M2** moderation_events write | RoomController, UserManager | — | Высокий | ⏸ DEFERRED — зависит от M1 |
 | **M3** active_restrictions read | EventRouter, MessageController | — | Высокий | ⏸ DEFERRED — зависит от M2 |
@@ -838,6 +860,7 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - ☑ SQL optimization — correlated COUNT → GROUP BY (`fba6ac5`)
 - ☑ updateOnlineUser() helper extracted (`afdab97`)
 - ☑ ADMIN extraction → chat-admin.js (`7c74476`)
+- ☑ FRIENDS extraction → chat-friends.js (`90c82be`)
 - ☐ Global role realtime update
 - ☐ Pagination LIMIT/OFFSET /api/rooms (Phase 3.1-B)
 - ⏸ Фаза M: завершение системы модерации (M1–M6) — DEFERRED, триггер: рост аудитории / модераторы
@@ -851,9 +874,9 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - Фаза 2 полностью (сервисы, JsonResponse, schema, WS, room role)
 - Фаза 3: шаг 3.1-A (SQL optimization) закрыт
 - Фаза 5 частично
-- Фаза JS: шаг JS-1 (ADMIN extraction) закрыт
+- Фаза JS: JS-1 (ADMIN) и JS-2A (FRIENDS) закрыты
 
-**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза JS-2 (дальнейшее разбиение), Фаза M (moderation), Фаза 4 (global role + permission unification — blocked)
+**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза JS-2B/2C/2D (NUMER/SETTINGS/ONLINE), Фаза M (moderation), Фаза 4 (global role + permission unification — blocked)
 
 ---
 

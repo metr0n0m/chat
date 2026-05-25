@@ -111,6 +111,7 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | updateOnlineUser() разрозненный inline-код в chat.js | ✅ CLOSED | `afdab97` |
 | Correlated COUNT(*) в RoomController::list() и numera() | ✅ CLOSED | `fba6ac5` |
 | Монолитный chat.js — ADMIN секция (~770 строк) | ✅ CLOSED | `943f49f`, `2c6b978`, `7c74476` |
+| Монолитный chat.js — FRIENDS секция (~25 строк) | ✅ CLOSED | `dcf4eaf`, `90c82be` |
 
 ### Incidents
 
@@ -261,8 +262,8 @@ $db->execute(
 | Нет пагинации /api/rooms | RoomController.php | Средний | OPEN |
 | SHOW COLUMNS runtime — UserManager, MessageController, RoomController mute | — | — | ✅ CLOSED `145edf6`, `4be390b` |
 | SHOW COLUMNS runtime — RoomManager::roomCategoryOptions() | RoomManager.php | Низкий | ⏸ DEFERRED BY DESIGN |
-| Монолитный chat.js (~2000 строк) | chat.js | Низкий | PARTIAL — ADMIN вынесен (`7c74476`), chat.js: 2112→1344 строк |
-| Friendships flow частичный | Router.php, chat.js | Низкий | HTTP-refresh acceptable |
+| Монолитный chat.js (~2000 строк) | chat.js | Низкий | PARTIAL — ADMIN + FRIENDS вынесены, chat.js: 2112→1325 строк |
+| Friendships flow частичный | Router.php, chat.js | Низкий | PARTIAL — есть отображение/поиск (`#friends-list`, `#friend-search`, `/api/friends`); полноценный add/remove/accept flow требует отдельного аудита; не трогать сейчас |
 | Нет unit-тестов | — | Средний | OPEN |
 | composer.json PHP ^8.4 vs prod 8.2? | composer.json | Средний | Верифицировать на production |
 | WS supervisord вместо systemd | supervisord.docker.conf | Низкий | Production: добавить systemd unit |
