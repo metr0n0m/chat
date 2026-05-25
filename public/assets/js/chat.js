@@ -176,7 +176,11 @@ function handleWS(data) {
       }
       break;
     case 'friend_online':
-    case 'friend_offline':  loadFriends(); break;
+    case 'friend_offline':
+      if (typeof loadFriends === 'function') {
+        loadFriends();
+      }
+      break;
     case 'force_logout': {
       forcedLogout = true;
       localStorage.removeItem('lastRoomId');
