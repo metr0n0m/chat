@@ -185,10 +185,6 @@ class MessageController
             return false;
         }
 
-        if ($room['type'] === 'numer' && $globalRole === 'moderator') {
-            return false;
-        }
-
         return true;
     }
 
