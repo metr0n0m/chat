@@ -137,12 +137,24 @@ function handleWS(data) {
     case 'system_message':  onSystemMessage(data.message); break;
     case 'whisper_sent':    onWhisperMessage(data.message, true); break;
     case 'whisper_received':onWhisperMessage(data.message, false); break;
-    case 'invite_received': onInviteReceived(data.invitation); break;
-    case 'invite_sent':     onInviteSent(data.invitation); break;
-    case 'invite_accepted': onInviteAccepted(data); break;
-    case 'invite_declined': onInviteDeclined(data); break;
-    case 'invite_expired':  onInviteExpired(data); break;
-    case 'numer_joined':    onNumerJoined(data); break;
+    case 'invite_received':
+      if (typeof onInviteReceived === 'function') onInviteReceived(data.invitation);
+      break;
+    case 'invite_sent':
+      if (typeof onInviteSent === 'function') onInviteSent(data.invitation);
+      break;
+    case 'invite_accepted':
+      if (typeof onInviteAccepted === 'function') onInviteAccepted(data);
+      break;
+    case 'invite_declined':
+      if (typeof onInviteDeclined === 'function') onInviteDeclined(data);
+      break;
+    case 'invite_expired':
+      if (typeof onInviteExpired === 'function') onInviteExpired(data);
+      break;
+    case 'numer_joined':
+      if (typeof onNumerJoined === 'function') onNumerJoined(data);
+      break;
     case 'room_counts':
       Object.entries(data.counts || {}).forEach(([id, count]) => {
         onlineCountsByRoom.set(Number(id), Number(count));
