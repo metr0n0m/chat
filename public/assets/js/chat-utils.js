@@ -47,6 +47,14 @@ function roomRoleLabel(role) {
   return {owner:'Владелец комнаты', local_admin:'Локальный администратор', local_moderator:'Локальный модератор', member:'', banned:'Забанен'}[role] || role;
 }
 
+function showToast(msg, type) {
+  type = type || 'info';
+  const colors = {success:'#198754',danger:'#dc3545',warning:'#ffc107',info:'#0dcaf0'};
+  const $t = $(`<div style="position:fixed;top:16px;right:16px;z-index:9999;padding:10px 18px;border-radius:8px;background:${colors[type]||colors.info};color:${type==='warning'?'#000':'#fff'};box-shadow:0 4px 12px rgba(0,0,0,.2);max-width:300px">${esc(msg)}</div>`);
+  $('body').append($t);
+  setTimeout(() => $t.fadeOut(400, function(){ $(this).remove(); }), 3500);
+}
+
 function systemAlert(msg, type, duration) {
   type = type || 'success';
   duration = (duration === undefined) ? 4000 : duration;
