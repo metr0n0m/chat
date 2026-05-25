@@ -531,6 +531,34 @@ git push origin main
 
 ---
 
+## ФАЗА JS: Разбиение монолитного chat.js
+
+### JS-1: ADMIN extraction [x] CLOSED
+
+**Коммиты:** `943f49f`, `2c6b978`, `7c74476`
+
+**Результат:**
+- `943f49f` — подготовка: typeof guard для `loadAdminNumera`, fix `csrfToken` → `CSRF_TOKEN`
+- `2c6b978` — extraction: ADMIN секция (~770 строк) → `public/assets/js/chat-admin.js`, `showToast()` → `chat-utils.js`, +1 строка `<script>` в `index.php`
+- `7c74476` — fix: удалена лишняя `}` в конце `chat.js` (SyntaxError после extraction)
+- `chat.js`: 2112 → 1344 строк (−768)
+- Production deploy на `7c74476`, chat-ws restart не требовался (JS-only)
+
+### JS-2: Дальнейшее разбиение chat.js [ ] OPEN
+
+Следующие кандидаты на вынос (в порядке приоритета):
+
+| Секция | Строки | Зависимости | Риск |
+|---|---|---|---|
+| NUMER FLOW | ~81 | wsSend, rooms, numera, openNumerWindow | Низкий |
+| FRIENDS | ~25 | loadFriends, renderFriends | Низкий |
+| SETTINGS | ~98 | CSRF_TOKEN, showToast, effectiveColor | Низкий |
+| ONLINE USER ACTIONS | ~389 | openUserInfo, wsSend, currentRoomId | Средний |
+
+Каждый вынос — отдельный plan → approve → implement → smoke → commit → deploy.
+
+---
+
 ## ФАЗА M: Завершение системы модерации [⏸] DEFERRED
 
 **Статус:** ⏸ DEFERRED — незавершённая инфраструктура модерации, уже присутствует на production, но не является ближайшей активной задачей.
@@ -788,6 +816,8 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 | 2.x Room role realtime update | 3 файла | — | Низкий | [x] CLOSED `14a993b` — проверено вручную |
 | 3.1-A SQL optimization (GROUP BY) | 1 файл | — | Нет | [x] CLOSED `fba6ac5` |
 | 3.1-B Pagination LIMIT/OFFSET | 2 файла | 1 час | Низкий | [ ] OPEN |
+| **JS-1** ADMIN extraction | 4 файла | — | — | [x] CLOSED `943f49f`, `2c6b978`, `7c74476` |
+| **JS-2** Дальнейшее разбиение chat.js | chat.js | — | Низкий | [ ] OPEN |
 | **M1** AccessContext подключение | RoomController, EventRouter | — | Высокий | ⏸ DEFERRED |
 | **M2** moderation_events write | RoomController, UserManager | — | Высокий | ⏸ DEFERRED — зависит от M1 |
 | **M3** active_restrictions read | EventRouter, MessageController | — | Высокий | ⏸ DEFERRED — зависит от M2 |
@@ -807,6 +837,7 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - ☑ Room role realtime update + system messages
 - ☑ SQL optimization — correlated COUNT → GROUP BY (`fba6ac5`)
 - ☑ updateOnlineUser() helper extracted (`afdab97`)
+- ☑ ADMIN extraction → chat-admin.js (`7c74476`)
 - ☐ Global role realtime update
 - ☐ Pagination LIMIT/OFFSET /api/rooms (Phase 3.1-B)
 - ⏸ Фаза M: завершение системы модерации (M1–M6) — DEFERRED, триггер: рост аудитории / модераторы
@@ -820,8 +851,9 @@ if (Connection::getInstance()->getSchemaVersion() >= 5) {
 - Фаза 2 полностью (сервисы, JsonResponse, schema, WS, room role)
 - Фаза 3: шаг 3.1-A (SQL optimization) закрыт
 - Фаза 5 частично
+- Фаза JS: шаг JS-1 (ADMIN extraction) закрыт
 
-**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза M (moderation), Фаза 4 (global role + permission unification — blocked)
+**Итого открыто:** Шаг 1.3 (SKIPPED), Фаза 3.1-B (LIMIT/OFFSET), Фаза JS-2 (дальнейшее разбиение), Фаза M (moderation), Фаза 4 (global role + permission unification — blocked)
 
 ---
 

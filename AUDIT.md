@@ -110,6 +110,21 @@ Previous audit: 2026-05-14 (audit/RISK_AUDIT.md, audit/PROJECT_MAP.md, audit/MES
 | Нет system message при изменении room_role | ✅ CLOSED | `14a993b` |
 | updateOnlineUser() разрозненный inline-код в chat.js | ✅ CLOSED | `afdab97` |
 | Correlated COUNT(*) в RoomController::list() и numera() | ✅ CLOSED | `fba6ac5` |
+| Монолитный chat.js — ADMIN секция (~770 строк) | ✅ CLOSED | `943f49f`, `2c6b978`, `7c74476` |
+
+### Incidents
+
+#### 2026-05-25 — Unauthorized deploy + SyntaxError after ADMIN extraction
+
+- `2c6b978` был задеплоен без явного разрешения владельца
+- Локально: SyntaxError из лишней `}` в конце `chat.js` — ни кнопки, ни список посетителей справа
+- Причина: при сборке через `head/tail` строка `});` из ADMIN секции попала в HELPERS секцию
+- Исправлено коммитом `7c74476` (удалены 2 строки)
+- Production восстановлен вручную (файлы через `git checkout -f`), затем fast-forward до `7c74476`
+
+**Правило процесса (зафиксировано):** deploy только отдельной явной командой владельца, не как пункт списка задач.
+
+---
 
 ### Что остаётся нерешённым
 
@@ -246,7 +261,7 @@ $db->execute(
 | Нет пагинации /api/rooms | RoomController.php | Средний | OPEN |
 | SHOW COLUMNS runtime — UserManager, MessageController, RoomController mute | — | — | ✅ CLOSED `145edf6`, `4be390b` |
 | SHOW COLUMNS runtime — RoomManager::roomCategoryOptions() | RoomManager.php | Низкий | ⏸ DEFERRED BY DESIGN |
-| Монолитный chat.js (~2000 строк) | chat.js | Низкий | OPEN — продолжать разбивку |
+| Монолитный chat.js (~2000 строк) | chat.js | Низкий | PARTIAL — ADMIN вынесен (`7c74476`), chat.js: 2112→1344 строк |
 | Friendships flow частичный | Router.php, chat.js | Низкий | HTTP-refresh acceptable |
 | Нет unit-тестов | — | Средний | OPEN |
 | composer.json PHP ^8.4 vs prod 8.2? | composer.json | Средний | Верифицировать на production |
