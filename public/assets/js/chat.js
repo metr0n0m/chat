@@ -1342,5 +1342,3 @@ function effectiveColor(hex, fallback = 'inherit') {
 }
 
 }
-
-}
