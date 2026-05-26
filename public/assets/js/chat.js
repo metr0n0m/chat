@@ -132,11 +132,21 @@ function handleWS(data) {
     case 'room_joined':     onRoomJoined(data); break;
     case 'user_joined':     onUserJoined(data); break;
     case 'user_left':       onUserLeft(data); break;
-    case 'new_message':     onNewMessage(data.message); break;
-    case 'message_deleted': onMessageDeleted(data); break;
-    case 'system_message':  onSystemMessage(data.message); break;
-    case 'whisper_sent':    onWhisperMessage(data.message, true); break;
-    case 'whisper_received':onWhisperMessage(data.message, false); break;
+    case 'new_message':
+      if (typeof onNewMessage === 'function') onNewMessage(data.message);
+      break;
+    case 'message_deleted':
+      if (typeof onMessageDeleted === 'function') onMessageDeleted(data);
+      break;
+    case 'system_message':
+      if (typeof onSystemMessage === 'function') onSystemMessage(data.message);
+      break;
+    case 'whisper_sent':
+      if (typeof onWhisperMessage === 'function') onWhisperMessage(data.message, true);
+      break;
+    case 'whisper_received':
+      if (typeof onWhisperMessage === 'function') onWhisperMessage(data.message, false);
+      break;
     case 'invite_received':
       if (typeof onInviteReceived === 'function') onInviteReceived(data.invitation);
       break;
