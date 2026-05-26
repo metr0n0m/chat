@@ -613,6 +613,7 @@ $_jsV = static function(string $f) use ($_jsDir): string {
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-numer.js<?= $_jsV('chat-numer.js') ?>"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-roomevents.js<?= $_jsV('chat-roomevents.js') ?>"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-friends.js<?= $_jsV('chat-friends.js') ?>"></script>
+<script nonce="<?= $nonce ?>" src="/assets/js/chat-settings.js<?= $_jsV('chat-settings.js') ?>"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-admin.js<?= $_jsV('chat-admin.js') ?>"></script>
 <script nonce="<?= $nonce ?>" src="/assets/js/chat-auth.js<?= $_jsV('chat-auth.js') ?>"></script>
 </body>
