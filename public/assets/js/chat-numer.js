@@ -3,14 +3,17 @@
 // ════════════════════════════════════════════════
 
 // SECTION: NUMER FLOW
+function upsertNumerInSidebar(roomId, roomName) {
+  if (numera.some(r => Number(r.id) === Number(roomId))) return;
+  numera.push({id: roomId, name: roomName});
+  const $item = $(`<div class="room-item" data-id="${roomId}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(roomName)}</span></div>`);
+  $item.on('click', () => openNumerWindow(roomId));
+  $('#numera-list').append($item);
+}
+
 function onNumerJoined(data) {
   if (data.room_id) openNumerWindow(data.room_id);
-  if (data.room_id && !numera.some(r => Number(r.id) === Number(data.room_id))) {
-    numera.push({id: data.room_id, name: data.room_name});
-    const $item = $(`<div class="room-item" data-id="${data.room_id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(data.room_name)}</span></div>`);
-    $item.on('click', () => openNumerWindow(data.room_id));
-    $('#numera-list').append($item);
-  }
+  if (data.room_id) upsertNumerInSidebar(data.room_id, data.room_name);
 }
 
 function onInviteSent(invitation) {
@@ -19,12 +22,7 @@ function onInviteSent(invitation) {
 
 function onInviteAccepted(data) {
   showToast('Приглашение принято: ' + displayName(data.user));
-  if (data.room_id && !numera.some(r => Number(r.id) === Number(data.room_id))) {
-    numera.push({id: data.room_id, name: data.room_name});
-    const $item = $(`<div class="room-item" data-id="${data.room_id}"><span class="room-name"><i class="fa fa-lock me-1"></i>${esc(data.room_name)}</span></div>`);
-    $item.on('click', () => openNumerWindow(data.room_id));
-    $('#numera-list').append($item);
-  }
+  if (data.room_id) upsertNumerInSidebar(data.room_id, data.room_name);
   if (data.room_id) openNumerWindow(data.room_id);
 }
 

@@ -163,8 +163,7 @@ function handleWS(data) {
       break;
     case 'room_count_changed':       onRoomCountChanged(data); break;
     case 'numer_destroyed':
-      numera = numera.filter(r => Number(r.id) !== Number(data.room_id));
-      $(`#numera-list .room-item[data-id="${data.room_id}"]`).remove();
+      removeNumerFromSidebar(data.room_id);
       if (
         $('#ownerModal').hasClass('show')
         && $('#ownerNumera').hasClass('active')
@@ -173,10 +172,18 @@ function handleWS(data) {
         loadAdminNumera();
       }
       break;
-    case 'kicked_from_room': onKickedFromRoom(data); break;
-    case 'banned_from_room': onBannedFromRoom(data); break;
-    case 'muted_in_room':    onMutedInRoom(data); break;
-    case 'room_deleted':     onRoomDeleted(data); break;
+    case 'kicked_from_room':
+      if (typeof onKickedFromRoom === 'function') onKickedFromRoom(data);
+      break;
+    case 'banned_from_room':
+      if (typeof onBannedFromRoom === 'function') onBannedFromRoom(data);
+      break;
+    case 'muted_in_room':
+      if (typeof onMutedInRoom === 'function') onMutedInRoom(data);
+      break;
+    case 'room_deleted':
+      if (typeof onRoomDeleted === 'function') onRoomDeleted(data);
+      break;
     case 'room_updated':
       if (data.data && data.data.name !== undefined) {
         $(`.room-item[data-id="${data.room_id}"] .room-name`).text(esc(data.data.name));
@@ -343,6 +350,16 @@ function onUserLeft(data) {
   const cur = onlineCountsByRoom.get(Number(data.room_id)) || 0;
   onlineCountsByRoom.set(Number(data.room_id), Math.max(0, cur - 1));
   updateRoomBadge(data.room_id);
+}
+
+function removeNumerFromSidebar(roomId) {
+  numera = numera.filter(r => Number(r.id) !== Number(roomId));
+  $(`#numera-list .room-item[data-id="${roomId}"]`).remove();
+}
+
+function removePublicRoomFromSidebar(roomId) {
+  rooms = rooms.filter(r => Number(r.id) !== Number(roomId));
+  $(`#rooms-list .room-item[data-id="${roomId}"]`).remove();
 }
 
 // ════════════════════════════════════════════════
@@ -979,61 +996,7 @@ function onRoomCountChanged(data) {
   updateRoomBadge(data.room_id);
 }
 
-// ════════════════════════════════════════════════
-//  KICK / BAN / DELETE
-// ════════════════════════════════════════════════
-// SECTION: ROOM EXIT AND MODERATION EVENTS
-function onKickedFromRoom(data) {
-  if (Number(data.room_id) === Number(currentPublicRoomId)) {
-    showToast('Вы были удалены из комнаты.', 'warning');
-    currentPublicRoomId = null;
-    if (Number(currentRoomId) === Number(data.room_id)) {
-      currentRoomId = null;
-      $('#room-title').text('Выберите комнату');
-      $('#messages-list').empty();
-      $('#load-more-btn-wrap').addClass('d-none');
-      $('#online-users-list').empty();
-    }
-    loadRooms(true);
-  }
-}
-
-function onBannedFromRoom(data) {
-  if (Number(data.room_id) === Number(currentPublicRoomId)) {
-    showToast('Вы забанены в комнате.', 'danger');
-    currentPublicRoomId = null;
-    localStorage.removeItem('lastRoomId');
-    if (Number(currentRoomId) === Number(data.room_id)) {
-      currentRoomId = null;
-      $('#room-title').text('Выберите комнату');
-      $('#messages-list').empty();
-      $('#load-more-btn-wrap').addClass('d-none');
-      $('#online-users-list').empty();
-    }
-    loadRooms(true);
-  }
-}
-
-function onMutedInRoom(data) {
-  if (data.room_id !== currentRoomId) return;
-  const until = data.muted_until ? dayjs(data.muted_until).format('HH:mm:ss') : '';
-  const reason = data.reason ? ` Причина: ${data.reason}` : '';
-  showToast(`Вам выдан кляп${until ? ` до ${until}` : ''}.${reason}`, 'warning');
-}
-
-function onRoomDeleted(data) {
-  if (Number(data.room_id) === Number(currentPublicRoomId)) {
-    currentPublicRoomId = null;
-    if (Number(currentRoomId) === Number(data.room_id)) {
-      showToast('Комната была удалена.', 'warning');
-      currentRoomId = null;
-      $('#room-title').text('Выберите комнату');
-      $('#messages-list').empty();
-    }
-  }
-  rooms = rooms.filter(r => Number(r.id) !== Number(data.room_id));
-  $(`#rooms-list .room-item[data-id="${data.room_id}"]`).remove();
-}
+// SECTION: ROOM EXIT AND MODERATION EVENTS — moved to chat-roomevents.js
 
 // SECTION: FRIENDS — moved to chat-friends.js
 
