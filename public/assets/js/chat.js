@@ -476,19 +476,6 @@ function canDeleteMessage(m) {
   return ['owner', 'local_admin', 'local_moderator'].includes(currentRoomRole);
 }
 
-function shouldShowSystemMessages() {
-  if (CURRENT_USER && typeof CURRENT_USER.show_system_messages !== 'undefined') {
-    return Number(CURRENT_USER.show_system_messages) !== 0;
-  }
-  return localStorage.getItem('show_system_messages') !== '0';
-}
-
-function shouldShowSystemMessage(m) {
-  const importance = (m && m.system_importance) ? m.system_importance : 'optional';
-  if (importance === 'important') return true;
-  return shouldShowSystemMessages();
-}
-
 function appendInputToken(token) {
   const $input = $('#msg-input');
   const base = $input.val();

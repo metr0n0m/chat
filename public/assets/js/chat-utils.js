@@ -73,3 +73,16 @@ function systemAlert(msg, type, duration) {
     }, duration);
   }
 }
+
+function shouldShowSystemMessages() {
+  if (CURRENT_USER && typeof CURRENT_USER.show_system_messages !== 'undefined') {
+    return Number(CURRENT_USER.show_system_messages) !== 0;
+  }
+  return localStorage.getItem('show_system_messages') !== '0';
+}
+
+function shouldShowSystemMessage(m) {
+  const importance = (m && m.system_importance) ? m.system_importance : 'optional';
+  if (importance === 'important') return true;
+  return shouldShowSystemMessages();
+}
