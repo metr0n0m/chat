@@ -306,8 +306,7 @@ function loadHistory(roomId, before) {
     if (!resp.success) return;
     const msgs = resp.messages;
     if (msgs.length === 0) { $('#load-more-btn-wrap').addClass('d-none'); return; }
-    if (msgs.length === 50) $('#load-more-btn-wrap').removeClass('d-none');
-    if (msgs.length > 0) oldestMessageId = msgs[0].id;
+    oldestMessageId = msgs[0].id;
 
     if (before) {
       const $list = $('#messages-list');
@@ -322,6 +321,12 @@ function loadHistory(roomId, before) {
     } else {
       msgs.forEach(m => appendMessage(m));
       scrollToBottom();
+    }
+
+    if (msgs.length >= 50) {
+      $('#load-more-btn-wrap').removeClass('d-none');
+    } else {
+      $('#load-more-btn-wrap').addClass('d-none');
     }
   });
 }
