@@ -8,25 +8,6 @@ const CURRENT_USER = ChatConfig.currentUser;
 const CHAT_TIME_FORMAT     = ChatConfig.timeFormat;
 const CHAT_DATETIME_FORMAT = ChatConfig.datetimeFormat;
 
-if (CURRENT_USER) {
-// SECTION: THEME
-// ════════════════════════════════════════════════
-//  THEME
-// ════════════════════════════════════════════════
-(function() {
-  const saved = localStorage.getItem('theme');
-  const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-bs-theme', saved || preferred);
-})();
-
-$('#themeToggle').on('click', function() {
-  const curr = document.documentElement.getAttribute('data-bs-theme');
-  const next = curr === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-bs-theme', next);
-  localStorage.setItem('theme', next);
-  $(this).find('i').toggleClass('fa-moon fa-sun');
-});
-
 // ════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════
@@ -48,6 +29,25 @@ let numera = [];
 const ignoredUserIds = new Set();
 const onlineCountsByRoom = new Map();
 const DEFAULT_AVATAR_URL = '/assets/avatar-default.svg';
+
+if (CURRENT_USER) {
+// SECTION: THEME
+// ════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════
+(function() {
+  const saved = localStorage.getItem('theme');
+  const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-bs-theme', saved || preferred);
+})();
+
+$('#themeToggle').on('click', function() {
+  const curr = document.documentElement.getAttribute('data-bs-theme');
+  const next = curr === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-bs-theme', next);
+  localStorage.setItem('theme', next);
+  $(this).find('i').toggleClass('fa-moon fa-sun');
+});
 
 // ════════════════════════════════════════════════
 //  INIT
