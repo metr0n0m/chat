@@ -785,6 +785,10 @@ function onRoomCountChanged(data) {
 
 // SECTION: SIDEBAR — moved to chat-sidebar.js
 // SECTION: ADMIN — moved to chat-admin.js
+// SECTION: HELPERS — moved to script level below
+
+}
+
 // ════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════
@@ -819,6 +823,4 @@ function effectiveColor(hex, fallback = 'inherit') {
   }
   _effectiveColorCache.set(key, result);
   return result;
-}
-
 }
