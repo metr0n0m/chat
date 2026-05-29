@@ -201,7 +201,7 @@ function handleWS(data) {
         if (r) r.name = data.data.name;
       }
       if (data.data && data.data.role !== undefined && data.data.target_user_id !== undefined) {
-        updateOnlineUser(data.data.target_user_id, {room_role: data.data.role});
+        if (typeof updateOnlineUser === 'function') updateOnlineUser(data.data.target_user_id, {room_role: data.data.role});
       }
       break;
     case 'friend_online':
@@ -343,7 +343,7 @@ function onRoomJoined(data) {
   $('#room-title').text(room.name || 'Комната');
   const desc = (room.description != null && room.description !== '') ? String(room.description) : '';
   desc ? $('#room-description').text(desc).removeClass('d-none') : $('#room-description').addClass('d-none');
-  renderOnlineList(data.online || []);
+  if (typeof renderOnlineList === 'function') renderOnlineList(data.online || []);
   onlineCountsByRoom.set(Number(data.room_id), (data.online || []).length);
   updateRoomBadge(data.room_id);
 
@@ -354,14 +354,14 @@ function onRoomJoined(data) {
 
 function onUserJoined(data) {
   if (data.room_id !== currentRoomId) return;
-  addToOnlineList(data.user);
+  if (typeof addToOnlineList === 'function') addToOnlineList(data.user);
   onlineCountsByRoom.set(Number(data.room_id), (onlineCountsByRoom.get(Number(data.room_id)) || 0) + 1);
   updateRoomBadge(data.room_id);
 }
 
 function onUserLeft(data) {
   if (data.room_id !== currentRoomId) return;
-  removeFromOnlineList(data.user_id);
+  if (typeof removeFromOnlineList === 'function') removeFromOnlineList(data.user_id);
   const cur = onlineCountsByRoom.get(Number(data.room_id)) || 0;
   onlineCountsByRoom.set(Number(data.room_id), Math.max(0, cur - 1));
   updateRoomBadge(data.room_id);
