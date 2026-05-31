@@ -361,8 +361,8 @@ class EventRouter
         $userId = (int) $session['id'];
 
         $participantsBeforeLeave = Connection::getInstance()->fetchAll(
-            "SELECT user_id FROM room_members WHERE room_id = ? AND room_role != 'banned'",
-            [$roomId]
+            "SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ? AND room_role != 'banned'",
+            [$roomId, $userId]
         );
 
         $result = NumerController::leave($roomId, $userId);
@@ -382,6 +382,9 @@ class EventRouter
 
         $this->cm->leaveRoom($userId, $roomId);
         $this->broadcastRoomCount($roomId);
+
+        // Always notify the leaver's main page to remove numer from sidebar
+        $this->cm->sendToUser($userId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
 
         if ($destroyed) {
             $this->cancelNumerCountdown($roomId);
@@ -468,8 +471,8 @@ class EventRouter
 
         if ($room['type'] === 'numer') {
             $participantsBeforeLeave = $db->fetchAll(
-                "SELECT user_id FROM room_members WHERE room_id = ? AND room_role != 'banned'",
-                [$roomId]
+                "SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ? AND room_role != 'banned'",
+                [$roomId, $userId]
             );
 
             $result = NumerController::leave($roomId, $userId);
@@ -480,6 +483,9 @@ class EventRouter
             $destroyed = (bool) ($result['destroyed'] ?? false);
             $this->cm->leaveRoom($userId, $roomId);
             $this->broadcastRoomCount($roomId);
+
+            // Always notify the leaver's main page to remove numer from sidebar
+            $this->cm->sendToUser($userId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
 
             if ($destroyed) {
                 $this->cancelNumerCountdown($roomId);
