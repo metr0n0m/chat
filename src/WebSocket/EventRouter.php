@@ -360,6 +360,11 @@ class EventRouter
         $roomId = (int) ($data['room_id'] ?? 0);
         $userId = (int) $session['id'];
 
+        $participantsBeforeLeave = Connection::getInstance()->fetchAll(
+            "SELECT user_id FROM room_members WHERE room_id = ? AND room_role != 'banned'",
+            [$roomId]
+        );
+
         $result = NumerController::leave($roomId, $userId);
         if (isset($result['error'])) {
             $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => $result['error']]);
@@ -381,6 +386,9 @@ class EventRouter
         if ($destroyed) {
             $this->cancelNumerCountdown($roomId);
             $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+            foreach ($participantsBeforeLeave as $p) {
+                $this->cm->sendToUser((int) $p['user_id'], ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+            }
         } else {
             $this->cm->sendToRoom($roomId, [
                 'event'   => 'numer_participant_left',
@@ -459,6 +467,11 @@ class EventRouter
         }
 
         if ($room['type'] === 'numer') {
+            $participantsBeforeLeave = $db->fetchAll(
+                "SELECT user_id FROM room_members WHERE room_id = ? AND room_role != 'banned'",
+                [$roomId]
+            );
+
             $result = NumerController::leave($roomId, $userId);
             if (isset($result['error'])) {
                 return;
@@ -471,6 +484,9 @@ class EventRouter
             if ($destroyed) {
                 $this->cancelNumerCountdown($roomId);
                 $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                foreach ($participantsBeforeLeave as $p) {
+                    $this->cm->sendToUser((int) $p['user_id'], ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                }
             } else {
                 $this->cm->sendToRoom($roomId, ['event' => 'numer_participant_left', 'room_id' => $roomId, 'user_id' => $userId]);
 
@@ -618,7 +634,11 @@ class EventRouter
                         return;
                     }
                     $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'idle' WHERE id = ?", [$roomId]);
+                    $participants = $db->fetchAll('SELECT user_id FROM room_members WHERE room_id = ?', [$roomId]);
                     $cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                    foreach ($participants as $p) {
+                        $cm->sendToUser((int) $p['user_id'], ['event' => 'numer_destroyed', 'room_id' => $roomId]);
+                    }
                     $cm->clearRoom($roomId);
                     $self->broadcastRoomCount($roomId);
                 } catch (\Throwable $e) {
