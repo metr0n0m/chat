@@ -470,46 +470,18 @@ class EventRouter
         }
 
         if ($room['type'] === 'numer') {
-            $participantsBeforeLeave = $db->fetchAll(
-                "SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ? AND room_role != 'banned'",
-                [$roomId, $userId]
-            );
-
-            $result = NumerController::leave($roomId, $userId);
-            if (isset($result['error'])) {
-                return;
-            }
-
-            $destroyed = (bool) ($result['destroyed'] ?? false);
+            // Popup disconnect = active presence leave only, NOT membership/access leave.
+            // Do NOT call NumerController::leave() here — that would DELETE room_members,
+            // which would remove the user's access and cause their sidebar to lose the numer
+            // after a refresh, even though they are still a valid participant.
+            // Explicit membership leave happens only in onLeaveNumer (leave_numer WS event).
             $this->cm->leaveRoom($userId, $roomId);
+            $this->cm->sendToRoom($roomId, [
+                'event'   => 'numer_participant_left',
+                'room_id' => $roomId,
+                'user_id' => $userId,
+            ]);
             $this->broadcastRoomCount($roomId);
-
-            // Always notify the leaver's main page to remove numer from sidebar
-            $this->cm->sendToUser($userId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
-
-            if ($destroyed) {
-                $this->cancelNumerCountdown($roomId);
-                $this->cm->sendToRoom($roomId, ['event' => 'numer_destroyed', 'room_id' => $roomId]);
-                foreach ($participantsBeforeLeave as $p) {
-                    $this->cm->sendToUser((int) $p['user_id'], ['event' => 'numer_destroyed', 'room_id' => $roomId]);
-                }
-            } else {
-                $this->cm->sendToRoom($roomId, ['event' => 'numer_participant_left', 'room_id' => $roomId, 'user_id' => $userId]);
-
-                if (!empty($result['owner_transferred']) && !empty($result['new_owner_id'])) {
-                    $newOwner = $db->fetchOne(
-                        'SELECT id, username, nick_color, avatar_url, global_role FROM users WHERE id = ?',
-                        [(int) $result['new_owner_id']]
-                    );
-                    if ($newOwner) {
-                        $this->cm->sendToRoom($roomId, ['event' => 'numer_owner_changed', 'room_id' => $roomId, 'owner' => $newOwner]);
-                    }
-                }
-
-                if ((int) ($result['remaining'] ?? 0) === 1) {
-                    $this->startNumerCountdown($roomId);
-                }
-            }
         }
     }
 
