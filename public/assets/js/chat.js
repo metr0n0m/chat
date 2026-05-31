@@ -477,41 +477,6 @@ $('#online-users-list').on('click', '.user-action-btn', function(e) {
   }
 });
 
-function showUserCtxMenu(e, uid, uname) {
-  e.preventDefault();
-  const $menu = $('#ctx-menu').empty();
-  if (uid === Number(CURRENT_USER.id)) {
-    $menu.append('<a class="dropdown-item" href="#" data-action="open-settings"><i class="fa fa-user-gear me-2"></i>Профиль и настройки</a>');
-    $menu.css({top: e.clientY, left: e.clientX}).show();
-    return;
-  }
-
-  $menu.append(`<a class="dropdown-item" href="#" data-action="mention" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-at me-2"></i>Личное обращение</a>`);
-  $menu.append(`<a class="dropdown-item" href="#" data-action="whisper" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-secret me-2"></i>Шёпот</a>`);
-  $menu.append(`<a class="dropdown-item" href="#" data-action="invite" data-id="${uid}"><i class="fa fa-door-open me-2"></i>Пригласить в нумер</a>`);
-  $menu.append(`<a class="dropdown-item" href="#" data-action="friend" data-id="${uid}"><i class="fa fa-user-plus me-2"></i>Добавить в друзья</a>`);
-  $menu.append(`<a class="dropdown-item" href="#" data-action="ignore" data-id="${uid}" data-name="${esc(uname)}"><i class="fa fa-user-slash me-2"></i>${ignoredUserIds.has(uid) ? 'Убрать игнор' : 'Игнор'}</a>`);
-
-  if (canModerateCurrentRoom()) {
-    $menu.append('<div class="dropdown-divider"></div>');
-    $menu.append(`<a class="dropdown-item text-warning" href="#" data-action="room-kick" data-id="${uid}"><i class="fa fa-user-minus me-2"></i>Удалить из комнаты</a>`);
-    $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="room-ban" data-id="${uid}"><i class="fa fa-ban me-2"></i>Забанить в комнате</a>`);
-    if (canAssignLocalModerator()) {
-      $menu.append(`<a class="dropdown-item" href="#" data-action="set-local-moderator" data-id="${uid}"><i class="fa fa-gavel me-2"></i>Назначить модератором</a>`);
-      $menu.append(`<a class="dropdown-item" href="#" data-action="set-member" data-id="${uid}"><i class="fa fa-user me-2"></i>Снять локальную роль</a>`);
-    }
-    if (canAssignLocalAdmin()) {
-      $menu.append(`<a class="dropdown-item" href="#" data-action="set-local-admin" data-id="${uid}"><i class="fa fa-user-shield me-2"></i>Назначить локальным админом</a>`);
-    }
-  }
-
-  if (['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role)) {
-    $menu.append('<div class="dropdown-divider"></div>');
-    $menu.append(`<a class="dropdown-item text-danger" href="#" data-action="ban-global" data-id="${uid}"><i class="fa fa-skull-crossbones me-2"></i>Глобальный бан</a>`);
-  }
-
-  $menu.css({top: e.clientY, left: e.clientX}).show();
-}
 
 function showModalAbove(el) {
   const parentEl = document.querySelector('.modal.show');
@@ -656,56 +621,6 @@ $('#user-info-actions').on('click', '.user-info-action-btn', function() {
   }
 });
 
-$(document).on('click', '#ctx-menu a', function(e) {
-  e.preventDefault();
-  const action = $(this).data('action');
-  const uid = Number($(this).data('id'));
-  const uname = $(this).data('name');
-  $('#ctx-menu').hide();
-
-  switch (action) {
-    case 'mention':
-      insertDirectAddress(uname);
-      break;
-    case 'whisper':
-      activateWhisperMode(uid, uname);
-      break;
-    case 'invite':
-      wsSend('invite_user', {to_user_id: uid});
-      break;
-    case 'friend':
-      $.post('/api/friends', {csrf_token: CSRF_TOKEN, to_user_id: uid}, () => showToast('Запрос отправлен.'));
-      break;
-    case 'ignore':
-      toggleIgnoreUser(uid, uname);
-      break;
-    case 'room-kick':
-      executeRoomAction('kick', uid, 'Удалить пользователя из комнаты?');
-      break;
-    case 'room-ban':
-      executeRoomAction('ban', uid, 'Забанить пользователя в комнате?');
-      break;
-    case 'set-local-moderator':
-      executeRoomAction('set_role', uid, null, {role: 'local_moderator'});
-      break;
-    case 'set-local-admin':
-      executeRoomAction('set_role', uid, null, {role: 'local_admin'});
-      break;
-    case 'set-member':
-      executeRoomAction('set_role', uid, null, {role: 'member'});
-      break;
-    case 'ban-global':
-      executeGlobalBan(uid);
-      break;
-    case 'open-settings':
-      new bootstrap.Modal(document.getElementById('settingsModal')).show();
-      break;
-  }
-});
-
-$(document).on('click', function(e) {
-  if (!$(e.target).closest('#ctx-menu, .online-user, .user-action-btn').length) $('#ctx-menu').hide();
-});
 
 function toggleIgnoreUser(uid, uname) {
   if (ignoredUserIds.has(uid)) {

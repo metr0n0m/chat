@@ -260,9 +260,6 @@ if (!$isLoggedIn) {
 
 <!-- ─── Modals ─── -->
 
-<!-- Context menu -->
-<div id="ctx-menu" class="dropdown-menu shadow" style="position:fixed;display:none;z-index:2000"></div>
-
 <!-- Room manage modal -->
 <div class="modal fade" id="roomManageModal" tabindex="-1">
   <div class="modal-dialog"><div class="modal-content">
