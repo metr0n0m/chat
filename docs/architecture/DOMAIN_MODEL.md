@@ -170,7 +170,7 @@ Decoupled by design (commit 40035d7).
 
 **Invariants:**
 - I-F1: No UNIQUE constraint on reverse pair — INSERT IGNORE prevents exact duplicate only
-- I-F2: status=blocked ENUM value, no code path found that sets it `[UNVERIFIED]`
+- I-F2: status=blocked ENUM value, no code path found that sets it (confirmed by grep across all PHP files)
 - I-F3: friend_online / friend_offline — case handlers in chat.js but NOT sent by any PHP code (grep confirmed: no match in Server.php or EventRouter.php)
 
 ---

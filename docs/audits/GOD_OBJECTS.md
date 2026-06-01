@@ -259,7 +259,7 @@ numer_owner_changed, numer_countdown, numer_countdown_cancelled, online_users, n
 1. STATE declarations (10+ variables: ws, currentRoomId, rooms, numera, etc.)
 2. Theme initialization
 3. CURRENT_USER injection point and app init
-4. WebSocket connect/reconnect logic (with exponential backoff `[UNVERIFIED — backoff not confirmed]`)
+4. WebSocket connect/reconnect logic (fixed 3-second delay: setTimeout(connectWS, 3000) at chat.js line 114; no exponential backoff)
 5. handleWS — master switch for all inbound WS events
 6. wsSend — outbound WS helper
 7. loadRooms — GET /api/rooms + GET /api/numera

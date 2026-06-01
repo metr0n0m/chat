@@ -22,7 +22,7 @@ sessions table in MariaDB.
 
 ## Services / Classes
 
-SecuritySession -- generate, hash, ipUaHash, create, validate, destroy,
+Security\Session -- generate, hash, ipUaHash, create, validate, destroy,
                     destroyAllForUser, isUserBlocked, current, setCookie, clearCookie
 
 ---

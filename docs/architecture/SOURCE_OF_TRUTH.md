@@ -72,7 +72,7 @@
 |---|---|---|---|---|---|
 | Global ban | users.is_banned, users.banned_until, users.ban_reason | — | Session::isUserBlocked (every WS event + HTTP validate) | UserManager::update (HTTP admin), EventRouter::onRoomAction global_ban (WS) | Two write paths; no immediate WS push |
 | Room ban | room_members.room_role=banned | — | EventRouter::onJoinRoom check, isUserBlocked | RoomController::manage/ban | — |
-| Room mute | room_members.muted_until | — | MessageController::send (isMuted) `[UNVERIFIED path]` | RoomController::manage/mute, UserManager::roomUnmute | — |
+| Room mute | room_members.muted_until | — | MessageController::send (muted_until check, verified: MessageController.php lines 88–92) | RoomController::manage/mute, UserManager::roomUnmute | — |
 | Moderation audit | moderation_events table | — | NOBODY (not connected) | NOBODY (not connected) | Phase M DEFERRED — table exists but is dead |
 | Active restrictions | active_restrictions table | — | NOBODY (not connected) | NOBODY (not connected) | Phase M DEFERRED |
 

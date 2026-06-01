@@ -41,13 +41,13 @@ created_at       DATETIME DEFAULT NOW()
 - friendships (requester_id, addressee_id)
 
 ## Services / Classes
-SecuritySession     -- validate, create, destroy, isUserBlocked, current, setCookie, clearCookie
-AuthLoginHandler    -- reads users by username, writes sessions
-AuthRegisterHandler -- writes users/sessions/email_verifications; calls DefaultRoomMembership, Mailer
-AuthGoogleOAuth     -- reads/writes users, oauth_tokens, sessions
-AuthEmailVerification -- reads/writes email_verifications, users
-AdminUserManager    -- profile, update, delete, updateSettings, listBanned, roomUnban, roomUnmute, uploadAvatar
-AdminAdminPanel     -- createUser, globalModerators, roomCreators
+Security\Session     -- validate, create, destroy, isUserBlocked, current, setCookie, clearCookie
+Auth\LoginHandler    -- reads users by username, writes sessions
+Auth\RegisterHandler -- writes users/sessions/email_verifications; calls DefaultRoomMembership, Mailer
+Auth\GoogleOAuth     -- reads/writes users, oauth_tokens, sessions
+Auth\EmailVerification -- reads/writes email_verifications, users
+Admin\UserManager    -- profile, update, delete, updateSettings, listBanned, roomUnban, roomUnmute, uploadAvatar
+Admin\AdminPanel     -- createUser, globalModerators, roomCreators
 
 ## Consumers (read)
 Session::validate          -- every HTTP request + every WS connect -- sessions JOIN users full snapshot
@@ -98,4 +98,4 @@ platform_owner  = 6
 admin           = 5
 moderator       = 4
 user            = base
-Used in: AdminAccess::resolveLevel, ChatRoomController::resolvePermission, SecurityAccessContext::getModerationContext
+Used in: Admin\Access::resolveLevel, Chat\RoomController::resolvePermission, Security\AccessContext::getModerationContext

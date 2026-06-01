@@ -51,7 +51,7 @@ Used by: WebSocketServer::onOpen
 
 ### SecurityColorContrast
 Uses: (pure math)
-Used by: UserManager::updateSettings [UNVERIFIED -- exact call path in updateSettings]
+Used by: NOBODY -- no call sites found in codebase (grep returned 0 results across all PHP files)
 
 ### SecurityAccessContext  [NOT CONNECTED]
 Uses: Connection
@@ -137,7 +137,7 @@ Used by: RegisterHandler
 ### AdminAccess
 Uses: Connection
 Used by: AdminPanel (requireAdmin, panel gates), RoomManager (requireOwnerPrivateArchive),
-         NumerPage, RoomController (canDeleteMessage [UNVERIFIED])
+         NumerPage, MessageController (canDeleteMessage -- verified: MessageController.php line 160)
 NOT used by: EventRouter (uses RoomController::resolvePermission instead -- RISK)
 
 ### AdminAdminPanel

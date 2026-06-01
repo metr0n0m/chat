@@ -68,10 +68,10 @@ active_restrictions  -- Phase M DEFERRED. Table created in DB, never written by 
 
 ## Services / Classes
 
-ChatRoomController   -- manage(kick/ban/mute/set_role) -- actual DB writes to room_members
-AdminUserManager     -- update (global ban), listBanned (auto-expire), roomUnban, roomUnmute
-SecuritySession      -- isUserBlocked (auto-expire + check on every WS event)
-WebSocketEventRouter -- onRoomAction (calls RoomController::manage), isUserBlocked check per event (line 43)
+Chat\RoomController   -- manage(kick/ban/mute/set_role) -- actual DB writes to room_members
+Admin\UserManager     -- update (global ban), listBanned (auto-expire), roomUnban, roomUnmute
+Security\Session      -- isUserBlocked (auto-expire + check on every WS event)
+WebSocket\EventRouter -- onRoomAction (calls RoomController::manage), isUserBlocked check per event (line 43)
 
 ---
 
@@ -84,11 +84,10 @@ Write path 1 -- HTTP admin:
     -> UserManager::update
     -> UPDATE users SET is_banned=1, banned_at=NOW(), banned_by=?, ban_reason=?, banned_until=?
 
-Write path 2 -- WS room_action:
-    room_action{action:global_ban} WS
-    -> EventRouter::onRoomAction
-    -> RoomController::manage
-    [Verified: manage() handles global_ban action [UNVERIFIED - action name in manage() not traced]]
+Write path 2 (NOT CONFIRMED):
+    RoomController::manage() switch handles only: rename/delete/set_role/kick/ban/mute.
+    No 'global_ban' case found in code (grep returned 0 results in RoomController.php and EventRouter.php).
+    Global ban via WS room_action is unconfirmed. HTTP admin path (path 1) is the only verified path.
 
 Read path -- lazy check on every WS event:
     EventRouter::route (line 43)
@@ -119,7 +118,7 @@ Write:
 
 Read/enforce:
     NumerController::invite -- checks if sender is muted (SELECT room_members WHERE user_id=? AND muted_until > NOW())
-    MessageController::send -- isMuted check [UNVERIFIED -- exact check path not confirmed in send()]
+    MessageController::send -- muted_until check (verified: MessageController.php lines 88–92)
 
 Auto-clear:
     UserManager::listBanned (GET /api/admin/bans):
@@ -144,7 +143,7 @@ NOT in codebase: user_kicked / user_banned / user_muted
 
 ## AccessContext.php (NOT CONNECTED)
 
-SecurityAccessContext (186 lines):
+Security\AccessContext (186 lines):
 - getModerationContext(userId, roomId) -> {level, source, role, room_id}
 - canModerate(actorCtx, targetCtx) -- implements I-1, I-3, scope, level checks
 - canModerateUser(actorId, targetId, roomId) -- with self-action guard

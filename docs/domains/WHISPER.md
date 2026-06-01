@@ -18,14 +18,14 @@ Whispers are stored in the same messages table as regular messages:
 
 No separate whisper table. Whispers are excluded from:
 - clearMessages (WHERE type != 'whisper')
-- public message history (MessageController::history filters by default [UNVERIFIED - filter logic not traced])
+- public message history (MessageController::history, verified: WHERE type != 'whisper' at line 35; own whispers always shown)
 
 ---
 
 ## Services / Classes
 
-ChatWhisperController -- send, ownerSessionList, ownerSessionDetail, archive, deleteWhisper, clearWhispers
-WebSocketEventRouter  -- onSendWhisper (calls WhisperController::send, sends whisper_sent + whisper_received)
+Chat\WhisperController -- send, ownerSessionList, ownerSessionDetail, archive, deleteWhisper, clearWhispers
+WebSocket\EventRouter  -- onSendWhisper (calls WhisperController::send, sends whisper_sent + whisper_received)
 
 ---
 
@@ -70,5 +70,5 @@ cm->checkWhisperLimit(userId):
 I-W1: Both sender and recipient must be in same room at send time (cm->isInRoom check, verified in EventRouter)
 I-W2: Whisper rate limit via cm->checkWhisperLimit (WHISPER_RATE_LIMIT_MIN constant)
 I-W3: Archive accessible only to platform_owner (Access::requireOwnerPrivateArchive, verified)
-I-W4: sender_session_id stored for session-level audit [UNVERIFIED -- not traced through all insert paths]
+I-W4: sender_session_id stored for session-level audit (verified: WhisperController.php lines 54–59 and MessageController.php lines 107–112)
 I-W5: Whispers excluded from bulk clearMessages operations (WHERE type != 'whisper', verified in RoomManager)

@@ -14,7 +14,7 @@ users.global_role + room_members.room_role in MariaDB.
 
 ---
 
-## Implementation 1: AdminAccess.php (162 lines)
+## Implementation 1: Admin\Access.php (162 lines)
 
 Path: src/Admin/Access.php
 
@@ -43,7 +43,7 @@ Used by:
 
 ---
 
-## Implementation 2: ChatRoomController::resolvePermission() (private, ~25 lines)
+## Implementation 2: Chat\RoomController::resolvePermission() (private, ~25 lines)
 
 Path: src/Chat/RoomController.php (private static method)
 
@@ -54,7 +54,7 @@ NOT used by EventRouter directly -- EventRouter calls RoomController::manage() w
 
 ---
 
-## Implementation 3: SecurityAccessContext.php (186 lines) -- NOT CONNECTED
+## Implementation 3: Security\AccessContext.php (186 lines) -- NOT CONNECTED
 
 Path: src/Security/AccessContext.php
 
@@ -116,9 +116,9 @@ STATUS: 0 call sites in entire codebase (verified by grep: no 'AccessContext', '
 
 THREE parallel implementations means a change to the permission model
 requires synchronized updates in 3 places:
-1. AdminAccess.php
-2. ChatRoomController::resolvePermission()
-3. SecurityAccessContext.php (not connected, but exists)
+1. Admin\Access.php
+2. Chat\RoomController::resolvePermission()
+3. Security\AccessContext.php (not connected, but exists)
 
 The correct fix is to wire AccessContext as the single implementation.
 This is blocked pending PREP-C (full caller audit).

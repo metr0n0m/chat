@@ -167,12 +167,14 @@ Fix requires IPC or a WS channel for server-to-client admin actions.
 
 ---
 
-## TD-12: Global ban has two write paths
+## TD-12: Global ban write path — second WS path not confirmed
 
-Priority: MEDIUM
+Priority: LOW (downgraded: second path not found in code)
 
-Path 1: HTTP POST /api/admin/users/{id} -> UserManager::update -> UPDATE users
-Path 2: WS room_action{global_ban} -> RoomController::manage -> UPDATE users [UNVERIFIED exact path]
+Path 1 (CONFIRMED): HTTP POST /api/admin/users/{id} -> UserManager::update -> UPDATE users
 
-Both paths should produce identical results but could diverge.
-Both paths: lazy enforcement (checked on next WS event, not pushed immediately).
+Path 2 (NOT CONFIRMED): No 'global_ban' action found in RoomController::manage() or EventRouter.php.
+    The second WS write path described in earlier analysis does not exist in the current code.
+    Global ban from the chat UI appears to route exclusively through the HTTP admin path.
+
+Lazy enforcement applies to path 1: ban not pushed immediately, detected on next WS event.

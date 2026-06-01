@@ -32,10 +32,10 @@ messages table in MariaDB.
 
 ## Services / Classes
 
-ChatMessageController    -- send (INSERT type=text), delete (UPDATE is_deleted=1), history (SELECT)
-ChatSystemMessageService -- emitRoomLifecycle (INSERT type=system + sendToRoom), emitModerationCall (sendToUser)
-ChatEmbedProcessor       -- URL embed detection, called from MessageController::send, result in embed_data
-ChatWhisperController    -- send (INSERT type=whisper), archive, ownerSessionList, ownerSessionDetail, deleteWhisper, clearWhispers
+Chat\MessageController    -- send (INSERT type=text), delete (UPDATE is_deleted=1), history (SELECT)
+Chat\SystemMessageService -- emitRoomLifecycle (INSERT type=system + sendToRoom), emitModerationCall (sendToUser)
+Chat\EmbedProcessor       -- URL embed detection, called from MessageController::send, result in embed_data
+Chat\WhisperController    -- send (INSERT type=whisper), archive, ownerSessionList, ownerSessionDetail, deleteWhisper, clearWhispers
 
 ---
 

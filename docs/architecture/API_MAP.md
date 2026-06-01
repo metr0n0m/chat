@@ -38,7 +38,7 @@
 | Method | Path | Router method | Controller | Service deps | Frontend function | JS file |
 |---|---|---|---|---|---|---|
 | GET | /api/users/{id} | dispatchApi | UserManager::profile | Timestamp | openUserInfo() | chat.js ONLINE USER ACTIONS |
-| POST | /api/settings | dispatchApi | UserManager::updateSettings | CSRF, UsernameRules, ColorContrast, GD | initSettings submit | chat-settings.js |
+| POST | /api/settings | dispatchApi | UserManager::updateSettings | CSRF, UsernameRules, GD | initSettings submit | chat-settings.js |
 | GET | /api/users/check | dispatchApi | Router::handleUsernameCheck (inline) | — | username availability check | chat-settings.js `[UNVERIFIED]` |
 | GET | /api/users/find | dispatchApi | Router::handleFindUser (inline) | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
 

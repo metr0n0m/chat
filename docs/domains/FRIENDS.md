@@ -23,7 +23,7 @@ friendships table in MariaDB.
 
 ## Services / Classes
 
-HttpRouter -- handleGetFriends, handleAddFriend, handleRespondFriend
+Http\Router -- handleGetFriends, handleAddFriend, handleRespondFriend
              (inline methods in Router, NO separate FriendController class)
 
 ---
@@ -76,6 +76,6 @@ They are DEAD STUB HANDLERS.
 
 I-F1: No UNIQUE constraint on reverse pair (requester_id, addressee_id) + (addressee_id, requester_id)
       INSERT IGNORE prevents exact duplicate only. Reverse pair (B->A after A->B) theoretically possible.
-I-F2: status='blocked' -- ENUM value, no code path found that sets it [UNVERIFIED]
+I-F2: status='blocked' -- ENUM value, no code path found that sets it (confirmed by grep across all PHP files in src/)
 I-F3: friend_online / friend_offline WS events are handled in JS but never sent by PHP
 I-F4: No notification WS event when friend request is sent or accepted

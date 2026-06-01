@@ -9,7 +9,7 @@
 Source of truth: room_members.room_role = 'owner' + rooms.owner_id (must match)
 No DB trigger enforces the sync. Both must be updated together.
 
-ACL numeric levels (AdminAccess::resolveLevel and RoomController::resolvePermission):
+ACL numeric levels (Admin\Access::resolveLevel and RoomController::resolvePermission):
     platform_owner = 6
     admin          = 5
     moderator      = 4

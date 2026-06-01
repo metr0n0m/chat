@@ -41,12 +41,12 @@ rooms table + room_members table in MariaDB.
 
 ## Services / Classes
 
-ChatRoomController    -- list, create, join, manage (rename/delete/kick/ban/mute/set_role), numera, members
-ChatRoomDeletionService -- deleteWithDependencies (used by RoomController + RoomManager)
-AdminRoomManager      -- admin CRUD: list, rename, delete, members, setMemberRole, changeOwner,
+Chat\RoomController    -- list, create, join, manage (rename/delete/kick/ban/mute/set_role), numera, members
+Chat\RoomDeletionService -- deleteWithDependencies (used by RoomController + RoomManager)
+Admin\RoomManager      -- admin CRUD: list, rename, delete, members, setMemberRole, changeOwner,
                            numeraActive, closeNumer, numeraArchive, numeraMessages, roomMessages,
                            clearMessages, clearUserMessages, clearNumerArchive, setCategory
-WebSocketEventRouter  -- onJoinRoom, onLeaveRoom, onRoomAction, handleRoomLeave
+WebSocket\EventRouter  -- onJoinRoom, onLeaveRoom, onRoomAction, handleRoomLeave
 
 ---
 

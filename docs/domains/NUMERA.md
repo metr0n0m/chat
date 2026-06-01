@@ -5,7 +5,7 @@
 
 ---
 
-# NUMER MODEL
+## NUMER MODEL
 > Version: 1.0 | Audit date: 2026-05-25
 > All facts verified against NumerController.php, EventRouter.php, NumerPage.php, ConnectionManager.php.
 > `[UNVERIFIED]` marks any claim not confirmed directly in code.
