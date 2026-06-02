@@ -120,6 +120,12 @@ class RoomController
         $db = Connection::getInstance();
         $action = $data['action'] ?? '';
 
+        // I-1: self-action guard — actor cannot target themselves for moderation actions.
+        $targetId = (int) ($data['target_user_id'] ?? 0);
+        if (in_array($action, ['kick', 'ban', 'mute', 'set_role'], true) && $targetId === $actorId) {
+            return ['error' => 'Нельзя применить это действие к самому себе.'];
+        }
+
         switch ($action) {
             case 'rename':
                 if ($permission['level'] < 3) {
@@ -176,8 +182,30 @@ class RoomController
         if (!in_array($role, $allowed, true)) {
             return ['error' => 'Недопустимая роль.'];
         }
-        if ($role === 'local_admin' && $permission['level'] < 3 && !in_array($actor['global_role'], ['platform_owner', 'admin'], true)) {
-            return ['error' => 'Только владелец комнаты или глобальный администратор может назначить local_admin.'];
+
+        // Derive actor's room role and global role for explicit policy checks.
+        // $permission['role'] is present only for room-local roles (owner/local_admin/local_moderator/member).
+        // For global roles (platform_owner/admin/moderator) it is absent.
+        $actorRoomRole   = $permission['role'] ?? null;
+        $actorGlobalRole = $actor['global_role'] ?? 'user';
+
+        // Policy: local_admin can be assigned only by room owner, global admin, or platform_owner.
+        if ($role === 'local_admin') {
+            $canAssign = in_array($actorGlobalRole, ['platform_owner', 'admin'], true)
+                      || $actorRoomRole === 'owner';
+            if (!$canAssign) {
+                return ['error' => 'Только владелец комнаты или глобальный администратор может назначить local_admin.'];
+            }
+        }
+
+        // Policy: local_moderator can be assigned only by room owner, local_admin, global admin, or platform_owner.
+        // local_moderator itself is NOT in this list.
+        if ($role === 'local_moderator') {
+            $canAssign = in_array($actorGlobalRole, ['platform_owner', 'admin'], true)
+                      || in_array($actorRoomRole, ['owner', 'local_admin'], true);
+            if (!$canAssign) {
+                return ['error' => 'Назначить local_moderator может только владелец комнаты, local_admin или глобальный администратор.'];
+            }
         }
 
         $target = $db->fetchOne(
@@ -192,6 +220,28 @@ class RoomController
         }
         if ($target['room_role'] === 'owner') {
             return ['error' => 'Нельзя изменить роль владельца.'];
+        }
+
+        // Policy: demotion to member requires appropriate rank depending on the current role being removed.
+        if ($role === 'member') {
+            $currentTargetRole = $target['room_role'];
+            if ($currentTargetRole === 'local_admin') {
+                // Removing local_admin requires: room owner, global admin, or platform_owner.
+                $canDemote = in_array($actorGlobalRole, ['platform_owner', 'admin'], true)
+                          || $actorRoomRole === 'owner';
+                if (!$canDemote) {
+                    return ['error' => 'Снять local_admin может только владелец комнаты или глобальный администратор.'];
+                }
+            }
+            if ($currentTargetRole === 'local_moderator') {
+                // Removing local_moderator requires: room owner, local_admin, global admin, or platform_owner.
+                // local_moderator itself is NOT in this list.
+                $canDemote = in_array($actorGlobalRole, ['platform_owner', 'admin'], true)
+                          || in_array($actorRoomRole, ['owner', 'local_admin'], true);
+                if (!$canDemote) {
+                    return ['error' => 'Снять local_moderator может только владелец комнаты, local_admin или глобальный администратор.'];
+                }
+            }
         }
 
         if ($target['room_role'] === $role) {
@@ -216,12 +266,13 @@ class RoomController
         }
 
         $target = $db->fetchOne(
-            'SELECT rm.room_role, u.username
+            'SELECT rm.room_role, u.username, u.global_role
              FROM room_members rm JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id = ? AND rm.user_id = ?',
             [$roomId, $targetId]
         );
-        if (!$target || $target['room_role'] === 'owner') {
+        // I-3: room owner and platform_owner cannot be kicked.
+        if (!$target || $target['room_role'] === 'owner' || $target['global_role'] === 'platform_owner') {
             return ['error' => 'Нельзя выгнать этого пользователя.'];
         }
 
@@ -236,12 +287,13 @@ class RoomController
         }
 
         $target = $db->fetchOne(
-            'SELECT rm.room_role, u.username
+            'SELECT rm.room_role, u.username, u.global_role
              FROM room_members rm JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id = ? AND rm.user_id = ?',
             [$roomId, $targetId]
         );
-        if (!$target || $target['room_role'] === 'owner') {
+        // I-3: room owner and platform_owner cannot be banned.
+        if (!$target || $target['room_role'] === 'owner' || $target['global_role'] === 'platform_owner') {
             return ['error' => 'Нельзя забанить этого пользователя.'];
         }
 
