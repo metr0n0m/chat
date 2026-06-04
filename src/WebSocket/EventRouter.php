@@ -41,11 +41,7 @@ class EventRouter
         // Full immediate moderation cleanup would require explicit IPC
         // between PHP-FPM and WS process.
         if (Session::isUserBlocked((int) $session['id'])) {
-            Session::destroyAllForUser((int) $session['id']);
-            $this->cm->closeUser(
-                (int) $session['id'],
-                ['event' => 'force_logout', 'reason' => 'banned_global']
-            );
+            $this->executeForceLogout((int) $session['id'], 'banned_global');
             return;
         }
 
