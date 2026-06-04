@@ -222,22 +222,22 @@ Does NOT block: TD-2a (executeForceLogout — atomic, manually verifiable),
 ---
 
 ### TD-NEW-2: 9 API routes with no confirmed JS caller
-Priority: LOW (clarification task, docs only)
+Status: CLOSED — all 9 classified 2026-06-04
 
-Routes in Router.php with no $.get/$.post found in public/assets/js/:
-    GET  /api/rooms/{id}/members
-    GET  /api/users/find
-    POST /api/friends/{id}/respond
-    GET  /api/admin/rooms/{id}/members
-    GET  /api/admin/whispers            (full archive, not /sessions)
-    DELETE /api/admin/whispers/{id}
-    POST /api/admin/whispers/clear
-    GET  /api/admin/moderators
-    GET  /api/admin/room-creators
+Results (grep across public/assets/js/, public/index.php, src/Chat/NumerPage.php):
 
-Action: grep across full public/ including inline PHP (NumerPage, index.php).
-Outcome: (a) found caller → update API_MAP.md, (b) dead endpoint → mark deprecated,
-         (c) external client → document. No code changes until status confirmed.
+    GET  /api/rooms/{id}/members    → ACTIVE — called by NumerPage.php refreshNumer()
+    GET  /api/users/find            → DEAD   — no caller found anywhere
+    POST /api/friends/{id}/respond  → DEAD   — friendship accept/decline UI does not exist
+    GET  /api/admin/rooms/{id}/members → DEAD — no caller found
+    GET  /api/admin/whispers        → DEAD   — JS uses /api/admin/whispers/sessions only
+    DELETE /api/admin/whispers/{id} → DEAD   — no caller found
+    POST /api/admin/whispers/clear  → DEAD   — no caller found
+    GET  /api/admin/moderators      → DEAD   — no caller found
+    GET  /api/admin/room-creators   → DEAD   — no caller found
+
+API_MAP.md updated with confirmed statuses.
+Code not changed (endpoints not deleted per constraints).
 
 ---
 

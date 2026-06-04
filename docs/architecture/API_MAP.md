@@ -28,7 +28,7 @@
 | POST | /api/rooms | dispatchApi | RoomController::create | CSRF | initSidebar form submit | chat-sidebar.js |
 | GET | /api/numera | dispatchApi | RoomController::numera | — | loadRooms() | chat.js |
 | GET | /numer/{id} | dispatchApi | NumerPage::render | Access, Session, CSRF | openNumerWindow() | chat.js |
-| GET | /api/rooms/{id}/members | dispatchApi | RoomController::members | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
+| GET | /api/rooms/{id}/members | dispatchApi | RoomController::members | — | refreshNumer() | NumerPage.php (inline JS) |
 | GET | /api/rooms/{id}/messages | dispatchApi | MessageController::history | SystemMessageService | loadHistory() | chat.js |
 
 ---
@@ -40,7 +40,7 @@
 | GET | /api/users/{id} | dispatchApi | UserManager::profile | Timestamp | openUserInfo() | chat.js ONLINE USER ACTIONS |
 | POST | /api/settings | dispatchApi | UserManager::updateSettings | CSRF, UsernameRules, GD | initSettings submit | chat-settings.js |
 | GET | /api/users/check | dispatchApi | Router::handleUsernameCheck (inline) | — | username availability check | chat-settings.js `[UNVERIFIED]` |
-| GET | /api/users/find | dispatchApi | Router::handleFindUser (inline) | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
+| GET | /api/users/find | dispatchApi | Router::handleFindUser (inline) | — | [DEAD — no caller found] | — |
 
 ---
 
@@ -50,7 +50,7 @@
 |---|---|---|---|---|---|---|
 | GET | /api/friends | dispatchApi | Router::handleGetFriends (inline) | Timestamp | loadFriends() | chat-friends.js |
 | POST | /api/friends | dispatchApi | Router::handleAddFriend (inline) | CSRF | ctx-menu action | chat.js ONLINE USER ACTIONS |
-| POST | /api/friends/{id}/respond | dispatchApi | Router::handleRespondFriend (inline) | CSRF | `[UNVERIFIED]` | `[UNVERIFIED]` |
+| POST | /api/friends/{id}/respond | dispatchApi | Router::handleRespondFriend (inline) | CSRF | [DEAD — no caller found; friendship accept/decline UI absent] | — |
 
 ---
 
@@ -72,7 +72,7 @@ All admin routes require `AdminPanel::requireAdmin()` (verified: dispatchAdmin l
 | POST | /api/admin/rooms/{id}/rename | dispatchAdmin | RoomManager::rename | CSRF | rename btn | chat-admin.js |
 | POST | /api/admin/rooms/{id}/category | dispatchAdmin | RoomManager::setCategory | CSRF | category select | chat-admin.js |
 | DELETE | /api/admin/rooms/{id} | dispatchAdmin | RoomManager::delete | CSRF, RoomDeletionService | delete btn | chat-admin.js |
-| GET | /api/admin/rooms/{id}/members | dispatchAdmin | RoomManager::members | Timestamp | `[UNVERIFIED]` | `[UNVERIFIED]` |
+| GET | /api/admin/rooms/{id}/members | dispatchAdmin | RoomManager::members | Timestamp | [DEAD — no caller found] | — |
 | GET | /api/admin/rooms/{id}/messages | dispatchAdmin | RoomManager::roomMessages | Timestamp | loadRoomMessages() | chat-admin.js |
 | POST | /api/admin/rooms/{id}/clear | dispatchAdmin | RoomManager::clearMessages | CSRF | clear btn | chat-admin.js |
 | POST | /api/admin/rooms/{id}/clear-user/{uid} | dispatchAdmin | RoomManager::clearUserMessages | CSRF | clear user btn | chat-admin.js |
@@ -84,11 +84,11 @@ All admin routes require `AdminPanel::requireAdmin()` (verified: dispatchAdmin l
 | GET | /api/admin/owner-overview | dispatchAdmin | AdminPanel::ownerOverview | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
 | GET | /api/admin/whispers/sessions | dispatchAdmin | WhisperController::ownerSessionList | Access | loadOwnerWhisperSessions() | chat-admin.js |
 | GET | /api/admin/whispers/sessions/{id} | dispatchAdmin | WhisperController::ownerSessionDetail | Access | `[UNVERIFIED]` | `[UNVERIFIED]` |
-| GET | /api/admin/whispers | dispatchAdmin | WhisperController::archive | Access | `[UNVERIFIED]` | `[UNVERIFIED]` |
-| DELETE | /api/admin/whispers/{id} | dispatchAdmin | WhisperController::deleteWhisper | Access | `[UNVERIFIED]` | `[UNVERIFIED]` |
-| POST | /api/admin/whispers/clear | dispatchAdmin | WhisperController::clearWhispers | Access, CSRF | `[UNVERIFIED]` | `[UNVERIFIED]` |
-| GET | /api/admin/moderators | dispatchAdmin | AdminPanel::globalModerators | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
-| GET | /api/admin/room-creators | dispatchAdmin | AdminPanel::roomCreators | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
+| GET | /api/admin/whispers | dispatchAdmin | WhisperController::archive | Access | [DEAD — JS uses /sessions only] | — |
+| DELETE | /api/admin/whispers/{id} | dispatchAdmin | WhisperController::deleteWhisper | Access | [DEAD — no caller found] | — |
+| POST | /api/admin/whispers/clear | dispatchAdmin | WhisperController::clearWhispers | Access, CSRF | [DEAD — no caller found] | — |
+| GET | /api/admin/moderators | dispatchAdmin | AdminPanel::globalModerators | — | [DEAD — no caller found] | — |
+| GET | /api/admin/room-creators | dispatchAdmin | AdminPanel::roomCreators | — | [DEAD — no caller found] | — |
 | GET | /api/admin/status-override-settings | dispatchAdmin | AdminPanel::statusOverrideSettings | — | `[UNVERIFIED]` | `[UNVERIFIED]` |
 | POST | /api/admin/status-override-settings | dispatchAdmin | AdminPanel::updateStatusOverrideSettings | CSRF | `[UNVERIFIED]` | `[UNVERIFIED]` |
 | GET | /api/admin/system-settings | dispatchAdmin | AdminPanel::getSystemSettings | — | loadAdminSettings() | chat-admin.js |
