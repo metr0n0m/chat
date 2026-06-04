@@ -6,6 +6,22 @@
 
 ## FIXED
 
+### TD-1: RBAC — resolvePermission duplication
+Fixed: 6e14243 2026-06-04
+Files:
+    src/Admin/Access.php
+    src/Chat/RoomController.php
+
+    resolvePermission() больше не дублирует level-логику.
+    Access::resolveLevel() стал единственным источником шкалы уровней.
+    RoomController::resolvePermission() остался thin wrapper:
+      вызывает Access::resolveLevel() для числового уровня,
+      отдельно читает room_role только для room-local ролей (level 0–3).
+    Контракт ?array{level:int, role?:string} сохранён.
+    AccessContext не использовался.
+
+---
+
 ### BUG-1..BUG-4 — RBAC security bugs
 Fixed: efe117c 2026-06-02
 Files: src/Chat/RoomController.php
@@ -32,59 +48,6 @@ Removed from active tracking.
 ---
 
 ## ACTIVE
-
-### TD-1: RBAC — resolvePermission duplication
-Priority: MEDIUM (downgraded from HIGH — PREP-C complete, immediate risk reduced by BUG-1..4 fix)
-Files:
-    src/Admin/Access.php (162 ln) — active, used by HTTP layer
-    src/Chat/RoomController.php — resolvePermission() private method, 25 ln
-    src/Security/AccessContext.php (186 ln) — written, 0 call sites
-
-Background:
-    RBAC_CALL_GRAPH.md completed 2026-05-31. All 20 permission decision points documented.
-    PREP-C blocker is removed.
-
-What the audit found:
-    The three implementations are not fully parallel. They serve different layers:
-    - Access.php: HTTP layer (AdminPanel, MessageController, WhisperController, NumerPage)
-    - resolvePermission(): called only inside RoomController::manage(), one call site
-    - AccessContext: 0 call sites; designed for DI-style usage incompatible with current static codebase
-
-AccessContext is NOT the migration target.
-Reasons (from architectural review 2026-06-02):
-    - Access.php cannot be replaced by AccessContext — it covers methods AccessContext lacks
-      (isOwner, canOpenAdminPanel, requireOwnerOnly, canDeleteMessage, canAccessRoom, etc.)
-    - AccessContext uses instance-with-flush() pattern incompatible with WS long-lived connections
-    - maxDurationType() (duration limits per role) would need separate wiring into RoomController::mute()
-      regardless — AccessContext does not activate it automatically
-    - Migration creates intermediate state worse than current (partial AccessContext + Access.php)
-    - Zero test coverage makes migration unsafe
-
-Real problem: resolvePermission() duplicates Access::resolveLevel() logic.
-Any future change to permission levels must be applied in two places.
-
-Next recommended step:
-    Replace self::resolvePermission() inside RoomController::manage() with Access::resolveLevel().
-    After this: one RBAC level implementation instead of two.
-    Access.php remains the single place to update permission rules.
-    AccessContext remains as documented future option, not active task.
-
-    Implementation note — Diff Plan required before execution:
-        Access::resolveLevel() returns int.
-        resolvePermission() returns ?array{level: int, role?: string}.
-        After BUG-4 fix, $permission['role'] is read in setRoomRole() (line 189)
-        to derive actor's room role for explicit policy checks.
-        Direct substitution is not possible without either:
-          (a) a wrapper that returns the same ?array shape, or
-          (b) a separate DB call for room_role alongside resolveLevel().
-        All sub-methods (setRoomRole, kick, ban, mute) accept array $permission —
-        their signatures are also affected.
-        Estimated scope: ~15–25 lines across manage() and sub-methods.
-
-AccessContext status: documented, not active. Revisit if project adds DI infrastructure,
-automated tests, or activates Phase M (moderation audit trail with duration enforcement).
-
----
 
 ### TD-2: EventRouter — timer state ownership
 Priority: MEDIUM (downgraded from HIGH — decomposition not the goal)
