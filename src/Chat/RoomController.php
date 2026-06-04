@@ -7,6 +7,7 @@ use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
 use Chat\Security\CSRF;
 use Chat\Support\Timestamp;
+use Chat\Admin\Access;
 use Chat\Chat\RoomDeletionService;
 
 class RoomController
@@ -346,29 +347,20 @@ class RoomController
 
     private static function resolvePermission(int $roomId, int $userId, array $actor): ?array
     {
-        if (($actor['global_role'] ?? 'user') === 'platform_owner') {
-            return ['level' => 6];
+        $level = Access::resolveLevel($roomId, $userId, $actor);
+        if ($level < 0) {
+            return null;
         }
-        if (($actor['global_role'] ?? 'user') === 'admin') {
-            return ['level' => 5];
+        if ($level >= 4) {
+            // global roles (platform_owner=6, admin=5, moderator=4) — no room_role needed
+            return ['level' => $level];
         }
-        if (($actor['global_role'] ?? 'user') === 'moderator') {
-            return ['level' => 4];
-        }
-
-        $db = Connection::getInstance();
-        $role = $db->fetchOne(
+        // room-local role required by setRoomRole() policy checks
+        $role = Connection::getInstance()->fetchOne(
             'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
             [$roomId, $userId]
         )['room_role'] ?? null;
-
-        return match ($role) {
-            'owner' => ['level' => 3, 'role' => $role],
-            'local_admin' => ['level' => 2, 'role' => $role],
-            'local_moderator' => ['level' => 1, 'role' => $role],
-            'member' => ['level' => 0, 'role' => $role],
-            default => null,
-        };
+        return ['level' => $level, 'role' => $role];
     }
 
     public static function numera(int $userId): void

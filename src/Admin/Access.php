@@ -138,7 +138,7 @@ class Access
         exit;
     }
 
-    private static function resolveLevel(int $roomId, int $userId, array $actor): int
+    public static function resolveLevel(int $roomId, int $userId, array $actor): int
     {
         $globalRole = $actor['global_role'] ?? 'user';
         if ($globalRole === 'platform_owner') return 6;
