@@ -223,6 +223,9 @@ if (!$isLoggedIn) {
     </button>
 
     <div id="input-area">
+      <div id="mute-banner" class="d-none px-3 py-2 text-center text-warning small" style="background:rgba(255,193,7,.1);border-top:1px solid rgba(255,193,7,.3)">
+        <i class="fa fa-comment-slash me-1"></i> <span id="mute-banner-text">Вам выдан кляп</span>
+      </div>
       <div class="composer-dock-main">
       <div id="whisper-bar">
         <i class="fa fa-user-secret me-1"></i> Шёпот для <strong id="whisper-target-name"></strong>
@@ -259,6 +262,42 @@ if (!$isLoggedIn) {
 </div>
 
 <!-- ─── Modals ─── -->
+
+<!-- Mute modal -->
+<div class="modal fade" id="muteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Кляп</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Срок <span class="text-danger">*</span></label>
+          <select class="form-select" id="mute-duration">
+            <option value="" selected disabled>— выберите срок —</option>
+            <option value="5">5 минут</option>
+            <option value="15">15 минут</option>
+            <option value="30">30 минут</option>
+            <option value="60">1 час</option>
+            <option value="180">3 часа</option>
+            <option value="720">12 часов</option>
+            <option value="1440">24 часа</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Причина <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="mute-reason" maxlength="255" placeholder="Причина кляпа">
+        </div>
+        <div id="mute-error" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-danger" id="mute-submit-btn" disabled>Выдать кляп</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Room manage modal -->
 <div class="modal fade" id="roomManageModal" tabindex="-1">

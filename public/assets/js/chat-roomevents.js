@@ -33,11 +33,55 @@ function onBannedFromRoom(data) {
   }
 }
 
+// ─── Mute state — silent helpers (no toasts) ─────────────────────────────────
+let _muteTimer = null;
+
+function applyMuteState(muteUntil) {
+  const until = muteUntil ? dayjs(muteUntil).format('HH:mm:ss') : '';
+  $('#msg-input').prop('disabled', true);
+  $('#send-btn').prop('disabled', true);
+  $('#mute-banner-text').text(`Кляп${until ? ` до ${until}` : ''}`);
+  $('#mute-banner').removeClass('d-none');
+  scheduleMuteExpiry(muteUntil);
+}
+
+function clearMuteState() {
+  $('#msg-input').prop('disabled', false);
+  $('#send-btn').prop('disabled', $('#msg-input').val().trim().length === 0 || !currentRoomId);
+  $('#mute-banner').addClass('d-none');
+  clearMuteExpiry();
+}
+
+function scheduleMuteExpiry(muteUntil) {
+  clearMuteExpiry();
+  if (!muteUntil) return;
+  const ms = dayjs(muteUntil).diff(dayjs());
+  if (ms <= 0) { clearMuteState(); return; }
+  _muteTimer = setTimeout(() => clearMuteState(), ms);
+}
+
+function clearMuteExpiry() {
+  if (_muteTimer) { clearTimeout(_muteTimer); _muteTimer = null; }
+}
+
+// ─── WS-handlers (live events — with toasts) ─────────────────────────────────
+
 function onMutedInRoom(data) {
   if (data.room_id !== currentRoomId) return;
-  const until = data.muted_until ? dayjs(data.muted_until).format('HH:mm:ss') : '';
-  const reason = data.reason ? ` Причина: ${data.reason}` : '';
-  showToast(`Вам выдан кляп${until ? ` до ${until}` : ''}.${reason}`, 'warning');
+  if (Number(data.target_user_id) === Number(CURRENT_USER.id)) {
+    const until = data.muted_until ? dayjs(data.muted_until).format('HH:mm:ss') : '';
+    const reason = data.reason ? ` Причина: ${data.reason}` : '';
+    showToast(`Вам выдан кляп${until ? ` до ${until}` : ''}.${reason}`, 'warning');
+    applyMuteState(data.muted_until);
+  }
+}
+
+function onUnmutedInRoom(data) {
+  if (data.room_id !== currentRoomId) return;
+  if (Number(data.target_user_id ?? CURRENT_USER.id) === Number(CURRENT_USER.id)) {
+    showToast('Кляп снят.', 'success');
+    clearMuteState();
+  }
 }
 
 function onRoomDeleted(data) {

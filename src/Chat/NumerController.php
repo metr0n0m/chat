@@ -21,14 +21,6 @@ class NumerController
     {
         $db = Connection::getInstance();
 
-        $muted = $db->fetchOne(
-            'SELECT muted_until FROM room_members WHERE user_id = ? AND muted_until > NOW() LIMIT 1',
-            [$fromId]
-        );
-        if ($muted) {
-            return ['error' => 'У вас кляп до ' . date('H:i:s', strtotime((string) $muted['muted_until'])) . '.'];
-        }
-
         $pendingCount = (int) $db->fetchOne(
             "SELECT COUNT(*) AS c FROM invitations WHERE from_user_id = ? AND status = 'pending'",
             [$fromId]

@@ -203,6 +203,17 @@ function handleWS(data) {
       if (data.data && data.data.role !== undefined && data.data.target_user_id !== undefined) {
         if (typeof updateOnlineUser === 'function') updateOnlineUser(data.data.target_user_id, {room_role: data.data.role});
       }
+      if (data.data && data.data.muted === true && data.data.target_user_id !== undefined) {
+        if (typeof updateOnlineUser === 'function')
+          updateOnlineUser(data.data.target_user_id, {muted_until: data.data.muted_until ?? null});
+      }
+      if (data.data && data.data.unmuted === true && data.data.target_user_id !== undefined) {
+        if (typeof updateOnlineUser === 'function')
+          updateOnlineUser(data.data.target_user_id, {muted_until: null});
+      }
+      break;
+    case 'unmuted_in_room':
+      if (typeof onUnmutedInRoom === 'function') onUnmutedInRoom(data);
       break;
     case 'friend_online':
     case 'friend_offline':
@@ -346,6 +357,13 @@ function onRoomJoined(data) {
   if (typeof renderOnlineList === 'function') renderOnlineList(data.online || []);
   onlineCountsByRoom.set(Number(data.room_id), (data.online || []).length);
   updateRoomBadge(data.room_id);
+  // Silently restore mute state for self on room join / reconnect
+  const selfEntry = (data.online || []).find(u => Number(u.id) === Number(CURRENT_USER.id));
+  if (selfEntry && selfEntry.muted_until && dayjs(selfEntry.muted_until).isAfter(dayjs())) {
+    if (typeof applyMuteState === 'function') applyMuteState(selfEntry.muted_until);
+  } else {
+    if (typeof clearMuteState === 'function') clearMuteState();
+  }
 
   const canManage = ['platform_owner', 'admin'].includes(CURRENT_USER.global_role) || ['owner', 'local_admin', 'local_moderator'].includes(data.my_role);
   $('#room-manage-btn').toggleClass('d-none', !canManage);
@@ -572,7 +590,13 @@ function openUserInfo(uid, uname = '') {
     if (canModRoom) {
       $actions.append(`<button type="button" class="btn btn-sm btn-outline-warning user-info-action-btn" data-action="room-kick">Удалить из комнаты</button>`);
       $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-ban">Бан в комнате</button>`);
-      $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-mute">Кляп</button>`);
+      const targetUser = currentOnlineUsers.find(u => Number(u.id) === uid);
+      const isMuted = targetUser && targetUser.muted_until && dayjs(targetUser.muted_until).isAfter(dayjs());
+      if (isMuted) {
+        $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="room-unmute">Снять кляп</button>`);
+      } else {
+        $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-mute">Кляп</button>`);
+      }
     }
     if (canGlobal) {
       $actions.append(`<button type="button" class="btn btn-sm btn-danger user-info-action-btn" data-action="ban-global">Глобальный бан</button>`);
@@ -607,14 +631,12 @@ $('#user-info-actions').on('click', '.user-info-action-btn', function() {
     case 'room-ban':
       executeRoomAction('ban', uid, 'Забанить пользователя в комнате?');
       break;
-    case 'room-mute': {
-      const minutesRaw = prompt('Кляп на сколько минут? (1-1440)', '15');
-      if (minutesRaw === null) return;
-      const minutes = Math.max(1, Math.min(1440, Number(minutesRaw) || 15));
-      const reason = prompt('Причина кляпа (необязательно):', '') || '';
-      executeRoomAction('mute', uid, null, {minutes, reason});
+    case 'room-mute':
+      openMuteModal(uid);
       break;
-    }
+    case 'room-unmute':
+      executeRoomAction('unmute', uid, 'Снять кляп с пользователя?');
+      break;
     case 'ban-global':
       executeGlobalBan(uid);
       break;
@@ -654,6 +676,33 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
   if (confirmText && !confirm(confirmText)) return;
   wsSend('room_action', {room_id: currentRoomId, action, target_user_id: targetUserId, ...extra});
 }
+
+// ─── Mute modal ───────────────────────────────────────────────────────────────
+let _muteTargetUserId = null;
+
+function openMuteModal(userId) {
+  _muteTargetUserId = userId;
+  $('#mute-duration').val('');
+  $('#mute-reason').val('');
+  $('#mute-error').addClass('d-none').text('');
+  $('#mute-submit-btn').prop('disabled', true);
+  new bootstrap.Modal(document.getElementById('muteModal')).show();
+}
+
+// Registered once at module load — not inside openMuteModal
+$(document).on('change input', '#mute-duration, #mute-reason', function() {
+  const dur = $('#mute-duration').val();
+  const reason = $('#mute-reason').val().trim();
+  $('#mute-submit-btn').prop('disabled', !dur || !reason);
+});
+
+$(document).on('click', '#mute-submit-btn', function() {
+  const minutes = parseInt($('#mute-duration').val(), 10);
+  const reason = $('#mute-reason').val().trim();
+  if (!minutes || !reason) return;
+  executeRoomAction('mute', _muteTargetUserId, null, {minutes, reason});
+  bootstrap.Modal.getInstance(document.getElementById('muteModal'))?.hide();
+});
 
 function executeGlobalBan(userId) {
   const choice = prompt(

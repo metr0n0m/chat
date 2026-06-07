@@ -123,7 +123,7 @@ class RoomController
 
         // I-1: self-action guard — actor cannot target themselves for moderation actions.
         $targetId = (int) ($data['target_user_id'] ?? 0);
-        if (in_array($action, ['kick', 'ban', 'mute', 'set_role'], true) && $targetId === $actorId) {
+        if (in_array($action, ['kick', 'ban', 'mute', 'unmute', 'set_role'], true) && $targetId === $actorId) {
             return ['error' => 'Нельзя применить это действие к самому себе.'];
         }
 
@@ -171,6 +171,9 @@ class RoomController
                 return self::ban($roomId, (int) ($data['target_user_id'] ?? 0), $actorId, $actor, $permission, $db);
             case 'mute':
                 return self::mute($roomId, (int) ($data['target_user_id'] ?? 0), $actorId, $actor, $permission, $db, $data);
+
+            case 'unmute':
+                return self::unmute($roomId, (int) ($data['target_user_id'] ?? 0), $actorId, $actor, $permission, $db);
 
             default:
                 return ['error' => 'Неизвестное действие.'];
@@ -320,15 +323,30 @@ class RoomController
             return ['error' => 'Нельзя выдать кляп этому пользователю.'];
         }
 
-        $minutes = (int)($data['minutes'] ?? 15);
-        $minutes = max(1, min(1440, $minutes));
-        $reason = mb_substr(trim((string)($data['reason'] ?? '')), 0, 255);
+        $minutes = isset($data['minutes']) ? (int) $data['minutes'] : 0;
+        if ($minutes <= 0) {
+            return ['error' => 'Выберите срок кляпа.'];
+        }
+        $minutes = min(1440, $minutes);
+
+        $reason = mb_substr(trim((string) ($data['reason'] ?? '')), 0, 255);
+        if ($reason === '') {
+            return ['error' => 'Укажите причину кляпа.'];
+        }
+
+        $activeMute = $db->fetchOne(
+            'SELECT muted_until FROM room_members WHERE room_id = ? AND user_id = ? AND muted_until > NOW()',
+            [$roomId, $targetId]
+        );
+        if ($activeMute) {
+            return ['error' => 'Пользователь уже в кляпе до ' . date('H:i', strtotime((string) $activeMute['muted_until'])) . '. Сначала снимите кляп.'];
+        }
 
         $db->execute(
             'UPDATE room_members
              SET muted_until = DATE_ADD(NOW(), INTERVAL ? MINUTE), mute_reason = ?
              WHERE room_id = ? AND user_id = ?',
-            [$minutes, $reason !== '' ? $reason : null, $roomId, $targetId]
+            [$minutes, $reason, $roomId, $targetId]
         );
 
         $row = $db->fetchOne(
@@ -343,6 +361,28 @@ class RoomController
             'muted_until' => Timestamp::isoUtc(isset($row['muted_until']) ? (string) $row['muted_until'] : null),
             'reason' => $row['mute_reason'] ?? null,
         ];
+    }
+
+    private static function unmute(int $roomId, int $targetId, int $actorId, array $actor, array $permission, Connection $db): array
+    {
+        if ($permission['level'] < 2 && !in_array($actor['global_role'], ['platform_owner', 'admin', 'moderator'], true)) {
+            return ['error' => 'Нет прав.'];
+        }
+
+        $target = $db->fetchOne(
+            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, $targetId]
+        );
+        if (!$target) {
+            return ['error' => 'Пользователь не состоит в комнате.'];
+        }
+
+        $db->execute(
+            'UPDATE room_members SET muted_until = NULL, mute_reason = NULL WHERE room_id = ? AND user_id = ?',
+            [$roomId, $targetId]
+        );
+
+        return ['unmuted' => true, 'target_user_id' => $targetId, 'room_id' => $roomId];
     }
 
     private static function resolvePermission(int $roomId, int $userId, array $actor): ?array

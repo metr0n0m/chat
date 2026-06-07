@@ -104,6 +104,7 @@ class EventRouter
         }
 
         $online = $this->getOnlineList($roomId, $db);
+        $online = \Chat\Support\Timestamp::normalizeRows($online, ['muted_until']);
         $this->cm->sendToConnection($conn, [
             'event'     => 'room_joined',
             'room_id'   => $roomId,
@@ -525,10 +526,18 @@ class EventRouter
         }
         if ($result['muted'] ?? false) {
             $this->cm->sendToUser((int) $result['target_user_id'], [
-                'event' => 'muted_in_room',
-                'room_id' => $roomId,
+                'event'       => 'muted_in_room',
+                'room_id'     => $roomId,
+                'target_user_id' => (int) $result['target_user_id'],
                 'muted_until' => Timestamp::isoUtc(isset($result['muted_until']) ? (string) $result['muted_until'] : null),
-                'reason' => $result['reason'] ?? null,
+                'reason'      => $result['reason'] ?? null,
+            ]);
+        }
+        if ($result['unmuted'] ?? false) {
+            $this->cm->sendToUser((int) $result['target_user_id'], [
+                'event'          => 'unmuted_in_room',
+                'room_id'        => $roomId,
+                'target_user_id' => (int) $result['target_user_id'],
             ]);
         }
 
@@ -565,7 +574,7 @@ class EventRouter
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
         return $db->fetchAll(
             'SELECT u.id, u.username, u.nickname, u.custom_status, u.nick_color, u.avatar_url, u.global_role,
-                    rm.room_role
+                    rm.room_role, rm.muted_until
              FROM users u
              JOIN room_members rm ON rm.room_id = ? AND rm.user_id = u.id
              WHERE u.id IN (' . $placeholders . ')
