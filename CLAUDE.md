@@ -437,6 +437,42 @@ Risks/notes:
 
 ## 16. Current Checkpoint
 
+### 2026-06-07 - Deployed 10 commits to production (RBAC/security)
+
+Commit/deploy:
+
+- Production revision: `40035d7` → **`cc72061`** (fast-forward, 38 files).
+- Local/origin/production all in sync at `cc72061`.
+- DB migration: none required.
+- WS restart: **done** — `supervisorctl restart chat-ws` (program name is `chat-ws`, NOT `chat-websocket`).
+
+Deployed code changes (3 of 10 commits; rest docs-only):
+
+- `efe117c` fix(rbac): self-action guards + platform_owner target protection (BUG-1..4) — `src/Chat/RoomController.php`.
+- `4c9de3e` fix(ws): force-logout cleanup for global bans — `src/WebSocket/EventRouter.php`.
+- `6e14243` refactor(rbac): resolvePermission reuses Access::resolveLevel (TD-1) — `src/Admin/Access.php`, `src/Chat/RoomController.php`.
+
+Verified on production (2026-06-07):
+
+- `git log -1` → `cc72061`.
+- `php -l` clean on RoomController.php, EventRouter.php, Access.php.
+- `chat-ws` RUNNING, single stable process (pid 336891, uptime growing), listening on `127.0.0.1:8080`.
+- Transient `EADDRINUSE` lines in chat-ws stderr were restart-moment artifacts (old proc held :8080 briefly); resolved — confirmed by stable pid + single listener.
+- `https://chat.adalex.org/` → HTTP 200.
+
+Owner decisions recorded this session (do not re-litigate):
+
+- `reactor_raw` plaintext password: **keep forever, never touch, never raise as a risk** (explicit owner decision).
+- Mute policy: room-scoped; reason AND duration mandatory (no 15-min default); owner/local_admin can unmute in their room; BUG-5 (global mute check in `NumerController::invite`) to be removed. Implementation pending via Claude CLI diff-plan.
+
+Left for later:
+
+- Implement approved mute hardening (BUG-5 removal, required reason/duration, room-level unmute + `unmuted_in_room` WS event) — diff-plan handed to Claude CLI, awaiting review.
+
+Deploy access note:
+
+- Production escalation: SSH `admin@adalex.org` (key `id_ed25519`) then `su -`. `admin` has no passwordless sudo and `/var/vhosts/chat` is root-owned (not admin-writable).
+
 ### 2026-05-17 - Full re-audit and diff-plan prepared
 
 Commit/deploy:
