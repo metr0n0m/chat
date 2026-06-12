@@ -21,6 +21,9 @@ config/config.php
 # Dependencies (restore via composer install)
 vendor/
 
+# Test runner cache
+.phpunit.cache/
+
 # Claude Code / AI tools
 .claude/
 .codex/
