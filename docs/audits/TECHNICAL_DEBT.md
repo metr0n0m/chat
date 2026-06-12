@@ -1,5 +1,8 @@
 # Technical Debt
-> Last updated: 2026-06-02 | Full architectural audit + RBAC validation complete.
+> Last updated: 2026-06-12 | Sanctions engine S0+S1 landed: SanctionService is the single
+> apply/lift path, AccessContext is wired (DB-first role resolution), test infrastructure
+> exists (PHPUnit 13, 115 integration/unit tests). See docs/architecture/SANCTIONS_ENGINE.md.
+> Previous: 2026-06-02 | Full architectural audit + RBAC validation complete.
 > Status markers: [ACTIVE] current sprint | [BACKLOG] no immediate action | [DECISION] owner approval required | [FIXED] resolved in code | [CLOSED] invalid or superseded
 
 ---
@@ -200,6 +203,13 @@ Fix requires IPC between PHP-FPM and WS process. Deferred.
 ---
 
 ### TD-NEW-1: Zero automated test coverage
+Status: FIXED 2026-06-12 — PHPUnit 13 + integration DB (chat_test, rebuilt from real schema
+each run inside chat_php container). 115 tests / 219 assertions: full RBAC matrix
+(RoomModerationRbacTest), numer lifecycle (NumerControllerTest), sanctions engine
+(SanctionServiceTest), SSRF guards (SafeHttpClientTest).
+Run: docker exec -w /var/www/chat chat_php php vendor/bin/phpunit
+Original assessment kept below for history.
+
 Priority: HIGH (acknowledged, no immediate action)
 
 Current state: 0 tests. rbac_test.php (temporary simulation) deleted after BUG-4 fix.
@@ -293,9 +303,14 @@ Options: implement the server-side push, or remove the dead handlers.
     reactor_raw field
         See TD-8 above.
 
+## UNFROZEN 2026-06-12 (Phase M activated as sanctions engine S0/S1, owner decision 2026-06-09)
+
     Phase M tables (moderation_events, active_restrictions)
-        Dead tables in production DB. Do not wire without Phase M decision.
+        LIVE since S1: SanctionService writes both tables on every manual sanction.
+        Migration 016 added actor_ip/target_ip/trigger_code, stop_words,
+        sanction_rules, login_attempts.
 
     AccessContext.php
-        Documented as future option. Not an active migration target.
-        Do not wire without: DI infrastructure, test coverage, Phase M activation.
+        WIRED since S1: SanctionService resolves actor/target contexts through it
+        (fresh instance per operation — no stale cache in the WS process) and
+        enforces invariants I-1/I-3 at engine level.

@@ -1,8 +1,18 @@
 # SANCTIONS_ENGINE.md — Движок санкций и автобана (360° дизайн)
 
-**Статус:** Проектный документ. До реализации. Требует ревью владельца.
-**Версия:** 0.1 (draft)
-**Дата:** 2026-06-09
+**Статус:** S0 и S1 реализованы (2026-06-12). S2 (мост HTTP→WS) — следующий этап.
+**Версия:** 0.2
+**Дата:** 2026-06-09 (дизайн), 2026-06-12 (S0+S1)
+
+> Реализация S0: `database/migrations/016_sanctions_engine_s0.sql` (actor_ip/target_ip/
+> trigger_code, лестница сроков 1h/3h/24h/7d/30d/permanent, stop_words, sanction_rules
+> с дефолтами shadow-режима, login_attempts). Применена локально, прод — при деплое.
+> Реализация S1: `src/Moderation/SanctionService.php` — единая точка apply/lift;
+> через неё идут RoomController (kick/ban/mute/unmute), UserManager (глобальный
+> бан/разбан, roomUnban/roomUnmute). AccessContext подключён (DB-first роли,
+> инварианты I-1/I-3 на уровне движка — включая mute). Чтение горячих путей пока
+> по старым полям (expand → migrate: переключение чтения на active_restrictions — S2).
+> Тесты: tests/Integration/SanctionServiceTest.php.
 **Связанные документы:** `MODERATION_POLICY.md` (политика прав — источник истины), `database/migrations/013-015`, `src/Security/AccessContext.php`.
 
 ---

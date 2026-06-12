@@ -437,6 +437,48 @@ Risks/notes:
 
 ## 16. Current Checkpoint
 
+### 2026-06-12 - Sanctions engine S0+S1, test infrastructure, SSRF hardening (LOCAL ONLY)
+
+Commit/deploy:
+
+- Local commits: `bea48f4` → `57b30bd` (+ docs commit after). All pushed to origin.
+- Production revision: still `cc72061` — production deliberately NOT touched (owner decision this session).
+- DB migration: `016_sanctions_engine_s0.sql` applied LOCALLY only (+ legacy import 015 run locally).
+- WS restart: local container restarted, RUNNING on new code; production WS untouched.
+
+Changed (one commit per step, all on main):
+
+- `9461012` mute visibility restricted to staff (mute policy item 7; debug logs cleaned).
+- `cb29e91` SANCTIONS_ENGINE.md design committed.
+- `95c4d2a` NumerController::leave atomic owner transfer (RISK-4).
+- `a51a3c6` SafeHttpClient: single SSRF-safe outbound HTTP layer (DNS-rebinding pinned IP,
+  no redirects, userinfo rejected); UserManager + EmbedProcessor delegate to it.
+- `2f0e1eb` migration 016: moderation_events +actor_ip/target_ip/trigger_code, ladder ENUM
+  1h/3h/24h/7d/30d/permanent, stop_words, sanction_rules (shadow defaults), login_attempts.
+- `e08af64` PHPUnit 13 infrastructure + RBAC/numer/SSRF suites (105 tests).
+- `57b30bd` SanctionService (S1): single apply/lift path, AccessContext wired,
+  I-1/I-3 enforced at engine level (mute now also protects platform_owner),
+  expireLapsed periodic in ws-server. 115 tests / 219 assertions green.
+
+How to run tests: `docker exec -w /var/www/chat chat_php php vendor/bin/phpunit`
+(bootstrap rebuilds chat_test DB from real schema each run).
+
+Production deploy checklist for this batch (when owner approves):
+
+1. `git pull --ff-only` to latest main.
+2. Apply DB migrations in order: verify 013/014 present, then 016; optionally run 015 import.
+3. `composer install` NOT required for runtime (phpunit is require-dev; prod uses --no-dev).
+4. Restart WS (`supervisorctl restart chat-ws`).
+5. Smoke: mute with reason+duration, re-mute rejected, unmute, mute invisible to regular
+   members, admin global ban writes moderation_events row.
+
+Left for later:
+
+- S2: HTTP→WS outbox bridge; switch hot-path restriction reads to active_restrictions.
+- S3: detectors in shadow mode (brute-force first — login_attempts table is ready).
+- Verify production config secrets (local APP_SECRET equals example placeholder; prod must differ).
+- composer audit reports advisories in 3 prod dependencies — review on next dependency pass.
+
 ### 2026-06-07 - Deployed 10 commits to production (RBAC/security)
 
 Commit/deploy:
