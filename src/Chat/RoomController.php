@@ -5,6 +5,7 @@ namespace Chat\Chat;
 
 use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
+use Chat\Moderation\SanctionService;
 use Chat\Security\CSRF;
 use Chat\Support\Timestamp;
 use Chat\Admin\Access;
@@ -280,7 +281,15 @@ class RoomController
             return ['error' => 'Нельзя выгнать этого пользователя.'];
         }
 
-        $db->execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', [$roomId, $targetId]);
+        $applied = SanctionService::apply([
+            'type'           => 'kick',
+            'actor_id'       => $actorId,
+            'target_user_id' => $targetId,
+            'room_id'        => $roomId,
+        ]);
+        if (isset($applied['error'])) {
+            return ['error' => $applied['error']];
+        }
         return ['kicked' => true, 'target_user_id' => $targetId, 'room_id' => $roomId, 'target_username' => $target['username']];
     }
 
@@ -301,10 +310,15 @@ class RoomController
             return ['error' => 'Нельзя забанить этого пользователя.'];
         }
 
-        $db->execute(
-            'UPDATE room_members SET room_role = ?, banned_at = NOW(), banned_by = ? WHERE room_id = ? AND user_id = ?',
-            ['banned', $actorId, $roomId, $targetId]
-        );
+        $applied = SanctionService::apply([
+            'type'           => 'ban_room',
+            'actor_id'       => $actorId,
+            'target_user_id' => $targetId,
+            'room_id'        => $roomId,
+        ]);
+        if (isset($applied['error'])) {
+            return ['error' => $applied['error']];
+        }
 
         return ['banned' => true, 'target_user_id' => $targetId, 'room_id' => $roomId, 'target_username' => $target['username']];
     }
@@ -342,12 +356,17 @@ class RoomController
             return ['error' => 'Пользователь уже в кляпе до ' . date('H:i', strtotime((string) $activeMute['muted_until'])) . '. Сначала снимите кляп.'];
         }
 
-        $db->execute(
-            'UPDATE room_members
-             SET muted_until = DATE_ADD(NOW(), INTERVAL ? MINUTE), mute_reason = ?
-             WHERE room_id = ? AND user_id = ?',
-            [$minutes, $reason, $roomId, $targetId]
-        );
+        $applied = SanctionService::apply([
+            'type'           => 'mute',
+            'actor_id'       => $actorId,
+            'target_user_id' => $targetId,
+            'room_id'        => $roomId,
+            'minutes'        => $minutes,
+            'reason'         => $reason,
+        ]);
+        if (isset($applied['error'])) {
+            return ['error' => $applied['error']];
+        }
 
         $row = $db->fetchOne(
             'SELECT muted_until, mute_reason FROM room_members WHERE room_id = ? AND user_id = ?',
@@ -377,10 +396,15 @@ class RoomController
             return ['error' => 'Пользователь не состоит в комнате.'];
         }
 
-        $db->execute(
-            'UPDATE room_members SET muted_until = NULL, mute_reason = NULL WHERE room_id = ? AND user_id = ?',
-            [$roomId, $targetId]
-        );
+        $lifted = SanctionService::lift([
+            'type'           => 'unmute',
+            'actor_id'       => $actorId,
+            'target_user_id' => $targetId,
+            'room_id'        => $roomId,
+        ]);
+        if (isset($lifted['error'])) {
+            return ['error' => $lifted['error']];
+        }
 
         return ['unmuted' => true, 'target_user_id' => $targetId, 'room_id' => $roomId];
     }

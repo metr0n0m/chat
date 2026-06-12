@@ -5,6 +5,7 @@ namespace Chat\Admin;
 
 use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
+use Chat\Moderation\SanctionService;
 use Chat\Security\CSRF;
 use Chat\Security\SafeHttpClient;
 use Chat\Security\Session;
@@ -81,8 +82,12 @@ class UserManager
             JsonResponse::error('Недостаточно прав для изменения отображаемого статуса.', 403);
         }
 
+        // Глобальный бан/разбан идёт через единый движок санкций (S1),
+        // не через общий UPDATE: журнал + active_restrictions + поля users атомарно.
+        $banDirective = array_key_exists('is_banned', $data) ? (int) (bool) $data['is_banned'] : null;
+
         foreach ($allowed as $field) {
-            if (!array_key_exists($field, $data)) {
+            if ($field === 'is_banned' || !array_key_exists($field, $data)) {
                 continue;
             }
 
@@ -102,35 +107,36 @@ class UserManager
 
             $set[] = "`$field` = ?";
             $params[] = $value;
-
-            // When banning: record metadata
-            if ($field === 'is_banned' && $value === 1) {
-                $actorId = $actor ? (int) $actor['id'] : null;
-                $reason  = trim((string) ($data['ban_reason'] ?? ''));
-                $hours   = (int) ($data['ban_hours'] ?? 0);
-                $set[]   = 'banned_at = NOW()';
-                $set[]   = 'banned_by = ?';
-                $params[] = $actorId;
-                $set[]   = 'ban_reason = ?';
-                $params[] = $reason !== '' ? $reason : null;
-                $set[]   = 'banned_until = ?';
-                $params[] = $hours > 0 ? date('Y-m-d H:i:s', time() + $hours * 3600) : null;
-            }
-            // When unbanning: clear metadata fields
-            if ($field === 'is_banned' && $value === 0) {
-                $set[] = 'banned_at = NULL';
-                $set[] = 'banned_by = NULL';
-                $set[] = 'banned_until = NULL';
-                $set[] = 'ban_reason = NULL';
-            }
         }
 
-        if ($set === []) {
+        if ($set === [] && $banDirective === null) {
             JsonResponse::error('Нет данных для обновления.');
         }
 
-        $params[] = $targetId;
-        $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
+        if ($set !== []) {
+            $params[] = $targetId;
+            $db->execute('UPDATE users SET ' . implode(', ', $set) . ' WHERE id = ?', $params);
+        }
+
+        if ($banDirective === 1) {
+            $hours  = (int) ($data['ban_hours'] ?? 0);
+            $result = SanctionService::apply([
+                'type'           => 'ban_global',
+                'actor_id'       => $actor ? (int) $actor['id'] : null,
+                'target_user_id' => $targetId,
+                'hours'          => $hours > 0 ? $hours : null,
+                'reason'         => (string) ($data['ban_reason'] ?? ''),
+            ]);
+            if (isset($result['error'])) {
+                JsonResponse::error($result['error'], 403);
+            }
+        } elseif ($banDirective === 0) {
+            SanctionService::lift([
+                'type'           => 'unban_global',
+                'actor_id'       => $actor ? (int) $actor['id'] : null,
+                'target_user_id' => $targetId,
+            ]);
+        }
 
         JsonResponse::success(['updated' => true]);
     }
@@ -544,11 +550,13 @@ class UserManager
         if (!CSRF::verifyRequest()) {
             JsonResponse::error('CSRF.', 403);
         }
-        $db = Connection::getInstance();
-        $db->execute(
-            "DELETE FROM room_members WHERE room_id = ? AND user_id = ? AND room_role = 'banned'",
-            [$roomId, $userId]
-        );
+        $actor = Session::current();
+        SanctionService::lift([
+            'type'           => 'unban_room',
+            'actor_id'       => $actor ? (int) $actor['id'] : null,
+            'target_user_id' => $userId,
+            'room_id'        => $roomId,
+        ]);
         JsonResponse::success();
     }
 
@@ -557,11 +565,13 @@ class UserManager
         if (!CSRF::verifyRequest()) {
             JsonResponse::error('CSRF.', 403);
         }
-        $db = Connection::getInstance();
-        $db->execute(
-            'UPDATE room_members SET muted_until = NULL, mute_reason = NULL WHERE room_id = ? AND user_id = ?',
-            [$roomId, $userId]
-        );
+        $actor = Session::current();
+        SanctionService::lift([
+            'type'           => 'unmute',
+            'actor_id'       => $actor ? (int) $actor['id'] : null,
+            'target_user_id' => $userId,
+            'room_id'        => $roomId,
+        ]);
         JsonResponse::success();
     }
 }

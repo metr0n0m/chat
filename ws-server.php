@@ -26,6 +26,13 @@ $loop->addPeriodicTimer(10, function () {
     } catch (\Throwable) {}
 });
 
+// Convert lapsed active_restrictions to restriction_expired audit events (S1)
+$loop->addPeriodicTimer(30, function () {
+    try {
+        \Chat\Moderation\SanctionService::expireLapsed();
+    } catch (\Throwable) {}
+});
+
 $bindHost = defined('WS_BIND_HOST') ? WS_BIND_HOST : WS_HOST;
 
 $server = IoServer::factory(
