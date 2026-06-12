@@ -132,50 +132,61 @@ class NumerController
         );
         $wasOwner = $member && ($member['room_role'] ?? '') === 'owner';
 
-        $db->execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', [$roomId, $userId]);
+        // Удаление участника, закрытие комнаты и передача owner — одна транзакция:
+        // rooms.owner_id и room_members.room_role='owner' не должны расходиться (RISK-4)
+        $db->beginTransaction();
+        try {
+            $db->execute('DELETE FROM room_members WHERE room_id = ? AND user_id = ?', [$roomId, $userId]);
 
-        $remaining = (int) $db->fetchOne(
-            "SELECT COUNT(*) AS c FROM room_members WHERE room_id = ? AND room_role != 'banned'",
-            [$roomId]
-        )['c'];
-
-        if ($remaining === 0) {
-            $db->execute(
-                "UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'last_left' WHERE id = ?",
+            $remaining = (int) $db->fetchOne(
+                "SELECT COUNT(*) AS c FROM room_members WHERE room_id = ? AND room_role != 'banned'",
                 [$roomId]
-            );
-            return ['left' => true, 'room_id' => $roomId, 'destroyed' => true];
-        }
+            )['c'];
 
-        $newOwnerId = null;
-        if ($wasOwner) {
-            $alreadyOwner = $db->fetchOne(
-                "SELECT user_id FROM room_members WHERE room_id = ? AND room_role = 'owner' LIMIT 1",
-                [$roomId]
-            );
+            if ($remaining === 0) {
+                $db->execute(
+                    "UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'last_left' WHERE id = ?",
+                    [$roomId]
+                );
+                $db->commit();
+                return ['left' => true, 'room_id' => $roomId, 'destroyed' => true];
+            }
 
-            if (!$alreadyOwner) {
-                $candidate = $db->fetchOne(
-                    "SELECT user_id
-                     FROM room_members
-                     WHERE room_id = ? AND room_role != 'banned'
-                     ORDER BY joined_at ASC, user_id ASC
-                     LIMIT 1",
+            $newOwnerId = null;
+            if ($wasOwner) {
+                $alreadyOwner = $db->fetchOne(
+                    "SELECT user_id FROM room_members WHERE room_id = ? AND room_role = 'owner' LIMIT 1",
                     [$roomId]
                 );
 
-                if ($candidate) {
-                    $newOwnerId = (int) $candidate['user_id'];
-                    $db->execute(
-                        "UPDATE room_members SET room_role = 'owner' WHERE room_id = ? AND user_id = ?",
-                        [$roomId, $newOwnerId]
+                if (!$alreadyOwner) {
+                    $candidate = $db->fetchOne(
+                        "SELECT user_id
+                         FROM room_members
+                         WHERE room_id = ? AND room_role != 'banned'
+                         ORDER BY joined_at ASC, user_id ASC
+                         LIMIT 1",
+                        [$roomId]
                     );
-                    $db->execute(
-                        'UPDATE rooms SET owner_id = ? WHERE id = ?',
-                        [$newOwnerId, $roomId]
-                    );
+
+                    if ($candidate) {
+                        $newOwnerId = (int) $candidate['user_id'];
+                        $db->execute(
+                            "UPDATE room_members SET room_role = 'owner' WHERE room_id = ? AND user_id = ?",
+                            [$roomId, $newOwnerId]
+                        );
+                        $db->execute(
+                            'UPDATE rooms SET owner_id = ? WHERE id = ?',
+                            [$newOwnerId, $roomId]
+                        );
+                    }
                 }
             }
+
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
         }
 
         return [
