@@ -103,7 +103,7 @@ class EventRouter
             $this->cm->joinRoom($conn, $roomId);
         }
 
-        $online = $this->getOnlineList($roomId, $db);
+        $online = $this->getOnlineList($roomId, $db, $session);
         $online = \Chat\Support\Timestamp::normalizeRows($online, ['muted_until']);
         $this->cm->sendToConnection($conn, [
             'event'     => 'room_joined',
@@ -562,25 +562,92 @@ class EventRouter
             );
         }
 
-        $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $result]);
+        // Strip mute fields from room-wide payload — regular members must not see muted_until
+        $publicResult = $result;
+        unset($publicResult['muted'], $publicResult['unmuted'],
+              $publicResult['muted_until'], $publicResult['reason']);
+        $this->cm->sendToRoom($roomId, ['event' => 'room_updated', 'room_id' => $roomId, 'data' => $publicResult]);
+
+        // Notify staff-only about mute state change (single SQL, excludes target)
+        if (($result['muted'] ?? false) || ($result['unmuted'] ?? false)) {
+            $staffEvent = [
+                'event'   => 'room_updated',
+                'room_id' => $roomId,
+                'data'    => [
+                    'muted'          => $result['muted'] ?? false,
+                    'unmuted'        => $result['unmuted'] ?? false,
+                    'target_user_id' => (int) $result['target_user_id'],
+                    'muted_until'    => $result['muted_until'] ?? null,
+                ],
+            ];
+            $this->sendMuteEventToRoomStaff($roomId, (int) $result['target_user_id'], $staffEvent, $db);
+        }
     }
 
-    private function getOnlineList(int $roomId, Connection $db): array
+    private function getOnlineList(int $roomId, Connection $db, array $viewerSession): array
     {
         $userIds = $this->cm->getRoomUserIds($roomId);
         if (!$userIds) {
             return [];
         }
+        $isStaff  = $this->isStaffInRoom($roomId, $viewerSession, $db);
+        $muteCol  = $isStaff ? ', rm.muted_until' : '';
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
         return $db->fetchAll(
             'SELECT u.id, u.username, u.nickname, u.custom_status, u.nick_color, u.avatar_url, u.global_role,
-                    rm.room_role, rm.muted_until
+                    rm.room_role' . $muteCol . '
              FROM users u
              JOIN room_members rm ON rm.room_id = ? AND rm.user_id = u.id
              WHERE u.id IN (' . $placeholders . ')
              ORDER BY u.username',
             array_merge([$roomId], $userIds)
         );
+    }
+
+    private function isStaffInRoom(int $roomId, array $session, Connection $db): bool
+    {
+        if (in_array($session['global_role'] ?? 'user',
+            ['platform_owner', 'admin', 'moderator'], true)) {
+            return true;
+        }
+        $row = $db->fetchOne(
+            'SELECT room_role FROM room_members WHERE room_id = ? AND user_id = ?',
+            [$roomId, (int) $session['id']]
+        );
+        return in_array($row['room_role'] ?? '', ['owner', 'local_admin', 'local_moderator'], true);
+    }
+
+    private function sendMuteEventToRoomStaff(
+        int $roomId,
+        int $targetUserId,
+        array $event,
+        Connection $db
+    ): void {
+        $userIds = $this->cm->getRoomUserIds($roomId);
+        if (!$userIds) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+        $rows = $db->fetchAll(
+            'SELECT rm.user_id, rm.room_role, u.global_role
+             FROM room_members rm
+             JOIN users u ON u.id = rm.user_id
+             WHERE rm.room_id = ? AND rm.user_id IN (' . $placeholders . ')',
+            array_merge([$roomId], $userIds)
+        );
+        $staffRoles  = ['owner', 'local_admin', 'local_moderator'];
+        $globalStaff = ['platform_owner', 'admin', 'moderator'];
+        foreach ($rows as $row) {
+            $uid = (int) $row['user_id'];
+            if ($uid === $targetUserId) {
+                continue; // target already received personal muted_in_room / unmuted_in_room
+            }
+            $isStaff = in_array($row['global_role'], $globalStaff, true)
+                    || in_array($row['room_role'],   $staffRoles,  true);
+            if ($isStaff) {
+                $this->cm->sendToUser($uid, $event);
+            }
+        }
     }
 
     private function userPayload(array $session): array

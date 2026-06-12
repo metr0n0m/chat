@@ -206,10 +206,14 @@ function handleWS(data) {
       if (data.data && data.data.muted === true && data.data.target_user_id !== undefined) {
         if (typeof updateOnlineUser === 'function')
           updateOnlineUser(data.data.target_user_id, {muted_until: data.data.muted_until ?? null});
+        if ($('#userInfoModal').hasClass('show') && Number(infoUserId) === Number(data.data.target_user_id))
+          renderUserInfoModButtons(data.data.target_user_id);
       }
       if (data.data && data.data.unmuted === true && data.data.target_user_id !== undefined) {
         if (typeof updateOnlineUser === 'function')
           updateOnlineUser(data.data.target_user_id, {muted_until: null});
+        if ($('#userInfoModal').hasClass('show') && Number(infoUserId) === Number(data.data.target_user_id))
+          renderUserInfoModButtons(data.data.target_user_id);
       }
       break;
     case 'unmuted_in_room':
@@ -578,8 +582,6 @@ function openUserInfo(uid, uname = '') {
     `);
 
     const isSelf = Number(infoUserId) === Number(CURRENT_USER.id);
-    const canModRoom = canModerateCurrentRoom() && !isSelf;
-    const canGlobal = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) && !isSelf;
 
     $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="mention">Обратиться</button>`);
     $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="whisper">Шёпот</button>`);
@@ -587,20 +589,7 @@ function openUserInfo(uid, uname = '') {
       $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="invite">В нумер</button>`);
     }
 
-    if (canModRoom) {
-      $actions.append(`<button type="button" class="btn btn-sm btn-outline-warning user-info-action-btn" data-action="room-kick">Удалить из комнаты</button>`);
-      $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-ban">Бан в комнате</button>`);
-      const targetUser = currentOnlineUsers.find(u => Number(u.id) === uid);
-      const isMuted = targetUser && targetUser.muted_until && dayjs(targetUser.muted_until).isAfter(dayjs());
-      if (isMuted) {
-        $actions.append(`<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="room-unmute">Снять кляп</button>`);
-      } else {
-        $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-mute">Кляп</button>`);
-      }
-    }
-    if (canGlobal) {
-      $actions.append(`<button type="button" class="btn btn-sm btn-danger user-info-action-btn" data-action="ban-global">Глобальный бан</button>`);
-    }
+    renderUserInfoModButtons(uid);
   }).fail(function() {
     $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
   });
@@ -677,6 +666,28 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
   wsSend('room_action', {room_id: currentRoomId, action, target_user_id: targetUserId, ...extra});
 }
 
+// ─── User info modal — moderation buttons (single source of truth) ────────────
+function renderUserInfoModButtons(userId) {
+  const target = currentOnlineUsers.find(u => Number(u.id) === Number(userId));
+  const isMuted = target && target.muted_until && dayjs(target.muted_until).isAfter(dayjs());
+  const $actions = $('#user-info-actions');
+  $actions.find('[data-action="room-kick"],[data-action="room-ban"],' +
+    '[data-action="room-mute"],[data-action="room-unmute"],[data-action="ban-global"]').remove();
+  const isSelf    = Number(userId) === Number(CURRENT_USER.id);
+  const canMod    = canModerateCurrentRoom() && !isSelf;
+  const canGlobal = ['platform_owner', 'admin', 'moderator'].includes(CURRENT_USER.global_role) && !isSelf;
+  if (canMod) {
+    $actions.append(`<button type="button" class="btn btn-sm btn-outline-warning user-info-action-btn" data-action="room-kick">Удалить из комнаты</button>`);
+    $actions.append(`<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-ban">Бан в комнате</button>`);
+    $actions.append(isMuted
+      ? `<button type="button" class="btn btn-sm btn-outline-secondary user-info-action-btn" data-action="room-unmute">Снять кляп</button>`
+      : `<button type="button" class="btn btn-sm btn-outline-danger user-info-action-btn" data-action="room-mute">Кляп</button>`);
+  }
+  if (canGlobal) {
+    $actions.append(`<button type="button" class="btn btn-sm btn-danger user-info-action-btn" data-action="ban-global">Глобальный бан</button>`);
+  }
+}
+
 // ─── Mute modal ───────────────────────────────────────────────────────────────
 let _muteTargetUserId = null;
 
@@ -686,7 +697,7 @@ function openMuteModal(userId) {
   $('#mute-reason').val('');
   $('#mute-error').addClass('d-none').text('');
   $('#mute-submit-btn').prop('disabled', true);
-  new bootstrap.Modal(document.getElementById('muteModal')).show();
+  showModalAbove(document.getElementById('muteModal'));
 }
 
 // Registered once at module load — not inside openMuteModal
