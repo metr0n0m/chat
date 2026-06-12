@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Chat\Chat;
 
+use Chat\Security\SafeHttpClient;
+
 class EmbedProcessor
 {
     private const TIMEOUT      = 3;
@@ -169,65 +171,12 @@ class EmbedProcessor
 
     private static function headRequest(string $url): ?array
     {
-        $parsed = parse_url($url);
-        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
-            return null;
-        }
-        $host = strtolower((string) ($parsed['host'] ?? ''));
-        if ($host === '') {
-            return null;
-        }
-        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : (gethostbyname($host) ?: '');
-        if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP,
-            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-            return null;
-        }
-
-        $ctx = stream_context_create(['http' => [
-            'method'          => 'HEAD',
-            'timeout'         => self::TIMEOUT,
-            'follow_location' => false,
-        ]]);
-        @file_get_contents($url, false, $ctx);
-        if (empty($http_response_header)) {
-            return null;
-        }
-        $headers = [];
-        foreach ($http_response_header as $line) {
-            if (strpos($line, ':') !== false) {
-                [$k, $v] = explode(':', $line, 2);
-                $headers[strtolower(trim($k))] = trim($v);
-            }
-        }
-        return $headers;
+        $headers = SafeHttpClient::head($url, self::TIMEOUT);
+        return $headers === [] ? null : $headers;
     }
 
     private static function fetchHtml(string $url): ?string
     {
-        $parsed = parse_url($url);
-        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
-            return null;
-        }
-        $host = strtolower((string) ($parsed['host'] ?? ''));
-        if ($host === '') {
-            return null;
-        }
-        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : (gethostbyname($host) ?: '');
-        if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP,
-            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-            return null;
-        }
-
-        $ctx = stream_context_create(['http' => [
-            'method'          => 'GET',
-            'timeout'         => self::TIMEOUT,
-            'follow_location' => false,
-            'header'          => 'Accept: text/html',
-        ]]);
-        $html = @file_get_contents($url, false, $ctx);
-        if ($html === false) {
-            return null;
-        }
-        return substr($html, 0, 50000);
+        return SafeHttpClient::get($url, self::TIMEOUT, 50000, ['Accept: text/html']);
     }
 }
