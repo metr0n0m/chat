@@ -6,7 +6,7 @@ namespace Chat\Http;
 use Chat\Security\{Session, CSRF};
 use Chat\Auth\{LoginHandler, RegisterHandler, GoogleOAuth, EmailVerification};
 use Chat\Chat\{RoomController, MessageController, WhisperController, NumerPage};
-use Chat\Admin\{AdminPanel, UserManager, RoomManager};
+use Chat\Admin\{AdminPanel, UserManager, RoomManager, SanctionPanel};
 use Chat\DB\Connection;
 use Chat\Support\Timestamp;
 
@@ -155,6 +155,11 @@ class Router
         }
         if ($this->method === 'GET'    && $this->path === '/api/admin/system-settings')   AdminPanel::getSystemSettings();
         if ($this->method === 'POST'   && $this->path === '/api/admin/system-settings')   AdminPanel::updateSystemSettings($admin, $_POST);
+
+        // Sanctions engine monitoring (S5a)
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/events')  SanctionPanel::events($_GET);
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/shadow')  SanctionPanel::shadow($_GET);
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/stats')   SanctionPanel::stats($_GET);
     }
 
     private function handleGetFriends(): never
