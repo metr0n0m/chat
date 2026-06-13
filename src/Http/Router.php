@@ -173,6 +173,9 @@ class Router
         if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/stopwords')          SanctionPanel::globalStopWords();
         if ($this->method === 'POST'   && $this->path === '/api/admin/sanctions/stopwords')          SanctionPanel::addGlobalStopWord($_POST);
         if ($this->method === 'DELETE' && preg_match('~^/api/admin/sanctions/stopwords/(\d+)$~', $this->path, $m)) SanctionPanel::removeStopWord((int) $m[1]);
+
+        // Sanctions IP intel (S5c) — staff alerts
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/ip-intel')  SanctionPanel::ipIntel($_GET);
     }
 
     private function handleGetFriends(): never

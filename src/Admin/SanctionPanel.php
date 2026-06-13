@@ -111,6 +111,17 @@ final class SanctionPanel
         JsonResponse::success(['config' => ViolationReporter::rules()]);
     }
 
+    /**
+     * Интел «волк в овечьей шкуре» (S5c): IP с забанённым И активным аккаунтом.
+     * Сигнал для разбора человеком — авто-действий нет (дизайн §8.3).
+     * Доступ — глобальный админ (наследует requireAdmin).
+     */
+    public static function ipIntel(array $query): void
+    {
+        $days = (int) ($query['days'] ?? 30);
+        JsonResponse::success(['alerts' => SanctionStats::ipIntel($days)]);
+    }
+
     /** Возобновление автонома после срабатывания предохранителя. */
     public static function resumeAutonomy(): void
     {
