@@ -101,6 +101,9 @@ class MessageController
             return ['error' => 'Сообщение пустое или слишком длинное.'];
         }
 
+        // Детектор стоп-слов (S3, тень): рапорт в журнал, сообщение не блокируется
+        \Chat\Moderation\StopWordDetector::scan($roomId, $actorId, $raw);
+
         $content = self::format($raw);
         $embed = EmbedProcessor::process($raw);
         $embedData = $embed ? json_encode($embed, JSON_UNESCAPED_UNICODE) : null;

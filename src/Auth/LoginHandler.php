@@ -5,6 +5,7 @@ namespace Chat\Auth;
 
 use Chat\DB\Connection;
 use Chat\Http\JsonResponse;
+use Chat\Moderation\BruteForceGuard;
 use Chat\Security\CSRF;
 use Chat\Security\Session;
 
@@ -32,7 +33,12 @@ class LoginHandler
             [$login, $login]
         );
 
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
         if (!$user || !password_verify($password, $user['password_hash'] ?? '')) {
+            // Детектор перебора (S3): счётчики на аккаунт и на IP + прогрессивная задержка.
+            // Текст ошибки единый — не раскрываем, что именно неверно (анти-энумерация).
+            BruteForceGuard::onFailure($user ? (int) $user['id'] : null, $ip);
             JsonResponse::error('Неверный логин или пароль.');
         }
 
@@ -44,7 +50,8 @@ class LoginHandler
             JsonResponse::error('Подтвердите email. Проверьте почту или запросите новое письмо.', 403);
         }
 
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        BruteForceGuard::onSuccess((int) $user['id'], $ip);
+
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $token = Session::create((int) $user['id'], $ip, $ua);
         Session::setCookie($token);

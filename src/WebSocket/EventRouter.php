@@ -175,6 +175,8 @@ class EventRouter
         }
 
         if (!$this->cm->checkRateLimit($userId)) {
+            // Детектор флуда (S3, тень): считает срывы rate-limit, не меняя поведение
+            \Chat\Moderation\FloodDetector::onRateLimitHit($userId, $roomId);
             $this->cm->sendToConnection($conn, ['event' => 'error', 'message' => Lang::get('errors.message.rate_limit')]);
             return;
         }
