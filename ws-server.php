@@ -10,6 +10,7 @@ use Ratchet\WebSocket\WsServer;
 use Chat\WebSocket\Server;
 use Chat\Support\Lang;
 use React\EventLoop\Loop;
+use React\Socket\SocketServer;
 
 Lang::init(APP_LOCALE);
 
@@ -23,14 +24,18 @@ $loop = Loop::get();
 $loop->addPeriodicTimer(10, function () {
     try {
         \Chat\Chat\NumerController::expireInvitations();
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) {
+        echo '[WS] Invite expiry error: ' . $e->getMessage() . PHP_EOL;
+    }
 });
 
 // Convert lapsed active_restrictions to restriction_expired audit events (S1)
 $loop->addPeriodicTimer(30, function () {
     try {
         \Chat\Moderation\SanctionService::expireLapsed();
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) {
+        echo '[WS] expireLapsed error: ' . $e->getMessage() . PHP_EOL;
+    }
 });
 
 $bindHost = defined('WS_BIND_HOST') ? WS_BIND_HOST : WS_HOST;
@@ -41,13 +46,19 @@ $chatServer = new Server();
 $loop->addPeriodicTimer(1, function () use ($chatServer) {
     try {
         \Chat\WebSocket\OutboxDispatcher::dispatch($chatServer->getConnectionManager());
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) {
+        echo '[WS] Outbox dispatch error: ' . $e->getMessage() . PHP_EOL;
+    }
 });
 
-$server = IoServer::factory(
+// ВАЖНО: сервер собирается вручную, НЕ через IoServer::factory().
+// factory() вызывает Factory::create(), который ПОДМЕНЯЕТ глобальный
+// Loop::get() новым циклом — все таймеры, зарегистрированные выше,
+// оказались бы в never-running цикле (так с апреля молча не работала
+// периодическая чистка приглашений). Один явный $loop — везде.
+$server = new IoServer(
     new HttpServer(new WsServer($chatServer)),
-    WS_PORT,
-    $bindHost,
+    new SocketServer($bindHost . ':' . WS_PORT, [], $loop),
     $loop
 );
 

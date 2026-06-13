@@ -582,7 +582,12 @@ class EventRouter
                     'muted_until'    => $result['muted_until'] ?? null,
                 ],
             ];
-            $this->sendMuteEventToRoomStaff($roomId, (int) $result['target_user_id'], $staffEvent, $db);
+            $this->sendMuteEventToRoomStaff(
+                $roomId,
+                (int) $result['target_user_id'],
+                $staffEvent,
+                Connection::getInstance()
+            );
         }
     }
 
