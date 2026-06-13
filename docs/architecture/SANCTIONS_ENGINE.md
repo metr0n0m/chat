@@ -1,8 +1,16 @@
 # SANCTIONS_ENGINE.md — Движок санкций и автобана (360° дизайн)
 
-**Статус:** S0 и S1 реализованы (2026-06-12). S2 (мост HTTP→WS) — следующий этап.
-**Версия:** 0.2
-**Дата:** 2026-06-09 (дизайн), 2026-06-12 (S0+S1)
+**Статус:** S0–S3 реализованы (S3 — теневой режим). Следующий этап — S4 (боевой автоном:
+circuit-breaker, kill-switch, применение санкций детекторами) после калибровки тени.
+**Версия:** 0.3
+**Дата:** 2026-06-09 (дизайн), 2026-06-12 (S0+S1), 2026-06-13 (S2+S3)
+
+> S2: мост `ws_outbox` (миграция 017) — `Chat\WebSocket\Outbox` + `OutboxDispatcher`
+> (поллинг 1с в ws-server). SanctionService шлёт типизированные события для http-канала.
+> S3: `ViolationReporter` → `moderation_shadow_log`; детекторы `BruteForceGuard`
+> (логин, счётчики аккаунт+IP), `StopWordDetector` (send_message), `FloodDetector`
+> (срывы rate-limit). mode='live' не активируется до S4.
+> Сквозная проверка: `tests/e2e/mute_check.php` (реальный WS-клиент, 9 проверок).
 
 > Реализация S0: `database/migrations/016_sanctions_engine_s0.sql` (actor_ip/target_ip/
 > trigger_code, лестница сроков 1h/3h/24h/7d/30d/permanent, stop_words, sanction_rules

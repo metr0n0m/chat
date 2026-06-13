@@ -437,6 +437,45 @@ Risks/notes:
 
 ## 16. Current Checkpoint
 
+### 2026-06-13 - S2 bridge + S3 shadow detectors + critical WS loop fix (LOCAL ONLY)
+
+Commit/deploy:
+
+- Local commits `bf4086a`..`b6f2a8b` (+docs), pushed to origin. Production still `cc72061`.
+- DB migration: `017_outbox_shadow_log.sql` applied locally (ws_outbox, moderation_shadow_log).
+- Local WS restarted; production untouched.
+
+Changed:
+
+- `bf4086a` migration 017: ws_outbox queue + shadow detector log.
+- `eec7054` S2: HTTP→WS outbox bridge. OutboxDispatcher (1s poll), StaffNotifier shared
+  staff-delivery, SanctionService emits typed events for http channel inside the sanction
+  transaction (global ban → force_logout + sessions destroyed; admin unmute →
+  unmuted_in_room + staff room_updated). RoomManager::closeNumer → numer_destroyed.
+- `bb87ff8` owner bug "кнопка кляп не меняется": profile endpoint returns
+  room_moderation.muted_until to room staff only (?room_id=N); client has single
+  updateUserMuteState() entry point; modal state comes from server, not online-list cache.
+- `07866a3` S3: shadow detectors. ViolationReporter (ladder step by recidivism from
+  sanction_rules), BruteForceGuard (login_attempts acc+IP counters, progressive delay,
+  10/15min), StopWordDetector (global+room lists, does NOT block in shadow),
+  FloodDetector (rate-limit hits, 60s window). Live mode gated behind S4.
+- `b6f2a8b` CRITICAL: IoServer::factory() replaces the global Loop singleton —
+  every timer registered before it (invite expiry sweep since April, expireLapsed,
+  outbox dispatcher) was on a never-running loop. Server now built explicitly with one
+  shared loop. Also fixed undefined $db TypeError in onRoomAction staff event (this was
+  the owner-reported "внутренняя ошибка" on unmute). Periodic timer catches now log.
+
+Verification:
+
+- 127 phpunit tests / 265 assertions green.
+- tests/e2e/mute_check.php (real RFC6455 WS client): 9/9 PASS — mute staff event,
+  profile gating, admin HTTP unmute delivered live via bridge, audit consistency.
+  Seed: tests/e2e/seed.php (users e2e_admin / e2e_target, password E2eTest!123).
+
+Production deploy additions for this batch: apply migrations 016 AND 017; restart WS
+(mandatory — ws-server.php changed); after deploy verify outbox drains
+(SELECT COUNT(*) FROM ws_outbox stays near 0).
+
 ### 2026-06-12 - Sanctions engine S0+S1, test infrastructure, SSRF hardening (LOCAL ONLY)
 
 Commit/deploy:
