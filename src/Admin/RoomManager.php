@@ -241,6 +241,8 @@ class RoomManager
             JsonResponse::error('Нумер не найден или уже закрыт.', 404);
         }
         $db->execute("UPDATE rooms SET is_closed = 1, closed_at = NOW(), close_reason = 'admin' WHERE id = ?", [$roomId]);
+        // S2: участники с открытым попапом узнают о закрытии сразу, без F5
+        \Chat\WebSocket\Outbox::toRoom($roomId, 'numer_destroyed', ['room_id' => $roomId]);
         JsonResponse::success(['closed' => true, 'room_id' => $roomId]);
     }
 

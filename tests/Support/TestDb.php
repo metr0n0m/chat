@@ -21,6 +21,7 @@ final class TestDb
             'active_restrictions', 'moderation_events',
             'messages', 'invitations', 'room_members', 'rooms',
             'sessions', 'users', 'stop_words', 'login_attempts',
+            'ws_outbox', 'moderation_shadow_log',
         ] as $table) {
             $db->execute('TRUNCATE TABLE `' . $table . '`');
         }

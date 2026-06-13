@@ -35,8 +35,17 @@ $loop->addPeriodicTimer(30, function () {
 
 $bindHost = defined('WS_BIND_HOST') ? WS_BIND_HOST : WS_HOST;
 
+$chatServer = new Server();
+
+// S2: deliver events queued by HTTP code (admin panel) to live WS clients
+$loop->addPeriodicTimer(1, function () use ($chatServer) {
+    try {
+        \Chat\WebSocket\OutboxDispatcher::dispatch($chatServer->getConnectionManager());
+    } catch (\Throwable) {}
+});
+
 $server = IoServer::factory(
-    new HttpServer(new WsServer(new Server())),
+    new HttpServer(new WsServer($chatServer)),
     WS_PORT,
     $bindHost,
     $loop

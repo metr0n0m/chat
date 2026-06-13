@@ -5,6 +5,9 @@ namespace Chat\Moderation;
 
 use Chat\DB\Connection;
 use Chat\Security\AccessContext;
+use Chat\Security\Session;
+use Chat\Support\Timestamp;
+use Chat\WebSocket\Outbox;
 
 /**
  * Единая точка выдачи (apply) и снятия (lift) санкций — этап S1 движка санкций.
@@ -173,6 +176,17 @@ final class SanctionService
                 );
             }
 
+            // Эффект I-9: глобальный бан рвёт сессии всегда (любой канал).
+            if ($type === 'ban_global') {
+                Session::destroyAllForUser($targetId);
+            }
+
+            // Канал http (PHP-FPM): доставить событие клиентам через мост S2.
+            // В одной транзакции с санкцией — событие не уедет без записи.
+            if (self::channel($intent) === 'http') {
+                self::emitApplied($type, $targetId, $roomId, $expiresAt, $reason);
+            }
+
             $db->commit();
             return ['event_id' => $eventId, 'expires_at' => $expiresAt];
         } catch (\Throwable $e) {
@@ -269,12 +283,65 @@ final class SanctionService
                 $db->execute('DELETE FROM active_restrictions WHERE id = ?', [(int) $restriction['id']]);
             }
 
+            if (self::channel($intent) === 'http') {
+                self::emitLifted($type, $targetId, $roomId);
+            }
+
             $db->commit();
             return ['event_id' => $eventId];
         } catch (\Throwable $e) {
             $db->rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Канал доставки WS-событий: 'ws' — вызывающий код сам в WS-процессе
+     * (EventRouter шлёт события напрямую), 'http' — PHP-FPM, события идут
+     * через мост ws_outbox. По умолчанию определяется по SAPI.
+     */
+    private static function channel(array $intent): string
+    {
+        return (string) ($intent['channel'] ?? (PHP_SAPI === 'cli' ? 'ws' : 'http'));
+    }
+
+    /** WS-события для санкций, применённых вне WS-процесса (контракт = EventRouter). */
+    private static function emitApplied(string $type, int $targetId, ?int $roomId, ?string $expiresAt, ?string $reason): void
+    {
+        switch ($type) {
+            case 'ban_global':
+                Outbox::toUser($targetId, 'force_logout', ['reason' => 'banned_global']);
+                break;
+
+            case 'mute':
+                $iso = Timestamp::isoUtc($expiresAt);
+                Outbox::toUser($targetId, 'muted_in_room', [
+                    'room_id' => $roomId, 'target_user_id' => $targetId,
+                    'muted_until' => $iso, 'reason' => $reason,
+                ]);
+                Outbox::toRoomStaff($roomId, 'room_updated', [
+                    'room_id' => $roomId,
+                    'data' => ['muted' => true, 'unmuted' => false, 'target_user_id' => $targetId, 'muted_until' => $iso],
+                ], $targetId);
+                break;
+            // ban_room из HTTP-канала сегодня не вызывается (нет пути в админке);
+            // при появлении — добавить banned_from_room + user_left здесь.
+        }
+    }
+
+    /** WS-события для снятий, выполненных вне WS-процесса. */
+    private static function emitLifted(string $type, int $targetId, ?int $roomId): void
+    {
+        if ($type === 'unmute') {
+            Outbox::toUser($targetId, 'unmuted_in_room', [
+                'room_id' => $roomId, 'target_user_id' => $targetId,
+            ]);
+            Outbox::toRoomStaff($roomId, 'room_updated', [
+                'room_id' => $roomId,
+                'data' => ['muted' => false, 'unmuted' => true, 'target_user_id' => $targetId, 'muted_until' => null],
+            ], $targetId);
+        }
+        // unban_room / unban_global: клиентского контракта на уведомление нет.
     }
 
     /**

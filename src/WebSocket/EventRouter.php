@@ -623,31 +623,8 @@ class EventRouter
         array $event,
         Connection $db
     ): void {
-        $userIds = $this->cm->getRoomUserIds($roomId);
-        if (!$userIds) {
-            return;
-        }
-        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
-        $rows = $db->fetchAll(
-            'SELECT rm.user_id, rm.room_role, u.global_role
-             FROM room_members rm
-             JOIN users u ON u.id = rm.user_id
-             WHERE rm.room_id = ? AND rm.user_id IN (' . $placeholders . ')',
-            array_merge([$roomId], $userIds)
-        );
-        $staffRoles  = ['owner', 'local_admin', 'local_moderator'];
-        $globalStaff = ['platform_owner', 'admin', 'moderator'];
-        foreach ($rows as $row) {
-            $uid = (int) $row['user_id'];
-            if ($uid === $targetUserId) {
-                continue; // target already received personal muted_in_room / unmuted_in_room
-            }
-            $isStaff = in_array($row['global_role'], $globalStaff, true)
-                    || in_array($row['room_role'],   $staffRoles,  true);
-            if ($isStaff) {
-                $this->cm->sendToUser($uid, $event);
-            }
-        }
+        // target уже получил персональное muted_in_room / unmuted_in_room
+        StaffNotifier::sendToRoomStaff($this->cm, $db, $roomId, $targetUserId, $event);
     }
 
     private function userPayload(array $session): array

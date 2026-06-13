@@ -55,6 +55,7 @@ $schemaFiles = [
     __DIR__ . '/../database/migrations/013_moderation_events.sql',
     __DIR__ . '/../database/migrations/014_active_restrictions.sql',
     __DIR__ . '/../database/migrations/016_sanctions_engine_s0.sql',
+    __DIR__ . '/../database/migrations/017_outbox_shadow_log.sql',
 ];
 
 foreach ($schemaFiles as $file) {

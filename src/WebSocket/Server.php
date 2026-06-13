@@ -28,6 +28,12 @@ class Server implements MessageComponentInterface
         echo '[WS] Server started on port ' . WS_PORT . PHP_EOL;
     }
 
+    /** Доступ к менеджеру соединений для периодических задач (outbox-мост S2). */
+    public function getConnectionManager(): ConnectionManager
+    {
+        return $this->cm;
+    }
+
     public function onOpen(ConnectionInterface $conn): void
     {
         $origin = $conn->httpRequest->getHeader('Origin')[0] ?? null;
