@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS `sanction_rules` (
 -- detectors log would_sanction but never ban until the owner flips to live.
 INSERT IGNORE INTO `sanction_rules` (`rule_key`, `value_json`) VALUES
   ('mode',              '"shadow"'),
+  ('autonomy_state',    '"active"'),
   ('escalation',        '{"stopword":{"start":"1h","threshold":5,"ladder":["1h","24h","7d","30d","permanent"]},"bruteforce":{"start":"3h","window_min":15,"attempts":10,"ladder":["3h","24h","7d","30d","permanent"]},"flood":{"start":"3h","threshold":5,"ladder":["3h","24h","7d","30d","permanent"]}}'),
   ('danger_weights',    '{"auth_attack":10,"malicious_content":8,"flood":7,"stopword":4,"spam":3,"ratelimit":1}'),
   ('danger_thresholds', '{"1h":5,"3h":15,"24h":30,"7d":50,"30d":65,"permanent":80}'),

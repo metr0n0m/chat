@@ -10,8 +10,9 @@ use Chat\DB\Connection;
  * Читает пачку событий, доставляет согласно audience и удаляет строки.
  *
  * Спец-обработка по event_type:
- *  - force_logout    → разорвать все соединения пользователя (cm->closeUser);
- *  - numer_destroyed → после доставки убрать комнату из presence (cm->clearRoom).
+ *  - force_logout     → разорвать все соединения пользователя (cm->closeUser);
+ *  - numer_destroyed  → после доставки убрать комнату из presence (cm->clearRoom);
+ *  - banned_from_room → после доставки убрать цель из presence комнаты (cm->leaveRoom).
  */
 final class OutboxDispatcher
 {
@@ -42,6 +43,9 @@ final class OutboxDispatcher
                         $cm->closeUser($targetId, $event);
                     } else {
                         $cm->sendToUser($targetId, $event);
+                    }
+                    if ($row['event_type'] === 'banned_from_room' && isset($event['room_id'])) {
+                        $cm->leaveRoom($targetId, (int) $event['room_id']);
                     }
                     break;
 

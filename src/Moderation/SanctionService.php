@@ -107,6 +107,13 @@ final class SanctionService
             return ['error' => 'Этого пользователя нельзя ограничить.'];
         }
 
+        // Иммунитет стаффа от автонома (S4, дизайн §9.1): система не санкционирует
+        // глобальный стафф — admin/moderator может тронуть только человек.
+        if (($intent['origin'] ?? 'realtime') === 'system'
+            && in_array($targetCtx['role'], ['admin', 'moderator'], true)) {
+            return ['error' => 'Автоном не применяет санкции к персоналу.'];
+        }
+
         $actorRole = self::resolveActorRole($actorId, $roomId, $intent);
         $expiresAt = self::computeExpiresAt($intent);
         $reason    = self::normalizeReason($intent['reason'] ?? null);
@@ -181,9 +188,12 @@ final class SanctionService
                 Session::destroyAllForUser($targetId);
             }
 
-            // Канал http (PHP-FPM): доставить событие клиентам через мост S2.
+            // Доставка событий клиентам через мост S2:
+            //  - канал http (PHP-FPM): EventRouter недоступен, шлём через outbox;
+            //  - origin system: автоном всегда шлёт через outbox — у него нет
+            //    WS-контекста, даже когда детектор сработал внутри WS-процесса.
             // В одной транзакции с санкцией — событие не уедет без записи.
-            if (self::channel($intent) === 'http') {
+            if (self::channel($intent) === 'http' || ($intent['origin'] ?? 'realtime') === 'system') {
                 self::emitApplied($type, $targetId, $roomId, $expiresAt, $reason);
             }
 
@@ -229,14 +239,31 @@ final class SanctionService
         $actorRole = self::resolveActorRole($actorId, $roomId, $intent);
 
         $db = Connection::getInstance();
+
+        // Ссылка на исходное событие выдачи — из горячей таблицы
+        $restriction = $db->fetchOne(
+            'SELECT id, event_id FROM active_restrictions
+             WHERE type = ? AND target_user_id = ? AND scope_key = ?',
+            [$restrictionType, $targetId, $isGlobal ? 'global' : 'room:' . $roomId]
+        );
+
+        // §4 дизайна: permanent-санкцию системы снимает ТОЛЬКО platform_owner.
+        if ($restriction !== null) {
+            $origin = $db->fetchOne(
+                'SELECT actor_role, expires_at FROM moderation_events WHERE id = ?',
+                [(int) $restriction['event_id']]
+            );
+            if ($origin !== null
+                && $origin['actor_role'] === 'system'
+                && $origin['expires_at'] === null
+                && $actorRole !== 'platform_owner'
+            ) {
+                return ['error' => 'Бессрочную санкцию системы может снять только владелец платформы.'];
+            }
+        }
+
         $db->beginTransaction();
         try {
-            // Ссылка на исходное событие выдачи — из горячей таблицы
-            $restriction = $db->fetchOne(
-                'SELECT id, event_id FROM active_restrictions
-                 WHERE type = ? AND target_user_id = ? AND scope_key = ?',
-                [$restrictionType, $targetId, $isGlobal ? 'global' : 'room:' . $roomId]
-            );
 
             switch ($type) {
                 case 'unmute':
@@ -324,8 +351,17 @@ final class SanctionService
                     'data' => ['muted' => true, 'unmuted' => false, 'target_user_id' => $targetId, 'muted_until' => $iso],
                 ], $targetId);
                 break;
-            // ban_room из HTTP-канала сегодня не вызывается (нет пути в админке);
-            // при появлении — добавить banned_from_room + user_left здесь.
+
+            case 'ban_room':
+                // контракт EventRouter: цель — banned_from_room, остальные — user_left;
+                // диспетчер по banned_from_room дополнительно чистит presence комнаты
+                Outbox::toUser($targetId, 'banned_from_room', [
+                    'room_id' => $roomId, 'target_user_id' => $targetId,
+                ]);
+                Outbox::toRoom($roomId, 'user_left', [
+                    'room_id' => $roomId, 'user_id' => $targetId,
+                ], $targetId);
+                break;
         }
     }
 
