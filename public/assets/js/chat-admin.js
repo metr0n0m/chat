@@ -22,6 +22,15 @@ function initAdmin() {
     if (tab === '#adminUsers')    loadAdminUsers();
     if (tab === '#adminRooms')    loadAdminRooms();
     if (tab === '#adminBans')     loadAdminBans();
+    if (tab === '#adminSanctions') loadSanctions();
+  });
+
+  $('#sanctionsSubTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
+    const tab = $(this).attr('href');
+    if (tab === '#sancEvents')    loadSanctionEvents();
+    if (tab === '#sancShadow')    loadSanctionShadow();
+    if (tab === '#sancStopwords') loadSanctionStopwords();
+    if (tab === '#sancIntel')     loadSanctionIntel();
   });
 
   $('#ownerTabs a[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
@@ -762,6 +771,158 @@ $('#adminSettingsForm').on('submit', function(e) {
     }
   }, 'json').fail(function(xhr) {
     $('#admin-settings-error').text(xhr.responseJSON?.error || 'Не удалось сохранить.').removeClass('d-none');
+  });
+});
+
+// ════════════════════════════════════════════════
+//  SANCTIONS ENGINE (S5)
+// ════════════════════════════════════════════════
+const SANC_ACT_LABEL = {
+  mute: 'кляп', unmute: 'снят кляп',
+  ban_room: 'бан в комнате', unban_room: 'разбан в комнате',
+  ban_global: 'глобальный бан', unban_global: 'глобальный разбан',
+  kick: 'кик', restriction_expired: 'истекло',
+};
+const SANC_TRIGGER_LABEL = {
+  bruteforce: 'перебор паролей', stopword: 'стоп-слово',
+  flood: 'флуд', spoof: 'подмена сессии',
+};
+function sancActLabel(a)     { return SANC_ACT_LABEL[a] || a; }
+function sancTriggerLabel(t) { return t ? (SANC_TRIGGER_LABEL[t] || t) : '—'; }
+
+function loadSanctions() {
+  $.get('/api/admin/sanctions/stats', function(resp) {
+    if (!resp.success) return;
+    const s = resp.stats, a = s.autonomy || {};
+    $('#sanctions-summary').html(
+      statCard('Активных мьютов', s.active_restrictions.mute, 'fa-comment-slash', 'secondary')
+      + statCard('Банов в комнатах', s.active_restrictions.ban_room, 'fa-door-closed', 'warning')
+      + statCard('Глобальных банов', s.active_restrictions.ban_global, 'fa-ban', 'danger')
+      + statCard('Тень за 30д', s.shadow_30d, 'fa-eye', 'info')
+    );
+    // Режим автонома (элементы есть только у владельца платформы)
+    const live = a.mode === 'live', paused = a.autonomy_state === 'paused';
+    $('#sanc-mode-badge')
+      .removeClass('bg-secondary bg-success bg-danger')
+      .addClass(live ? 'bg-danger' : 'bg-secondary')
+      .text(live ? 'БОЕВОЙ' : 'тень');
+    $('#sanc-state-badge').toggleClass('d-none', !live)
+      .removeClass('bg-success bg-warning')
+      .addClass(paused ? 'bg-warning' : 'bg-success')
+      .text(paused ? 'на паузе' : 'активен');
+    $('#sanc-live-btn').toggleClass('d-none', live);
+    $('#sanc-shadow-btn').toggleClass('d-none', !live);
+    $('#sanc-resume-btn').toggleClass('d-none', !(live && paused));
+    $('#sanc-mode-hint').text(live
+      ? 'Система применяет санкции автоматически. Снять автономный бессрочный бан может только владелец платформы.'
+      : 'Система только наблюдает и записывает, что сделала бы. Реальные баны не выдаются.');
+    loadSanctionEvents();
+  });
+}
+
+function sancRows(rows, cols) {
+  if (!rows || !rows.length) return '<div class="text-muted p-2">Записей нет.</div>';
+  let h = '<table class="table table-sm"><thead><tr>' + cols.map(c => `<th>${c[0]}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r => { h += '<tr>' + cols.map(c => `<td>${c[1](r)}</td>`).join('') + '</tr>'; });
+  return h + '</tbody></table>';
+}
+
+function loadSanctionEvents() {
+  $.get('/api/admin/sanctions/events', function(resp) {
+    if (!resp.success) return;
+    $('#sanc-events-table').html(sancRows(resp.events, [
+      ['Время', r => r.created_at ? formatChatDateTime(r.created_at) : '—'],
+      ['Действие', r => esc(sancActLabel(r.act))],
+      ['Кто', r => r.origin === 'system' ? '<span class="badge bg-info">система</span>' : esc(r.actor_username || '—')],
+      ['Кого', r => esc(r.target_username || '—')],
+      ['Комната', r => esc(r.room_name || '—')],
+      ['Триггер', r => esc(sancTriggerLabel(r.trigger_code))],
+      ['Срок', r => esc(r.duration_type || '—')],
+      ['Причина', r => esc(r.reason || '—')],
+    ]));
+  });
+}
+
+function loadSanctionShadow() {
+  $.get('/api/admin/sanctions/shadow', function(resp) {
+    if (!resp.success) return;
+    $('#sanc-shadow-table').html(sancRows(resp.shadow, [
+      ['Время', r => r.created_at ? formatChatDateTime(r.created_at) : '—'],
+      ['Триггер', r => esc(sancTriggerLabel(r.trigger_code))],
+      ['Цель', r => esc(r.target_username || r.target_ip || '—')],
+      ['Комната', r => esc(r.room_name || '—')],
+      ['Выдало бы', r => esc(sancActLabel(r.would_sanction))],
+      ['Срок', r => esc(r.would_duration || '—')],
+      ['Детали', r => esc(r.details || '—')],
+    ]));
+  }).fail(() => $('#sanc-shadow-table').html('<div class="text-muted p-2">Недоступно.</div>'));
+}
+
+function loadSanctionStopwords() {
+  $.get('/api/admin/sanctions/stopwords', function(resp) {
+    if (!resp.success) return;
+    $('#sanc-stopwords-table').html(sancRows(resp.stop_words, [
+      ['Слово', r => esc(r.pattern)],
+      ['Срок санкции', r => esc(r.duration)],
+      ['Добавлено', r => r.created_at ? formatChatDateTime(r.created_at) : '—'],
+      ['', r => `<button class="btn btn-sm btn-outline-danger sanc-sw-del" data-id="${r.id}"><i class="fa fa-trash"></i></button>`],
+    ]));
+  });
+}
+
+function loadSanctionIntel() {
+  $.get('/api/admin/sanctions/ip-intel', function(resp) {
+    if (!resp.success) return;
+    if (!resp.alerts || !resp.alerts.length) {
+      $('#sanc-intel-table').html('<div class="text-muted p-2">Подозрительных совпадений по IP нет.</div>');
+      return;
+    }
+    $('#sanc-intel-table').html(sancRows(resp.alerts, [
+      ['IP', a => esc(a.ip)],
+      ['Забанены', a => a.banned.map(esc).join(', ')],
+      ['Активны с того же IP', a => '<span class="text-warning">' + a.others.map(esc).join(', ') + '</span>'],
+    ]) + '<div class="text-muted small p-1">Сигнал для ручного разбора. Автоматический бан по совпадению IP не выполняется.</div>');
+  });
+}
+
+// — управление режимом (владелец платформы) —
+function sancSetMode(value, extra) {
+  $.post('/api/admin/sanctions/config', Object.assign({csrf_token: CSRF_TOKEN, key: 'mode', value}, extra || {}), function(resp) {
+    if (resp.success) { showToast('Режим обновлён.', 'success'); loadSanctions(); }
+  }, 'json').fail(function(xhr) {
+    const err = xhr.responseJSON?.error || 'Ошибка.';
+    if (xhr.status === 409 && confirm(err + '\n\nВключить боевой режим?')) {
+      sancSetMode('live', {confirm: 1});
+    } else {
+      showToast(err, 'danger');
+    }
+  });
+}
+$(document).on('click', '#sanc-live-btn',   () => sancSetMode('live'));
+$(document).on('click', '#sanc-shadow-btn', () => sancSetMode('shadow'));
+$(document).on('click', '#sanc-resume-btn', function() {
+  $.post('/api/admin/sanctions/resume', {csrf_token: CSRF_TOKEN}, function(resp) {
+    if (resp.success) { showToast('Автоном возобновлён.', 'success'); loadSanctions(); }
+  }, 'json').fail(xhr => showToast(xhr.responseJSON?.error || 'Ошибка.', 'danger'));
+});
+
+// — стоп-слова —
+$(document).on('click', '#sanc-sw-add-btn', function() {
+  const pattern = $('#sanc-sw-input').val().trim();
+  const duration = $('#sanc-sw-duration').val();
+  if (pattern.length < 2) { showToast('Слишком короткое слово.', 'warning'); return; }
+  $.post('/api/admin/sanctions/stopwords', {csrf_token: CSRF_TOKEN, pattern, duration}, function(resp) {
+    if (resp.success) { $('#sanc-sw-input').val(''); loadSanctionStopwords(); }
+  }, 'json').fail(xhr => showToast(xhr.responseJSON?.error || 'Ошибка.', 'danger'));
+});
+$(document).on('click', '.sanc-sw-del', function() {
+  const id = $(this).data('id');
+  $.ajax({
+    url: `/api/admin/sanctions/stopwords/${id}`,
+    method: 'DELETE',
+    headers: {'X-CSRF-Token': CSRF_TOKEN},
+    success: () => loadSanctionStopwords(),
+    error: xhr => showToast(xhr.responseJSON?.error || 'Ошибка.', 'danger'),
   });
 });
 

@@ -474,6 +474,7 @@ if (!$isLoggedIn) {
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminUsers">Пользователи</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminRooms">Комнаты</a></li>
         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminBans">Баны</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#adminSanctions">Санкции</a></li>
       </ul>
       <div class="tab-content">
         <div class="tab-pane fade show active" id="adminDash">
@@ -494,6 +495,51 @@ if (!$isLoggedIn) {
         </div>
         <div class="tab-pane fade" id="adminBans">
           <div id="admin-bans-table"></div>
+        </div>
+        <div class="tab-pane fade" id="adminSanctions">
+          <div id="sanctions-summary" class="row g-2 mb-3"></div>
+          <?php if ($user['global_role'] === 'platform_owner'): ?>
+          <div class="card mb-3"><div class="card-body py-2">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <span class="fw-semibold me-1"><i class="fa fa-robot me-1"></i>Автоном:</span>
+              <span id="sanc-mode-badge" class="badge bg-secondary">—</span>
+              <span id="sanc-state-badge" class="badge bg-secondary d-none">—</span>
+              <div class="ms-auto d-flex gap-2">
+                <button class="btn btn-sm btn-outline-warning d-none" id="sanc-resume-btn">Возобновить автоном</button>
+                <button class="btn btn-sm btn-outline-secondary d-none" id="sanc-shadow-btn">Вернуть в тень</button>
+                <button class="btn btn-sm btn-outline-danger d-none" id="sanc-live-btn">Включить боевой режим</button>
+              </div>
+            </div>
+            <div class="text-muted small mt-1" id="sanc-mode-hint"></div>
+          </div></div>
+          <?php endif; ?>
+          <ul class="nav nav-pills mb-2 small" id="sanctionsSubTabs">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#sancEvents">Журнал событий</a></li>
+            <?php if ($user['global_role'] === 'platform_owner'): ?>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sancShadow">Теневой журнал</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sancStopwords">Стоп-слова</a></li>
+            <?php endif; ?>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sancIntel">Интел по IP</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="sancEvents"><div id="sanc-events-table"></div></div>
+            <?php if ($user['global_role'] === 'platform_owner'): ?>
+            <div class="tab-pane fade" id="sancShadow"><div id="sanc-shadow-table"></div></div>
+            <div class="tab-pane fade" id="sancStopwords">
+              <div class="d-flex gap-2 mb-2 flex-wrap">
+                <input type="text" class="form-control form-control-sm" id="sanc-sw-input" placeholder="Стоп-слово..." style="max-width:220px" maxlength="255">
+                <select class="form-select form-select-sm" id="sanc-sw-duration" style="max-width:140px">
+                  <option value="1h">1 час</option><option value="3h">3 часа</option>
+                  <option value="24h">24 часа</option><option value="7d">7 дней</option>
+                  <option value="30d">30 дней</option><option value="permanent">навсегда</option>
+                </select>
+                <button class="btn btn-sm btn-outline-primary" id="sanc-sw-add-btn">Добавить</button>
+              </div>
+              <div id="sanc-stopwords-table"></div>
+            </div>
+            <?php endif; ?>
+            <div class="tab-pane fade" id="sancIntel"><div id="sanc-intel-table"></div></div>
+          </div>
         </div>
       </div>
     </div>
