@@ -22,6 +22,7 @@ let whisperToId   = null;
 let whisperToName = null;
 let infoUserId = null;
 let infoUsername = '';
+let infoUserMuteUntil = null; // состояние кляпа цели модалки — с сервера (room_moderation)
 let isScrolledToBottom = true;
 let oldestMessageId = null;
 let rooms = [];
@@ -204,16 +205,10 @@ function handleWS(data) {
         if (typeof updateOnlineUser === 'function') updateOnlineUser(data.data.target_user_id, {room_role: data.data.role});
       }
       if (data.data && data.data.muted === true && data.data.target_user_id !== undefined) {
-        if (typeof updateOnlineUser === 'function')
-          updateOnlineUser(data.data.target_user_id, {muted_until: data.data.muted_until ?? null});
-        if ($('#userInfoModal').hasClass('show') && Number(infoUserId) === Number(data.data.target_user_id))
-          renderUserInfoModButtons(data.data.target_user_id);
+        updateUserMuteState(data.data.target_user_id, data.data.muted_until ?? null);
       }
       if (data.data && data.data.unmuted === true && data.data.target_user_id !== undefined) {
-        if (typeof updateOnlineUser === 'function')
-          updateOnlineUser(data.data.target_user_id, {muted_until: null});
-        if ($('#userInfoModal').hasClass('show') && Number(infoUserId) === Number(data.data.target_user_id))
-          renderUserInfoModButtons(data.data.target_user_id);
+        updateUserMuteState(data.data.target_user_id, null);
       }
       break;
     case 'unmuted_in_room':
@@ -546,11 +541,15 @@ function openUserInfo(uid, uname = '') {
   $body.html('<div class="text-muted">Загрузка...</div>');
   $actions.empty();
 
-  $.get(`/api/users/${infoUserId}`, function(resp) {
+  infoUserMuteUntil = null;
+  $.get(`/api/users/${infoUserId}`, {room_id: Number(currentRoomId || 0)}, function(resp) {
     if (!resp || !resp.success || !resp.user) {
       $body.html('<div class="alert alert-danger mb-0">Не удалось загрузить профиль.</div>');
       return;
     }
+
+    // Источник правды о кляпе — сервер (отдаёт только стаффу комнаты)
+    infoUserMuteUntil = resp.room_moderation ? (resp.room_moderation.muted_until ?? null) : null;
 
     const u = resp.user;
     const showLastSeen = !(Number(u.hide_last_seen || 0) === 1) || canModerateCurrentRoom() || ['platform_owner', 'admin'].includes(CURRENT_USER.global_role);
@@ -666,10 +665,27 @@ function executeRoomAction(action, targetUserId, confirmText = null, extra = {})
   wsSend('room_action', {room_id: currentRoomId, action, target_user_id: targetUserId, ...extra});
 }
 
+// ─── Mute state — единая точка обновления на клиенте ─────────────────────────
+// Сервер — источник правды; каждое изменение приходит типизированным событием
+// (room_updated muted/unmuted для стаффа, muted_in_room/unmuted_in_room для цели).
+// Эта функция — единственное место, где состояние кляпа применяется к UI.
+function updateUserMuteState(userId, mutedUntil) {
+  if (typeof updateOnlineUser === 'function')
+    updateOnlineUser(userId, {muted_until: mutedUntil});
+  if (Number(infoUserId) === Number(userId)) {
+    infoUserMuteUntil = mutedUntil;
+    if ($('#userInfoModal').hasClass('show')) renderUserInfoModButtons(userId);
+  }
+}
+
 // ─── User info modal — moderation buttons (single source of truth) ────────────
 function renderUserInfoModButtons(userId) {
-  const target = currentOnlineUsers.find(u => Number(u.id) === Number(userId));
-  const isMuted = target && target.muted_until && dayjs(target.muted_until).isAfter(dayjs());
+  // Для цели модалки состояние пришло с сервера (профиль + live-события);
+  // онлайн-список — запасной источник (например, кнопки вне модалки).
+  const muteSource = Number(infoUserId) === Number(userId)
+    ? infoUserMuteUntil
+    : (currentOnlineUsers.find(u => Number(u.id) === Number(userId)) || {}).muted_until;
+  const isMuted = !!(muteSource && dayjs(muteSource).isAfter(dayjs()));
   const $actions = $('#user-info-actions');
   $actions.find('[data-action="room-kick"],[data-action="room-ban"],' +
     '[data-action="room-mute"],[data-action="room-unmute"],[data-action="ban-global"]').remove();

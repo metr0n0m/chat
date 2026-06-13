@@ -201,7 +201,28 @@ class UserManager
         $user['hide_last_seen'] = (int)($user['hide_last_seen'] ?? 0);
         $user = Timestamp::normalizeFields($user, ['created_at', 'last_seen_at']);
 
-        JsonResponse::success(['user' => $user]);
+        $response = ['user' => $user];
+
+        // Состояние модерации в комнате — источник правды для модальных кнопок
+        // («Кляп»/«Снять кляп»). Отдаётся ТОЛЬКО стаффу комнаты: обычный участник
+        // состояние кляпа не видит (политика владельца 2026-06-09, п.7).
+        $roomId = (int) ($_GET['room_id'] ?? 0);
+        $viewer = Session::current();
+        if ($roomId > 0 && $viewer && \Chat\Admin\Access::canModerateRoom($viewer, $roomId)) {
+            $member = $db->fetchOne(
+                'SELECT muted_until FROM room_members
+                 WHERE room_id = ? AND user_id = ? AND muted_until > NOW()',
+                [$roomId, $userId]
+            );
+            $response['room_moderation'] = [
+                'room_id'     => $roomId,
+                'muted_until' => Timestamp::isoUtc(
+                    $member !== null ? (string) $member['muted_until'] : null
+                ),
+            ];
+        }
+
+        JsonResponse::success($response);
     }
 
     public static function updateSettings(int $userId, array $post, array $files): void
