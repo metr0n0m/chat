@@ -437,13 +437,29 @@ Risks/notes:
 
 ## 16. Current Checkpoint
 
-### 2026-06-13 - S2 bridge + S3 shadow detectors + critical WS loop fix (LOCAL ONLY)
+### 2026-06-13 - PRODUCTION DEPLOY: cc72061 → be5a44e (sanctions engine S0–S3)
 
 Commit/deploy:
 
-- Local commits `bf4086a`..`b6f2a8b` (+docs), pushed to origin. Production still `cc72061`.
+- Production fast-forwarded `cc72061` → **`be5a44e`** (42 files, 15 commits: mute policy
+  completion, SafeHttpClient, SanctionService S1, outbox bridge S2, shadow detectors S3,
+  WS loop fix, test suite).
+- DB migrations applied on production: 013, 014, 015 (import: 0 rows), 016, 017.
+  sanction_rules seeded (5 rules, mode=shadow). All idempotent, all clean.
+- WS restart: done (`supervisorctl restart chat-ws`, pid 394458, stable).
+- Verified: `php -l` clean on 8 key files; site HTTP 200 (internal + external);
+  ws_outbox drains (0 pending); chat-ws single stable process 3+ min after restart.
+- Deploy method: ssh key as admin → `su -` root (password via stdin), scripted
+  `/tmp/chat_deploy.sh` (removed after use).
+- Production PHP confirmed **8.4.21** — composer.json `^8.4` requirement is satisfied;
+  the old "prod is PHP 8.2" doc concern is obsolete.
+
+### 2026-06-13 - S2 bridge + S3 shadow detectors + critical WS loop fix (local work record)
+
+Commit/deploy:
+
+- Local commits `bf4086a`..`b6f2a8b` (+docs), pushed to origin.
 - DB migration: `017_outbox_shadow_log.sql` applied locally (ws_outbox, moderation_shadow_log).
-- Local WS restarted; production untouched.
 
 Changed:
 
