@@ -108,6 +108,11 @@ class Router
 
         if ($this->method === 'GET'  && $this->path === '/api/users/check') $this->handleUsernameCheck();
         if ($this->method === 'GET'  && $this->path === '/api/users/find')  $this->handleFindUser();
+
+        // Room stop-words (S5b) — room owner scope; permission checked in SanctionPanel
+        if ($this->method === 'GET'    && preg_match('~^/api/rooms/(\d+)/stopwords$~', $this->path, $m))            SanctionPanel::roomStopWords((int) $m[1]);
+        if ($this->method === 'POST'   && preg_match('~^/api/rooms/(\d+)/stopwords$~', $this->path, $m))            SanctionPanel::addRoomStopWord((int) $m[1], $_POST);
+        if ($this->method === 'DELETE' && preg_match('~^/api/rooms/(\d+)/stopwords/(\d+)$~', $this->path, $m))      SanctionPanel::removeStopWord((int) $m[2]);
     }
 
     private function dispatchAdmin(): void
@@ -160,6 +165,14 @@ class Router
         if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/events')  SanctionPanel::events($_GET);
         if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/shadow')  SanctionPanel::shadow($_GET);
         if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/stats')   SanctionPanel::stats($_GET);
+
+        // Sanctions engine control (S5b) — platform_owner only (enforced in SanctionPanel)
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/config')  SanctionPanel::getConfig();
+        if ($this->method === 'POST'   && $this->path === '/api/admin/sanctions/config')  SanctionPanel::updateConfig($_POST);
+        if ($this->method === 'POST'   && $this->path === '/api/admin/sanctions/resume')  SanctionPanel::resumeAutonomy();
+        if ($this->method === 'GET'    && $this->path === '/api/admin/sanctions/stopwords')          SanctionPanel::globalStopWords();
+        if ($this->method === 'POST'   && $this->path === '/api/admin/sanctions/stopwords')          SanctionPanel::addGlobalStopWord($_POST);
+        if ($this->method === 'DELETE' && preg_match('~^/api/admin/sanctions/stopwords/(\d+)$~', $this->path, $m)) SanctionPanel::removeStopWord((int) $m[1]);
     }
 
     private function handleGetFriends(): never
